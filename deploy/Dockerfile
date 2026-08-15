@@ -34,6 +34,7 @@ COPY api api
 COPY cli cli
 COPY database database
 COPY processing processing
+COPY resources resources
 COPY services services
 COPY storage storage
 
