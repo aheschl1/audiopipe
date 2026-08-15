@@ -202,7 +202,7 @@
           "me"
         ],
         "summary": "Who this token belongs to",
-        "description": "Identity plus stored-audio totals.",
+        "description": "Identity plus per-resource stored totals.",
         "operationId": "read_me_v1_me_get",
         "responses": {
           "200": {
@@ -629,8 +629,8 @@
         "tags": [
           "sessions"
         ],
-        "summary": "Mint a short-lived audio playback token",
-        "description": "A token for the audio route's ``?token=`` parameter.\n\nMedia elements (``<audio src>``) cannot send an Authorization header, so\nthe session-audio route also accepts a token in the URL. This mints one\nwhose lifetime is minutes; the player re-mints when it expires. It is a\nreal API token, just time-boxed \u2014 expired ``playback`` rows are purged\nopportunistically on each mint.",
+        "summary": "Mint a short-lived media playback token",
+        "description": "A token for the media route's ``?token=`` parameter.\n\nMedia elements (``<audio src>``) cannot send an Authorization header, so\nthe session-media route also accepts a token in the URL. This mints one\nwhose lifetime is minutes; the player re-mints when it expires. It is a\nreal API token, just time-boxed \u2014 expired ``playback`` rows are purged\nopportunistically on each mint.",
         "operationId": "create_playback_token_v1_sessions__session_id__playback_post",
         "security": [
           {
@@ -700,9 +700,196 @@
         "tags": [
           "sessions"
         ],
-        "summary": "List a session's audio segments",
-        "description": "In capture order (by `sequence`).",
+        "summary": "List a session's segments",
+        "description": "In capture order (by `sequence`), interleaved across resources.",
         "operationId": "list_session_segments_v1_sessions__session_id__segments_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "A recording session belonging to you.",
+              "title": "Session Id"
+            },
+            "description": "A recording session belonging to you."
+          },
+          {
+            "name": "resource",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only segments of this resource.",
+              "title": "Resource"
+            },
+            "description": "Only segments of this resource."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SegmentRead_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}/resources": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "What this session holds, per resource",
+        "description": "One entry per resource with any segments, ordered by resource name.",
+        "operationId": "list_session_resources_v1_sessions__session_id__resources_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "A recording session belonging to you.",
+              "title": "Session Id"
+            },
+            "description": "A recording session belonging to you."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionResourceRead"
+                  },
+                  "title": "Response List Session Resources V1 Sessions  Session Id  Resources Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}/resources/location/points": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "A session's location points by timeline position",
+        "description": "The session's fixes in timeline order, windowed like the timeline \u2014\nadjacent windows partition the stream. A session with no location\nresource yields an empty page, like an unprocessed session's timeline\nserves just its frames.",
+        "operationId": "list_session_location_points_v1_sessions__session_id__resources_location_points_get",
         "security": [
           {
             "HTTPBearer": []
@@ -743,6 +930,40 @@
               "default": 0,
               "title": "Offset"
             }
+          },
+          {
+            "name": "from_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From Ms"
+            }
+          },
+          {
+            "name": "to_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To Ms"
+            }
           }
         ],
         "responses": {
@@ -751,7 +972,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_SegmentRead_"
+                  "$ref": "#/components/schemas/Page_LocationPointRead_"
                 }
               }
             }
@@ -852,44 +1073,6 @@
             "description": "Only artifacts of this kind."
           },
           {
-            "name": "from_ms",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Only span artifacts overlapping at/after this time.",
-              "title": "From Ms"
-            },
-            "description": "Only span artifacts overlapping at/after this time."
-          },
-          {
-            "name": "to_ms",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Only span artifacts overlapping before this time.",
-              "title": "To Ms"
-            },
-            "description": "Only span artifacts overlapping before this time."
-          },
-          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -910,6 +1093,40 @@
               "minimum": 0,
               "default": 0,
               "title": "Offset"
+            }
+          },
+          {
+            "name": "from_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From Ms"
+            }
+          },
+          {
+            "name": "to_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To Ms"
             }
           }
         ],
@@ -963,7 +1180,7 @@
           "sessions"
         ],
         "summary": "A session's ordered event timeline",
-        "description": "What happened when: session frames, speech starts/ends, transcripts,\nsound tags and the sound spans built from them.\n\nEvents carry a ``type`` discriminator; clients must ignore types they do\nnot recognise \u2014 future processing tiers add new ones. `limit`/`offset`\npage over events (one artifact can yield several, so offsets here do not\nline up with the artifacts route). A `from_ms`/`to_ms` window keeps only\nevents positioned inside it, so adjacent windows partition the stream \u2014\na span straddling a boundary contributes its `speech-end` alone, and a\n`sound-span` that began before the window is left out entirely.\n\nAn unprocessed (or speechless) session serves just its session frames;\nprocessing status stays introspectable via `.../artifacts?kind=speech-map`.",
+        "description": "What happened when: session frames, speech starts/ends, transcripts,\nsound tags, the sound spans built from them, and location points.\n\nEvents carry a ``type`` discriminator; clients must ignore types they do\nnot recognise \u2014 future processing tiers add new ones. `limit`/`offset`\npage over events (one artifact can yield several, so offsets here do not\nline up with the artifacts route). A `from_ms`/`to_ms` window keeps only\nevents positioned inside it, so adjacent windows partition the stream \u2014\na span straddling a boundary contributes its `speech-end` alone, and a\n`sound-span` that began before the window is left out entirely.\n\nAn unprocessed (or speechless) session serves just its session frames;\nprocessing status stays introspectable via `.../artifacts?kind=speech-map`.\nLocation points come straight from the stored segments \u2014 no pipeline \u2014\nso they appear live while the session is still streaming.",
         "operationId": "get_session_timeline_v1_sessions__session_id__timeline_get",
         "security": [
           {
@@ -982,44 +1199,6 @@
               "title": "Session Id"
             },
             "description": "A recording session belonging to you."
-          },
-          {
-            "name": "from_ms",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Only events at/after this time.",
-              "title": "From Ms"
-            },
-            "description": "Only events at/after this time."
-          },
-          {
-            "name": "to_ms",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Only events before this time.",
-              "title": "To Ms"
-            },
-            "description": "Only events before this time."
           },
           {
             "name": "limit",
@@ -1042,6 +1221,40 @@
               "minimum": 0,
               "default": 0,
               "title": "Offset"
+            }
+          },
+          {
+            "name": "from_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From Ms"
+            }
+          },
+          {
+            "name": "to_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To Ms"
             }
           }
         ],
@@ -1255,20 +1468,29 @@
         }
       }
     },
-    "/v1/sessions/{session_id}/audio": {
+    "/v1/sessions/{session_id}/resources/{resource}/media": {
       "get": {
         "tags": [
           "sessions"
         ],
-        "summary": "Stream a session's audio as one WAV",
-        "description": "Every segment's PCM behind a single WAV header, in sequence order.\n\nThe stitched size is known from the rows alone, so `Range` (seeking) and\nconditional requests work exactly as on the per-segment route. An open\nsession serves the audio ingested so far; re-request for more.\n\nThe representation (header, plan, ETag) is cached per session and reused\nuntil its segments change, so a conditional check or a range seek costs one\ncheap fingerprint query rather than a full re-read. No pooled database\nconnection is held while the body streams from the blob store.",
-        "operationId": "get_session_audio_v1_sessions__session_id__audio_get",
+        "summary": "Stream a session's rendered media for one resource",
+        "description": "The session's whole stream of one resource as a single media object.\n\nOnly resources whose type is *renderable* serve media; today that is\naudio \u2014 every segment's PCM behind a single WAV header, in sequence\norder. The stitched size is known from the rows alone, so `Range`\n(seeking) and conditional requests work exactly as on the per-segment\nroute. An open session serves what has been ingested so far; re-request\nfor more.\n\nThe representation (header, plan, ETag) is cached per session and reused\nuntil its segments change, so a conditional check or a range seek costs one\ncheap fingerprint query rather than a full re-read. No pooled database\nconnection is held while the body streams from the blob store.",
+        "operationId": "get_session_media_v1_sessions__session_id__resources__resource__media_get",
         "security": [
           {
             "HTTPBearer": []
           }
         ],
         "parameters": [
+          {
+            "name": "resource",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resource"
+            }
+          },
           {
             "name": "session_id",
             "in": "path",
@@ -1302,7 +1524,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The whole session, stitched.",
+            "description": "The whole session, rendered.",
             "content": {
               "audio/wav": {}
             }
@@ -1318,7 +1540,7 @@
             "description": "Unauthorized"
           },
           "404": {
-            "description": "The session holds no audio."
+            "description": "Unknown or non-renderable resource, or the session holds none of it."
           },
           "206": {
             "content": {
@@ -1330,7 +1552,7 @@
             "description": "The client's cached copy is still current."
           },
           "409": {
-            "description": "The session's segments do not form one continuous WAV.",
+            "description": "The session's segments do not form one continuous stream.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1340,7 +1562,7 @@
             }
           },
           "416": {
-            "description": "The requested range lies outside the audio."
+            "description": "The requested range lies outside the media."
           },
           "422": {
             "description": "Validation Error",
@@ -1360,7 +1582,7 @@
         "tags": [
           "segments"
         ],
-        "summary": "List your audio segments",
+        "summary": "List your segments",
         "description": "Across every session the caller owns, most recently ingested first.",
         "operationId": "list_segments_v1_segments_get",
         "security": [
@@ -1369,6 +1591,24 @@
           }
         ],
         "parameters": [
+          {
+            "name": "resource",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only segments of this resource.",
+              "title": "Resource"
+            },
+            "description": "Only segments of this resource."
+          },
           {
             "name": "limit",
             "in": "query",
@@ -1442,7 +1682,7 @@
         "tags": [
           "segments"
         ],
-        "summary": "Fetch one audio segment's metadata",
+        "summary": "Fetch one segment's metadata",
         "operationId": "get_segment_v1_segments__segment_id__get",
         "security": [
           {
@@ -1457,10 +1697,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "description": "An audio segment belonging to you.",
+              "description": "A segment belonging to you.",
               "title": "Segment Id"
             },
-            "description": "An audio segment belonging to you."
+            "description": "A segment belonging to you."
           }
         ],
         "responses": {
@@ -1507,14 +1747,14 @@
         }
       }
     },
-    "/v1/segments/{segment_id}/audio": {
+    "/v1/segments/{segment_id}/media": {
       "get": {
         "tags": [
           "segments"
         ],
-        "summary": "Download a segment's audio",
-        "description": "Stream the stored audio, honouring `Range` and conditional requests.\n\nA `Range` is passed through to the object store, so only that slice is\ntransferred. Segments are immutable, so `If-None-Match` answers 304 without\ntouching the store.",
-        "operationId": "get_segment_audio_v1_segments__segment_id__audio_get",
+        "summary": "Download a segment's stored bytes",
+        "description": "Serve what the segment stores: the blob for blob-backed resources\n(honouring `Range` and conditional requests), the inline payload as JSON\notherwise.\n\nA `Range` is passed through to the object store, so only that slice is\ntransferred. Segments are immutable, so `If-None-Match` answers 304 without\ntouching the store.",
+        "operationId": "get_segment_media_v1_segments__segment_id__media_get",
         "security": [
           {
             "HTTPBearer": []
@@ -1528,17 +1768,18 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "description": "An audio segment belonging to you.",
+              "description": "A segment belonging to you.",
               "title": "Segment Id"
             },
-            "description": "An audio segment belonging to you."
+            "description": "A segment belonging to you."
           }
         ],
         "responses": {
           "200": {
-            "description": "The whole audio object.",
+            "description": "The stored object (blob resources) or inline payload.",
             "content": {
-              "audio/*": {}
+              "audio/*": {},
+              "application/json": {}
             }
           },
           "401": {
@@ -1572,6 +1813,141 @@
           },
           "416": {
             "description": "The requested range lies outside the object."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/resources/location/points": {
+      "get": {
+        "tags": [
+          "resources"
+        ],
+        "summary": "Query your location by wall-clock time",
+        "description": "Every stored fix across your sessions, oldest first.\n\nThe window is the same `from_ms`/`to_ms` range every timeline route\ntakes, read as **epoch milliseconds** here \u2014 there is no single session\nto be relative to, and it is the unit location payloads already carry in\n``t``. Half-open on the fix's ``captured_at``. Like the search routes,\n``session_id`` narrows within your own data rather than 404ing on\nsomeone else's id.",
+        "operationId": "list_location_points_v1_resources_location_points_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only points of this session (foreign ids match nothing).",
+              "title": "Session Id"
+            },
+            "description": "Only points of this session (foreign ids match nothing)."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "from_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From Ms"
+            }
+          },
+          {
+            "name": "to_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To Ms"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_LocationPointRead_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -3776,6 +4152,48 @@
         "title": "ArtifactRead",
         "description": "A pipeline output attached to a session, as served over HTTP.\n\n``start_ms``/``end_ms`` place it on the session timeline; both null means\nthe whole session. Carries no ``bucket``/``object_key`` \u2014 large payloads\nlive in the blob store and are surfaced through pipeline-specific routes\nor ``metadata``."
       },
+      "AudioAttrs": {
+        "properties": {
+          "codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codec"
+          },
+          "sample_rate_hz": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Rate Hz"
+          },
+          "channels": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channels"
+          }
+        },
+        "type": "object",
+        "title": "AudioAttrs",
+        "description": "PCM parameters as declared by the client (all optional)."
+      },
       "AudioSearchRead": {
         "properties": {
           "artifact_id": {
@@ -3852,6 +4270,113 @@
         ],
         "title": "AudioSearchResponse",
         "description": "The ranked matches plus the query's embedding model, for provenance."
+      },
+      "AudioSegmentRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "ingested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ingested At"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "offset_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset Ms"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "byte_size": {
+            "type": "integer",
+            "title": "Byte Size"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "checksum_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum Sha256",
+            "description": "Hex-encoded SHA-256 of the wire payload."
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "resource": {
+            "type": "string",
+            "const": "audio",
+            "title": "Resource",
+            "default": "audio"
+          },
+          "attrs": {
+            "$ref": "#/components/schemas/AudioAttrs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "session_id",
+          "sequence",
+          "ingested_at",
+          "captured_at",
+          "offset_ms",
+          "duration_ms",
+          "byte_size",
+          "content_type",
+          "checksum_sha256",
+          "metadata",
+          "attrs"
+        ],
+        "title": "AudioSegmentRead"
       },
       "AudioTagEvent": {
         "properties": {
@@ -4068,6 +4593,260 @@
         ],
         "title": "HealthRead"
       },
+      "LocationPointEvent": {
+        "properties": {
+          "at_ms": {
+            "type": "integer",
+            "title": "At Ms",
+            "description": "Position of this event on the session timeline, ms."
+          },
+          "segment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Segment Id",
+            "description": "The resource segment this event derives from."
+          },
+          "type": {
+            "type": "string",
+            "const": "location-point",
+            "title": "Type",
+            "default": "location-point"
+          },
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          },
+          "alt_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt M"
+          },
+          "accuracy_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy M"
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Captured At",
+            "description": "Wall-clock time of the fix."
+          }
+        },
+        "type": "object",
+        "required": [
+          "at_ms",
+          "segment_id",
+          "lat",
+          "lon",
+          "captured_at"
+        ],
+        "title": "LocationPointEvent",
+        "description": "One GPS fix.\n\n``at_ms`` is wall-clock-derived (the fix's time minus the session start),\nwhich can drift from the audio-position time other events use when\ncapture had gaps \u2014 the same caveat as ``session-end``."
+      },
+      "LocationPointRead": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "segment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Segment Id",
+            "description": "The batch segment the point arrived in."
+          },
+          "at_ms": {
+            "type": "integer",
+            "title": "At Ms"
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Captured At"
+          },
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          },
+          "alt_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt M"
+          },
+          "accuracy_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy M"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "segment_id",
+          "at_ms",
+          "captured_at",
+          "lat",
+          "lon",
+          "alt_m",
+          "accuracy_m"
+        ],
+        "title": "LocationPointRead",
+        "description": "One GPS fix, addressed on both clocks.\n\n``at_ms`` is the position on its session's timeline (wall clock minus\nsession start). It can drift from the audio-position time other timeline\nentries use when capture had gaps, and can be negative for a fix taken\njust before the session row was created."
+      },
+      "LocationSegmentAttrs": {
+        "properties": {
+          "points": {
+            "type": "integer",
+            "title": "Points"
+          }
+        },
+        "type": "object",
+        "required": [
+          "points"
+        ],
+        "title": "LocationSegmentAttrs"
+      },
+      "LocationSegmentRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "ingested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ingested At"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "offset_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset Ms"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "byte_size": {
+            "type": "integer",
+            "title": "Byte Size"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "checksum_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum Sha256",
+            "description": "Hex-encoded SHA-256 of the wire payload."
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "resource": {
+            "type": "string",
+            "const": "location",
+            "title": "Resource",
+            "default": "location"
+          },
+          "attrs": {
+            "$ref": "#/components/schemas/LocationSegmentAttrs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "session_id",
+          "sequence",
+          "ingested_at",
+          "captured_at",
+          "offset_ms",
+          "duration_ms",
+          "byte_size",
+          "content_type",
+          "checksum_sha256",
+          "metadata",
+          "attrs"
+        ],
+        "title": "LocationSegmentRead"
+      },
       "LoginRequest": {
         "properties": {
           "email": {
@@ -4108,7 +4887,11 @@
             "$ref": "#/components/schemas/UserRead"
           },
           "usage": {
-            "$ref": "#/components/schemas/UsageRead"
+            "items": {
+              "$ref": "#/components/schemas/ResourceUsageRead"
+            },
+            "type": "array",
+            "title": "Usage"
           }
         },
         "type": "object",
@@ -4117,7 +4900,7 @@
           "usage"
         ],
         "title": "MeRead",
-        "description": "`GET /v1/me`: who the token belongs to, and what they have stored."
+        "description": "`GET /v1/me`: who the token belongs to, and what they have stored.\n\n``usage`` holds one entry per resource the caller has captured, ordered by\nresource name; a resource never captured has no entry."
       },
       "Page_ArtifactRead_": {
         "properties": {
@@ -4150,6 +4933,38 @@
           "has_more"
         ],
         "title": "Page[ArtifactRead]"
+      },
+      "Page_LocationPointRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LocationPointRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "True when more rows exist past this slice."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "limit",
+          "offset",
+          "has_more"
+        ],
+        "title": "Page[LocationPointRead]"
       },
       "Page_SegmentRead_": {
         "properties": {
@@ -4663,139 +5478,46 @@
         "title": "ReclusterResponse",
         "description": "Counts from one batch rebuild."
       },
-      "SegmentRead": {
+      "ResourceUsageRead": {
         "properties": {
-          "id": {
+          "resource": {
             "type": "string",
-            "format": "uuid",
-            "title": "Id"
+            "title": "Resource"
           },
-          "session_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Session Id"
-          },
-          "sequence": {
+          "segments": {
             "type": "integer",
-            "title": "Sequence"
+            "title": "Segments"
           },
-          "ingested_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Ingested At"
-          },
-          "captured_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Captured At"
-          },
-          "offset_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Offset Ms"
-          },
-          "duration_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Duration Ms"
-          },
-          "byte_size": {
+          "total_bytes": {
             "type": "integer",
-            "title": "Byte Size"
-          },
-          "content_type": {
-            "type": "string",
-            "title": "Content Type"
-          },
-          "checksum_sha256": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Checksum Sha256",
-            "description": "Hex-encoded SHA-256 of the audio."
-          },
-          "codec": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Codec"
-          },
-          "sample_rate_hz": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sample Rate Hz"
-          },
-          "channels": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Channels"
-          },
-          "metadata": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Metadata"
+            "title": "Total Bytes"
           }
         },
         "type": "object",
         "required": [
-          "id",
-          "session_id",
-          "sequence",
-          "ingested_at",
-          "captured_at",
-          "offset_ms",
-          "duration_ms",
-          "byte_size",
-          "content_type",
-          "checksum_sha256",
-          "codec",
-          "sample_rate_hz",
-          "channels",
-          "metadata"
+          "resource",
+          "segments",
+          "total_bytes"
         ],
-        "title": "SegmentRead",
-        "description": "An audio segment's metadata as served over HTTP.\n\nCarries no ``bucket`` or ``object_key``; audio is fetched from\n``GET /v1/segments/{id}/audio``."
+        "title": "ResourceUsageRead",
+        "description": "How much of one resource the caller has stored."
+      },
+      "SegmentRead": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AudioSegmentRead"
+          },
+          {
+            "$ref": "#/components/schemas/LocationSegmentRead"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "resource",
+          "mapping": {
+            "audio": "#/components/schemas/AudioSegmentRead",
+            "location": "#/components/schemas/LocationSegmentRead"
+          }
+        }
       },
       "SessionCreateRequest": {
         "properties": {
@@ -4976,6 +5698,56 @@
         ],
         "title": "SessionRead",
         "description": "A recording session as served over HTTP.\n\nCarries no ``user_id``; every session a caller can see is their own."
+      },
+      "SessionResourceRead": {
+        "properties": {
+          "resource": {
+            "type": "string",
+            "title": "Resource"
+          },
+          "segments": {
+            "type": "integer",
+            "title": "Segments"
+          },
+          "total_bytes": {
+            "type": "integer",
+            "title": "Total Bytes"
+          },
+          "first_captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Captured At"
+          },
+          "last_captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Captured At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "resource",
+          "segments",
+          "total_bytes",
+          "first_captured_at",
+          "last_captured_at"
+        ],
+        "title": "SessionResourceRead",
+        "description": "What one session holds of one resource."
       },
       "SessionSpeakerRead": {
         "properties": {
@@ -5906,12 +6678,16 @@
           },
           {
             "$ref": "#/components/schemas/SoundSpanEvent"
+          },
+          {
+            "$ref": "#/components/schemas/LocationPointEvent"
           }
         ],
         "discriminator": {
           "propertyName": "type",
           "mapping": {
             "audio-tag": "#/components/schemas/AudioTagEvent",
+            "location-point": "#/components/schemas/LocationPointEvent",
             "session-end": "#/components/schemas/SessionEndEvent",
             "session-start": "#/components/schemas/SessionStartEvent",
             "sound-span": "#/components/schemas/SoundSpanEvent",
@@ -6152,25 +6928,6 @@
         ],
         "title": "TranscriptSearchResponse",
         "description": "Matching utterances, best first."
-      },
-      "UsageRead": {
-        "properties": {
-          "segments": {
-            "type": "integer",
-            "title": "Segments"
-          },
-          "total_bytes": {
-            "type": "integer",
-            "title": "Total Bytes"
-          }
-        },
-        "type": "object",
-        "required": [
-          "segments",
-          "total_bytes"
-        ],
-        "title": "UsageRead",
-        "description": "How much audio the caller has stored."
       },
       "UserRead": {
         "properties": {

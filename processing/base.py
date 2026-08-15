@@ -16,6 +16,7 @@ from typing import Any, ClassVar
 
 from database.schema.jobs import Job, JobCreate
 from processing.config import ProcessingSettings
+from resources import Resource
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,9 @@ class Pipeline(ABC):
 
     # Registry key, ``processing_jobs.pipeline`` value, and blob-prefix segment.
     name: ClassVar[str]
+
+    # The resource this pipeline moves over; None = session-scoped work.
+    resource: ClassVar[Resource | None] = None
 
     def __init__(self, callback: Callback | None = None) -> None:
         self.callback = callback

@@ -91,7 +91,7 @@ export async function toggleClip(clip: Clip): Promise<void> {
     return
   }
 
-  const src = `/v1/sessions/${clip.sessionId}/audio?token=${encodeURIComponent(value)}`
+  const src = `/v1/sessions/${clip.sessionId}/resources/audio/media?token=${encodeURIComponent(value)}`
   if (loadedSrc !== src) {
     element.src = src
     loadedSrc = src

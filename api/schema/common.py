@@ -24,6 +24,25 @@ class PageParams(BaseModel):
         return self.limit + 1
 
 
+class RangeParams(BaseModel):
+    """`from_ms` / `to_ms` query parameters for time-windowed listings.
+
+    The window is half-open ``[from_ms, to_ms)``, so adjacent windows
+    partition a stream — no duplicates, no gaps. Session-scoped routes read
+    it as session-relative milliseconds; cross-session routes as epoch
+    milliseconds (the same unit resource payloads carry).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    from_ms: Annotated[
+        int | None, Query(ge=0, description="Only items at/after this time, ms.")
+    ] = None
+    to_ms: Annotated[
+        int | None, Query(ge=0, description="Only items before this time, ms.")
+    ] = None
+
+
 class Page[T](BaseModel):
     """A slice of a listing. Carries no total count -- see ``has_more``."""
 

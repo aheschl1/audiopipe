@@ -15,7 +15,7 @@ async def test_me_reports_identity_and_empty_usage(
     body = (await client.get("/v1/me", headers=account.headers)).json()
     assert body["user"]["id"] == str(account.user.id)
     assert body["user"]["email"] == account.user.email
-    assert body["usage"] == {"segments": 0, "total_bytes": 0}
+    assert body["usage"] == []
 
 
 async def test_sessions_are_listed_newest_first(
@@ -181,7 +181,7 @@ async def test_session_audio_stitches_every_segment(
         await ingest(session.id, payload)
     expected = _expected_stitch(payloads)
 
-    response = await client.get(f"/v1/sessions/{session.id}/audio", headers=account.headers)
+    response = await client.get(f"/v1/sessions/{session.id}/resources/audio/media", headers=account.headers)
     assert response.status_code == 200
     assert response.headers["content-type"] == "audio/wav"
     assert response.headers["content-length"] == str(len(expected))
@@ -190,7 +190,7 @@ async def test_session_audio_stitches_every_segment(
     # Conditional GET: the ETag covers the exact segment set.
     etag = response.headers["etag"]
     cached = await client.get(
-        f"/v1/sessions/{session.id}/audio",
+        f"/v1/sessions/{session.id}/resources/audio/media",
         headers={**account.headers, "If-None-Match": etag},
     )
     assert cached.status_code == 304
@@ -198,7 +198,7 @@ async def test_session_audio_stitches_every_segment(
     # A new chunk changes the audio, so the validator must change too.
     await ingest(session.id, wav_bytes(seconds=0.05, freq=999))
     grown = await client.get(
-        f"/v1/sessions/{session.id}/audio",
+        f"/v1/sessions/{session.id}/resources/audio/media",
         headers={**account.headers, "If-None-Match": etag},
     )
     assert grown.status_code == 200
@@ -220,7 +220,7 @@ async def test_session_audio_range_spans_segment_boundaries(
     # A slice crossing from inside the first segment into the second.
     start, end = 40, len(payloads[0]) + 100
     response = await client.get(
-        f"/v1/sessions/{session.id}/audio",
+        f"/v1/sessions/{session.id}/resources/audio/media",
         headers={**account.headers, "Range": f"bytes={start}-{end}"},
     )
     assert response.status_code == 206
@@ -228,7 +228,7 @@ async def test_session_audio_range_spans_segment_boundaries(
     assert response.headers["content-range"] == f"bytes {start}-{end}/{len(expected)}"
 
     past_the_end = await client.get(
-        f"/v1/sessions/{session.id}/audio",
+        f"/v1/sessions/{session.id}/resources/audio/media",
         headers={**account.headers, "Range": f"bytes={len(expected)}-"},
     )
     assert past_the_end.status_code == 416
@@ -237,15 +237,15 @@ async def test_session_audio_range_spans_segment_boundaries(
 async def test_session_audio_refuses_mixed_content_types(
     client: httpx.AsyncClient, account: Account
 ) -> None:
-    from services import audio
+    from services import segments as segment_service
     from tests.e2e.conftest import ingest
     from tests.wav import wav_bytes
 
     session = await make_session(account)
     await ingest(session.id, wav_bytes(seconds=0.05))
-    await audio.ingest_segment(session.id, b"not-wav-bytes", content_type="audio/webm")
+    await segment_service.ingest_segment(session.id, b"not-wav-bytes", content_type="audio/webm")
 
-    response = await client.get(f"/v1/sessions/{session.id}/audio", headers=account.headers)
+    response = await client.get(f"/v1/sessions/{session.id}/resources/audio/media", headers=account.headers)
     assert response.status_code == 409
 
 
@@ -253,5 +253,5 @@ async def test_session_audio_404_when_empty(
     client: httpx.AsyncClient, account: Account
 ) -> None:
     session = await make_session(account)
-    response = await client.get(f"/v1/sessions/{session.id}/audio", headers=account.headers)
+    response = await client.get(f"/v1/sessions/{session.id}/resources/audio/media", headers=account.headers)
     assert response.status_code == 404

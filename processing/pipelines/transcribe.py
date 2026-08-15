@@ -24,6 +24,7 @@ from database.schema.jobs import Job, JobCreate
 from processing.base import Pipeline
 from processing.config import get_settings
 from processing.transcriber import Transcriber
+from resources import Resource
 from services import stitch, timeline
 
 _SOURCE_PIPELINE = "diarize"
@@ -31,6 +32,7 @@ _SOURCE_PIPELINE = "diarize"
 
 class TranscribePipeline(Pipeline):
     name = "transcribe"
+    resource = Resource.AUDIO
 
     async def setup(self) -> None:
         self._settings = get_settings()

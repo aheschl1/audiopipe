@@ -64,6 +64,19 @@ def test_header_ignores_unknown_fields() -> None:
     assert payload == b"x"
 
 
+def test_header_without_resource_is_audio() -> None:
+    # Every pre-resource client remains a valid audio stream.
+    head = b'{"sequence": 0}'
+    header, _ = decode_chunk(len(head).to_bytes(4, "big") + head + b"x")
+    assert header.resource == "audio"
+
+
+def test_header_carries_resource() -> None:
+    header = ChunkHeader(sequence=4, resource="location")
+    decoded, _ = decode_chunk(encode_chunk(header, b'{"points": []}'))
+    assert decoded.resource == "location"
+
+
 def test_parse_client_frame_hello_and_finish() -> None:
     hello = parse_client_frame(
         '{"type": "hello", "version": 1, "defaults": {"content_type": "audio/wav"}}'

@@ -152,7 +152,7 @@ class SessionsRepo(BaseRepo):
     async def delete(self, session_id: UUID) -> bool:
         """Delete a session and, by cascade, its segment rows.
 
-        Blobs are not touched; use ``services.audio.delete_session`` for those.
+        Blobs are not touched; use ``services.segments.delete_session`` for those.
         """
         return await self._execute(
             "DELETE FROM recording_sessions WHERE id = %s", (session_id,)

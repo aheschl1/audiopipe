@@ -7,6 +7,7 @@
 """
 
 import asyncio
+import json
 import mimetypes
 from datetime import timedelta
 from functools import wraps
@@ -21,7 +22,7 @@ from database import DatabaseError, DatabasePipe, close_pool, get_settings
 from database.exceptions import NotFoundError
 from database.schema.sessions import SessionCreate
 from database.schema.users import UserCreate
-from services import audio as audio_service
+from services import segments as segment_service
 from storage import BlobNotFoundError, BlobPipe, close_blob_client
 from storage import get_settings as get_storage_settings
 
@@ -72,7 +73,7 @@ def _human_bytes(count: int) -> str:
 
 @click.group()
 def cli() -> None:
-    """Manage users, auth tokens, recording sessions, and audio segments."""
+    """Manage users, auth tokens, recording sessions, and resource segments."""
 
 
 @cli.command()
@@ -133,7 +134,7 @@ async def users_list(limit: int, offset: int) -> None:
 @click.argument("email")
 @async_command
 async def users_show(email: str) -> None:
-    """Show one user, their tokens, and their stored audio."""
+    """Show one user, their tokens, and their stored data."""
     async with DatabasePipe() as pipe:
         user = await _require_user(pipe, email)
         tokens = await pipe.tokens.list_for_user(user.id)
@@ -146,7 +147,12 @@ async def users_show(email: str) -> None:
     click.echo(f"created      {user.created_at:%Y-%m-%d %H:%M:%S %Z}")
     click.echo(f"tokens       {sum(token.is_active for token in tokens)} active / {len(tokens)}")
     click.echo(f"sessions     {sum(s.is_open for s in sessions)} open / {len(sessions)}")
-    click.echo(f"audio        {usage.segments} segments, {_human_bytes(usage.total_bytes)}")
+    if not usage:
+        click.echo("stored       nothing")
+    for row in usage:
+        click.echo(
+            f"{row.resource:<12} {row.segments} segments, {_human_bytes(row.total_bytes)}"
+        )
 
 
 @users.command("set-password")
@@ -283,7 +289,7 @@ async def tokens_purge_expired() -> None:
 
 @cli.group()
 def blobs() -> None:
-    """Inspect the blob store holding the raw audio."""
+    """Inspect the blob store holding blob-backed resources (audio)."""
 
 
 @blobs.command("check")
@@ -366,10 +372,10 @@ async def sessions_end(session_id: UUID) -> None:
 @click.option("--yes", is_flag=True, help="Skip the confirmation prompt.")
 @async_command
 async def sessions_delete(session_id: UUID, yes: bool) -> None:
-    """Delete a session, its segments, and their audio."""
+    """Delete a session, its segments, and their stored data."""
     if not yes:
-        click.confirm(f"delete session {session_id} and all of its audio?", abort=True)
-    removed = await audio_service.delete_session(session_id)
+        click.confirm(f"delete session {session_id} and all of its data?", abort=True)
+    removed = await segment_service.delete_session(session_id)
     click.echo(f"deleted session and {removed} object(s)")
 
 
@@ -518,12 +524,13 @@ async def speakers_recluster(
 
 @cli.group()
 def segments() -> None:
-    """Ingest and retrieve audio segments."""
+    """Ingest and retrieve resource segments."""
 
 
 @segments.command("ingest")
 @click.argument("session_id", type=click.UUID)
 @click.argument("path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--resource", default="audio", help="Resource type of the file's contents.")
 @click.option("--content-type", default=None, help="Defaults to a guess from the filename.")
 @click.option("--duration-ms", type=int, default=None)
 @click.option("--offset-ms", type=int, default=None)
@@ -531,37 +538,40 @@ def segments() -> None:
 async def segments_ingest(
     session_id: UUID,
     path: Path,
+    resource: str,
     content_type: str | None,
     duration_ms: int | None,
     offset_ms: int | None,
 ) -> None:
-    """Store a local audio file as the next segment of a session."""
+    """Store a local file as the next segment of a session."""
     guessed = content_type or mimetypes.guess_type(path.name)[0]
-    segment = await audio_service.ingest_segment(
+    segment = await segment_service.ingest_segment(
         session_id,
         path.read_bytes(),
-        content_type=guessed or audio_service.DEFAULT_CONTENT_TYPE,
+        resource=resource,
+        content_type=guessed,
         filename=path.name,
         duration_ms=duration_ms,
         offset_ms=offset_ms,
     )
     click.echo(f"{segment.id}  seq {segment.sequence}  {_human_bytes(segment.byte_size)}")
-    click.echo(segment.object_key)
+    click.echo(segment.object_key if segment.object_key else "(stored inline)")
 
 
 @segments.command("list")
 @click.argument("session_id", type=click.UUID)
+@click.option("--resource", default=None, help="Only segments of this resource.")
 @async_command
-async def segments_list(session_id: UUID) -> None:
+async def segments_list(session_id: UUID, resource: str | None) -> None:
     """List the segments of a session, in order."""
     async with DatabasePipe() as pipe:
-        found = await pipe.segments.list_for_session(session_id)
+        found = await pipe.segments.list_for_session(session_id, resource=resource)
     if not found:
         click.echo("no segments")
         return
     for segment in found:
         click.echo(
-            f"{segment.id}  seq {segment.sequence:<5} "
+            f"{segment.id}  seq {segment.sequence:<5} {segment.resource:<9} "
             f"{_human_bytes(segment.byte_size):>10}  {segment.content_type:<16} "
             f"{segment.ingested_at:%Y-%m-%d %H:%M}"
         )
@@ -575,15 +585,21 @@ async def segments_show(segment_id: UUID) -> None:
     async with DatabasePipe() as pipe:
         segment = await pipe.segments.get(segment_id)
     if segment is None:
-        raise NotFoundError("audio segment", segment_id)
+        raise NotFoundError("segment", segment_id)
     click.echo(f"id         {segment.id}")
     click.echo(f"session    {segment.session_id}")
+    click.echo(f"resource   {segment.resource}")
     click.echo(f"sequence   {segment.sequence}")
     click.echo(f"ingested   {segment.ingested_at:%Y-%m-%d %H:%M:%S %Z}")
     click.echo(f"size       {_human_bytes(segment.byte_size)} ({segment.byte_size} bytes)")
     click.echo(f"type       {segment.content_type}")
     click.echo(f"sha256     {_fmt(segment.checksum_hex)}")
-    click.echo(f"object     {segment.bucket}/{segment.object_key}")
+    if segment.attrs:
+        click.echo(f"attrs      {segment.attrs}")
+    if segment.object_key is not None:
+        click.echo(f"object     {segment.bucket}/{segment.object_key}")
+    else:
+        click.echo("stored     inline")
 
 
 @segments.command("download")
@@ -591,10 +607,18 @@ async def segments_show(segment_id: UUID) -> None:
 @click.argument("dest", type=click.Path(dir_okay=False, path_type=Path))
 @async_command
 async def segments_download(segment_id: UUID, dest: Path) -> None:
-    """Write a segment's audio to a local file."""
-    segment, data = await audio_service.read_segment(segment_id)
+    """Write a segment's stored bytes (or inline payload as JSON) to a file."""
+    try:
+        segment, data = await segment_service.read_segment(segment_id)
+        source = segment.object_key
+    except segment_service.NoBlobError:
+        async with DatabasePipe() as pipe:
+            segment = await pipe.segments.get(segment_id)
+        assert segment is not None  # NoBlobError implies the row exists
+        data = json.dumps(segment.payload).encode()
+        source = "inline payload"
     dest.write_bytes(data)
-    click.echo(f"wrote {_human_bytes(len(data))} to {dest} (from {segment.object_key})")
+    click.echo(f"wrote {_human_bytes(len(data))} to {dest} (from {source})")
 
 
 @segments.command("url")
@@ -603,7 +627,12 @@ async def segments_download(segment_id: UUID, dest: Path) -> None:
 @async_command
 async def segments_url(segment_id: UUID, expires_in: int | None) -> None:
     """Print a presigned URL that serves the segment directly."""
-    click.echo(await audio_service.segment_url(segment_id, expires_in=expires_in))
+    try:
+        click.echo(await segment_service.segment_url(segment_id, expires_in=expires_in))
+    except segment_service.NoBlobError:
+        raise click.ClickException(
+            "segment stores its payload inline; use 'segments download'"
+        ) from None
 
 
 @segments.command("delete")
@@ -611,10 +640,10 @@ async def segments_url(segment_id: UUID, expires_in: int | None) -> None:
 @click.option("--yes", is_flag=True, help="Skip the confirmation prompt.")
 @async_command
 async def segments_delete(segment_id: UUID, yes: bool) -> None:
-    """Delete a segment and its audio."""
+    """Delete a segment and its stored data."""
     if not yes:
-        click.confirm(f"delete segment {segment_id} and its audio?", abort=True)
-    deleted = await audio_service.delete_segment(segment_id)
+        click.confirm(f"delete segment {segment_id} and its stored data?", abort=True)
+    deleted = await segment_service.delete_segment(segment_id)
     click.echo("deleted" if deleted else "no such segment")
 
 

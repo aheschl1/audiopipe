@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { api, type TimelineEvent, type TranscriptEvent } from "../api/client"
+import {
+  api,
+  type LocationPointEvent,
+  type TimelineEvent,
+  type TranscriptEvent,
+} from "../api/client"
 import { fmtClock } from "../format"
+import { describePoint, fmtCoords } from "../location"
 import { describeSpan } from "../sounds"
 import SpeakerChip from "./SpeakerChip"
 import TimelineFilter, { loadHidden, type EventKind } from "./TimelineFilter"
@@ -11,8 +17,13 @@ const PAGE = 200
 const FOCUS_LEAD_MS = 15_000
 
 function eventKey(event: TimelineEvent, index: number): string {
-  const artifact = "artifact_id" in event ? event.artifact_id : "session"
-  return `${artifact}-${event.type}-${event.at_ms}-${index}`
+  const source =
+    "artifact_id" in event
+      ? event.artifact_id
+      : "segment_id" in event
+        ? event.segment_id
+        : "session"
+  return `${source}-${event.type}-${event.at_ms}-${index}`
 }
 
 // Renders the session's event stream. The union is open by contract —
@@ -46,6 +57,8 @@ export default function Timeline({
   const [flashKey, setFlashKey] = useState<string | null>(null)
   const flashed = useRef(false)
   const [hidden, setHidden] = useState<Set<EventKind>>(loadHidden)
+  // Location runs render collapsed; a click on the head row expands one.
+  const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set())
   // Inline transcript correction; keyed like the rows so only one is open.
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState("")
@@ -303,6 +316,71 @@ export default function Timeline({
                 {fmtClock(event.start_ms)}–{fmtClock(event.end_ms)} ·{" "}
                 {fmtClock(event.end_ms - event.start_ms)}
               </span>
+            </div>
+          </div>
+        )
+      }
+      case "location-point": {
+        if (hidden.has("location-point")) return null
+        // Consecutive points collapse into one expandable row (coalescing
+        // lives in the render pass, so windowing/pagination are untouched);
+        // only the run's first event renders.
+        if (index > 0 && events[index - 1]?.type === "location-point") return null
+        let end = index
+        while (end + 1 < events.length && events[end + 1]?.type === "location-point") end++
+        const run = events.slice(index, end + 1) as LocationPointEvent[]
+        const first = run[0]!
+        const last = run[run.length - 1]!
+        const expanded = expandedRuns.has(key)
+        return (
+          <div key={key} ref={flash ? flashRef : undefined} className={`event tags ${flash ? "flash" : ""}`}>
+            <button
+              className="event-time"
+              title="listen from here"
+              onClick={() => onSeek(Math.max(0, first.at_ms))}
+            >
+              {fmtClock(Math.max(0, first.at_ms))}
+            </button>
+            <div className="event-body">
+              <button
+                className="chip as-button"
+                title={expanded ? "collapse" : "show every point"}
+                onClick={() =>
+                  setExpandedRuns((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(key)) next.delete(key)
+                    else next.add(key)
+                    return next
+                  })
+                }
+              >
+                📍 {run.length === 1 ? fmtCoords(first) : `${run.length} points`}
+              </button>
+              {run.length > 1 && (
+                <span className="row-dim">
+                  {" "}{fmtCoords(first)} → {fmtCoords(last)} ·{" "}
+                  {fmtClock(Math.max(0, first.at_ms))}–{fmtClock(Math.max(0, last.at_ms))}
+                </span>
+              )}
+              {run.length === 1 && first.accuracy_m != null && (
+                <span className="row-dim"> ±{Math.round(first.accuracy_m)} m</span>
+              )}
+              {expanded && run.length > 1 && (
+                <div className="list">
+                  {run.map((point, i) => (
+                    <div key={`${point.segment_id}-${point.at_ms}-${i}`} className="row-dim">
+                      <button
+                        className="event-time"
+                        title="listen from here"
+                        onClick={() => onSeek(Math.max(0, point.at_ms))}
+                      >
+                        {fmtClock(Math.max(0, point.at_ms))}
+                      </button>{" "}
+                      {describePoint(point)}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )

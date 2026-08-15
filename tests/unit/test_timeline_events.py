@@ -301,3 +301,113 @@ def test_sound_span_window_keeps_only_spans_starting_inside() -> None:
     # position, so a span that began before it is dropped rather than clipped.
     rows = [_sound_span(0, 600_000)]
     assert assemble(_session(), rows, from_ms=120_000, to_ms=240_000) == []
+
+
+def _location_segment(session: RecordingSession, points: list[dict]) -> Any:
+    from database.schema.segments import ResourceSegment
+
+    return ResourceSegment(
+        id=uuid4(),
+        session_id=session.id,
+        user_id=session.user_id,
+        resource="location",
+        sequence=0,
+        ingested_at=_NOW,
+        payload={"points": points},
+        byte_size=1,
+        content_type="application/json",
+    )
+
+
+def _epoch_ms(at: datetime) -> int:
+    return int(at.timestamp() * 1000)
+
+
+def test_location_segments_expand_per_point() -> None:
+    session = _session()
+    base = _epoch_ms(_NOW)
+    segment = _location_segment(
+        session,
+        [
+            {"lat": 51.0, "lon": -114.0, "t": base + 1_000, "accuracy_m": 4.0},
+            {"lat": 51.1, "lon": -114.1, "t": base + 2_500, "alt_m": 1045.0},
+        ],
+    )
+    events = assemble(session, [], segments=[segment])
+    points = [event for event in events if event.type == "location-point"]
+    assert [(p.at_ms, p.lat, p.lon) for p in points] == [
+        (1_000, 51.0, -114.0),
+        (2_500, 51.1, -114.1),
+    ]
+    assert points[0].accuracy_m == 4.0 and points[0].alt_m is None
+    assert points[1].alt_m == 1045.0
+    assert points[0].segment_id == segment.id
+    assert points[0].captured_at == _NOW + timedelta(seconds=1)
+
+
+def test_location_points_interleave_and_window_partitions() -> None:
+    session = _session(ended_after_ms=10_000)
+    base = _epoch_ms(_NOW)
+    segment = _location_segment(
+        session,
+        [{"lat": 51.0, "lon": -114.0, "t": base + at} for at in (500, 2_000, 6_000)],
+    )
+    transcript = _artifact(
+        "transcribe", "transcript", start_ms=2_000, end_ms=3_000, metadata={"text": "hi"}
+    )
+
+    everything = assemble(session, [transcript], segments=[segment])
+    assert [event.type for event in everything] == [
+        "session-start",
+        "location-point",
+        "transcript",       # transcript ranks before location-point on a tie
+        "location-point",
+        "location-point",
+        "session-end",
+    ]
+
+    first = assemble(session, [transcript], segments=[segment], from_ms=0, to_ms=2_000)
+    second = assemble(
+        session, [transcript], segments=[segment], from_ms=2_000, to_ms=10_000
+    )
+    assert [e.at_ms for e in first if e.type == "location-point"] == [500]
+    assert [e.at_ms for e in second if e.type == "location-point"] == [2_000, 6_000]
+
+
+def test_unregistered_resource_segments_are_skipped() -> None:
+    from database.schema.segments import ResourceSegment
+
+    session = _session()
+    audio = ResourceSegment(
+        id=uuid4(),
+        session_id=session.id,
+        user_id=session.user_id,
+        resource="audio",
+        sequence=0,
+        ingested_at=_NOW,
+        bucket="b",
+        object_key="k",
+        byte_size=10,
+        content_type="audio/wav",
+    )
+    events = assemble(session, [], segments=[audio])
+    assert [event.type for event in events] == ["session-start"]
+
+
+def test_empty_location_payload_yields_nothing() -> None:
+    from database.schema.segments import ResourceSegment
+
+    session = _session()
+    segment = ResourceSegment(
+        id=uuid4(),
+        session_id=session.id,
+        user_id=session.user_id,
+        resource="location",
+        sequence=0,
+        ingested_at=_NOW,
+        payload={},
+        byte_size=1,
+        content_type="application/json",
+    )
+    events = assemble(session, [], segments=[segment])
+    assert [event.type for event in events] == ["session-start"]

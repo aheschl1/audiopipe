@@ -19,7 +19,8 @@ from uuid import UUID
 
 from services import stitch
 from database.pipe import DatabasePipe
-from database.schema.segments import AudioSegment, SegmentSetFingerprint
+from resources import Resource
+from database.schema.segments import ResourceSegment, SegmentSetFingerprint
 from database.schema.sessions import RecordingSession
 from storage.pipe import BlobPipe
 
@@ -41,7 +42,7 @@ class SessionAudio:
     plan: stitch.StitchPlan
 
 
-def _session_etag(segments: list[AudioSegment]) -> str:
+def _session_etag(segments: list[ResourceSegment]) -> str:
     """Strong validator over the exact set of stitched segments."""
     digest = hashlib.sha256()
     for segment in segments:
@@ -121,7 +122,7 @@ async def resolve_session_audio(session: RecordingSession) -> SessionAudio | Non
         if cached is not None:
             return cached
         segments = await pipe.segments.list_for_session(
-            session.id, limit=_MAX_STITCH_SEGMENTS
+            session.id, resource=Resource.AUDIO, limit=_MAX_STITCH_SEGMENTS
         )
 
     # Pure planning plus a 44-byte header fetch, all off the database connection.

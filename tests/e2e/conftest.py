@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 TEST_BUCKET = "test-audio"
 
 TABLES = (
-    "users, recording_sessions, audio_segments, auth_tokens, "
+    "users, recording_sessions, resource_segments, auth_tokens, "
     "processing_jobs, pipeline_artifacts, speakers, cluster_params, "
     "speaker_pins, ab_votes"
 )
@@ -413,10 +413,20 @@ async def make_session(account: Account, device: str = "glasses-01", label: str 
 
 
 async def ingest(session_id, payload: bytes, **kwargs):
-    from services import audio
+    from services import segments as segment_service
 
-    return await audio.ingest_segment(
+    return await segment_service.ingest_segment(
         session_id, payload, content_type="audio/wav", filename="clip.wav", **kwargs
+    )
+
+
+async def ingest_location(session_id, points: list[dict], **kwargs):
+    import json
+
+    from services import segments as segment_service
+
+    return await segment_service.ingest_segment(
+        session_id, json.dumps({"points": points}).encode(), resource="location", **kwargs
     )
 
 

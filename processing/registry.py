@@ -8,6 +8,7 @@ process — they are never pickled across the process boundary.
 
 from typing import Any
 
+import resources
 from database.pipe import DatabasePipe
 from database.schema.jobs import Job, JobCreate
 from processing.base import Callback, Pipeline
@@ -74,3 +75,10 @@ if len(set(names())) != len(PIPELINES):
 if "users" in names():
     # The blob layout reserves users/ for segment storage (storage/keys.py).
     raise RuntimeError("'users' is a reserved name; pick another pipeline name")
+for _cls in PIPELINES:
+    # The Resource type makes a stray name statically improbable; this catches
+    # an enum member the registry does not implement.
+    if _cls.resource is not None and _cls.resource not in resources.names():
+        raise RuntimeError(
+            f"pipeline {_cls.name!r} declares unknown resource {_cls.resource!r}"
+        )

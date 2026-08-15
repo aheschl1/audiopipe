@@ -43,3 +43,33 @@ class PipelineDiscovery(BaseRepo):
             """,
             (pipeline, limit),
         )
+
+    async def ended_sessions_with_resource_without(
+        self, pipeline: str, resource: str, limit: int = 100
+    ) -> list[RecordingSession]:
+        """:meth:`ended_sessions_without`, restricted to sessions that hold
+        at least one segment of ``resource``.
+
+        The shape resource-typed pipelines discover with: a session that never
+        captured their resource is not their work, and gets no job (and hence
+        no empty completion marker). The EXISTS probe rides the
+        (session_id, resource, ...) index.
+        """
+        return await self._fetch_all(
+            RecordingSession,
+            f"""
+                SELECT {_SESSION_COLUMNS} FROM recording_sessions s
+                WHERE s.ended_at IS NOT NULL
+                  AND EXISTS (
+                      SELECT 1 FROM resource_segments rs
+                      WHERE rs.session_id = s.id AND rs.resource = %s
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM processing_jobs j
+                      WHERE j.pipeline = %s AND j.session_id = s.id
+                  )
+                ORDER BY s.ended_at
+                LIMIT %s
+            """,
+            (resource, pipeline, limit),
+        )

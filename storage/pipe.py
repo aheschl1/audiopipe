@@ -5,7 +5,7 @@
         url = await blobs.presign_get(key)
 
 Object writes are durable as soon as they land; there is no transaction to roll
-back. :mod:`services.audio` cleans up objects whose database row failed.
+back. :mod:`services.segments` cleans up objects whose database row failed.
 
 The S3 client is process-wide and opened on first use, the counterpart of
 ``database.pipe.get_pool``: building a client resolves credentials and creates

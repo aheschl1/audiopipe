@@ -24,6 +24,7 @@ from database.repos.artifacts import ArtifactsRepo
 from database.repos.cluster_params import ClusterParamsRepo
 from database.repos.embeddings import AudioEmbeddingsRepo, EmbeddingsRepo
 from database.repos.jobs import JobsRepo
+from database.repos.locations import LocationsRepo
 from database.repos.segments import SegmentsRepo
 from database.repos.sessions import SessionsRepo
 from database.repos.speakers import SpeakersRepo
@@ -121,6 +122,10 @@ class DatabasePipe:
     @cached_property
     def segments(self) -> SegmentsRepo:
         return SegmentsRepo(self.connection)
+
+    @cached_property
+    def locations(self) -> LocationsRepo:
+        return LocationsRepo(self.connection)
 
     @cached_property
     def jobs(self) -> JobsRepo:

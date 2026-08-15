@@ -17,7 +17,7 @@ class Clip:
     def __init__(self, segment: Any, payload: bytes) -> None:
         self.segment = segment
         self.payload = payload
-        self.url = f"/v1/segments/{segment.id}/audio"
+        self.url = f"/v1/segments/{segment.id}/media"
         self.size = len(payload)
 
 
@@ -176,7 +176,7 @@ async def test_streaming_is_chunked_for_large_objects(
 
     received = bytearray()
     async with client.stream(
-        "GET", f"/v1/segments/{segment.id}/audio", headers=account.headers
+        "GET", f"/v1/segments/{segment.id}/media", headers=account.headers
     ) as response:
         assert response.status_code == 200
         async for chunk in response.aiter_bytes():

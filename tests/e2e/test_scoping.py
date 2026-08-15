@@ -17,7 +17,7 @@ async def test_another_users_rows_are_invisible_and_unconfirmable(
         f"/v1/sessions/{theirs.id}",
         f"/v1/sessions/{theirs.id}/segments",
         f"/v1/segments/{their_segment.id}",
-        f"/v1/segments/{their_segment.id}/audio",
+        f"/v1/segments/{their_segment.id}/media",
     ):
         response = await client.get(path, headers=account.headers)
         assert response.status_code == 404, path
@@ -52,4 +52,6 @@ async def test_usage_counts_only_your_own_audio(
     await ingest(mine.id, payload)
 
     me = (await client.get("/v1/me", headers=account.headers)).json()
-    assert me["usage"] == {"segments": 1, "total_bytes": len(payload)}
+    assert me["usage"] == [
+        {"resource": "audio", "segments": 1, "total_bytes": len(payload)}
+    ]

@@ -26,6 +26,7 @@ from database.schema.jobs import Job, JobCreate
 from processing.base import Pipeline
 from processing.config import get_settings
 from processing.transcriber import Transcriber, TranscriberError
+from resources import Resource
 from services import stitch, timeline
 
 MODELS = ("parakeet", "whisper")
@@ -69,6 +70,7 @@ def _blocks(utterances: Sequence[PipelineArtifact]) -> dict[tuple[int, int], lis
 
 class TranscribeAbPipeline(Pipeline):
     name = "transcribe-ab"
+    resource = Resource.AUDIO
 
     async def setup(self) -> None:
         self._settings = get_settings()

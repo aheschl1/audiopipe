@@ -20,6 +20,8 @@ from storage.pipe import BlobPipe
 
 
 class SessionStatsPipeline(Pipeline):
+    # Session-scoped, not resource-typed: the stats cover every resource the
+    # session captured, so any ended session is work.
     name = "session-stats"
 
     async def discover(self, limit: int) -> Sequence[JobCreate]:
@@ -50,13 +52,25 @@ class SessionStatsPipeline(Pipeline):
             # Deterministic failure hook for exercising retry-to-dead.
             raise RuntimeError("boom requested by session metadata")
 
+        # Top-level totals span every resource; the breakdown carries each
+        # resource's own numbers (duration_ms only means playtime for audio —
+        # for location it is the batches' covered span).
         stats = {
-            "segments": aggregates.segments,
-            "total_bytes": aggregates.total_bytes,
-            "duration_ms": aggregates.duration_ms,
+            "segments": sum(row.segments for row in aggregates),
+            "total_bytes": sum(row.total_bytes for row in aggregates),
+            "duration_ms": sum(row.duration_ms for row in aggregates),
+            "resources": {
+                row.resource: {
+                    "segments": row.segments,
+                    "total_bytes": row.total_bytes,
+                    "duration_ms": row.duration_ms,
+                }
+                for row in aggregates
+            },
         }
+        segment_ids = [id for row in aggregates for id in row.segment_ids]
         info = None
-        if aggregates.segments:
+        if segment_ids:
             key = pipeline_key(self.name, session.id, "stats.json")
             async with BlobPipe() as blobs:
                 info = await blobs.put(
@@ -70,7 +84,7 @@ class SessionStatsPipeline(Pipeline):
                     session_id=session.id,
                     bucket=info.bucket if info else None,
                     object_key=info.key if info else None,
-                    links={"segments": [str(id) for id in aggregates.segment_ids]},
+                    links={"segments": [str(id) for id in segment_ids]},
                     metadata=stats,
                 )
             )

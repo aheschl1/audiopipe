@@ -63,6 +63,7 @@ from processing.base import Pipeline
 from processing.clustering import cluster_corpus
 from processing.config import get_settings
 from processing.diarizer import Diarizer, Turn
+from resources import Resource
 from services import stitch, timeline
 
 logger = logging.getLogger(__name__)
@@ -333,6 +334,7 @@ def split_labels(
 
 class DiarizePipeline(Pipeline):
     name = "diarize"
+    resource = Resource.AUDIO
 
     async def setup(self) -> None:
         self._settings = get_settings()

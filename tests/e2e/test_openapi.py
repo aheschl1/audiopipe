@@ -11,7 +11,10 @@ EXPECTED_METHODS = {
     "/v1/sessions": {"get", "post"},
     "/v1/sessions/{session_id}": {"get"},
     "/v1/sessions/{session_id}/artifacts": {"get"},
-    "/v1/sessions/{session_id}/audio": {"get"},
+    "/v1/resources/location/points": {"get"},
+    "/v1/sessions/{session_id}/resources": {"get"},
+    "/v1/sessions/{session_id}/resources/location/points": {"get"},
+    "/v1/sessions/{session_id}/resources/{resource}/media": {"get"},
     "/v1/sessions/{session_id}/end": {"post"},
     "/v1/sessions/{session_id}/label": {"post"},
     "/v1/sessions/{session_id}/playback": {"post"},
@@ -24,7 +27,7 @@ EXPECTED_METHODS = {
     "/v1/ab/results": {"get"},
     "/v1/segments": {"get"},
     "/v1/segments/{segment_id}": {"get"},
-    "/v1/segments/{segment_id}/audio": {"get"},
+    "/v1/segments/{segment_id}/media": {"get"},
     "/v1/search/audio": {"get"},
     "/v1/search/tags": {"get"},
     "/v1/search/tags/labels": {"get"},
@@ -57,12 +60,14 @@ async def test_openapi_publishes_every_route(client: httpx.AsyncClient) -> None:
 async def test_segment_schema_hides_storage_layout(client: httpx.AsyncClient) -> None:
     """Guards the omission: a re-added column would fail here, not in review."""
     spec = (await client.get("/openapi.json")).json()
-    properties = spec["components"]["schemas"]["SegmentRead"]["properties"]
-
-    assert "bucket" not in properties
-    assert "object_key" not in properties
-    assert "user_id" not in properties
-    assert "checksum_sha256" in properties
+    for schema in ("AudioSegmentRead", "LocationSegmentRead"):
+        properties = spec["components"]["schemas"][schema]["properties"]
+        assert "bucket" not in properties
+        assert "object_key" not in properties
+        assert "payload" not in properties
+        assert "user_id" not in properties
+        assert "checksum_sha256" in properties
+        assert "resource" in properties
 
 
 async def test_paged_schemas_are_generated_per_item_type(client: httpx.AsyncClient) -> None:
@@ -87,6 +92,7 @@ async def test_timeline_event_union_is_discriminated(client: httpx.AsyncClient) 
         "transcript",
         "audio-tag",
         "sound-span",
+        "location-point",
     }
     assert "label" in schemas["SoundSpanEvent"]["properties"]
     # Transcripts never leak the storage layout; the full text is inline and

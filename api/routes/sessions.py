@@ -1,8 +1,10 @@
-"""Recording sessions: create, list, inspect, end, and the stitched audio.
+"""Recording sessions: create, list, inspect, end, and per-resource media.
 
-Audio enters a session through the streaming websocket (see
+Resources enter a session through the streaming websocket (see
 ``api.routes.stream``), not through these routes.
 """
+
+import resources as resource_registry
 
 from collections.abc import AsyncIterator
 from datetime import timedelta
@@ -13,12 +15,13 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from api import session_audio, timeline_events
 from services import stitch
-from api.deps import CurrentUser, OwnedSession, Paging, Pipe, PlayableSession
+from api.deps import CurrentUser, OwnedSession, Paging, Pipe, PlayableSession, Range
 from api.ranges import RangeNotSatisfiable, etag_matches, parse_range
 from api.schema.artifacts import ArtifactRead
 from api.schema.auth import PlaybackTokenRead
 from api.schema.common import ErrorResponse, Page
-from api.schema.segments import SegmentRead
+from api.schema.locations import LocationPointRead
+from api.schema.segments import SegmentRead, SessionResourceRead, segment_read
 from api.schema.sessions import (
     SessionCreateRequest,
     SessionLabelRequest,
@@ -94,12 +97,12 @@ _PLAYBACK_TTL = timedelta(minutes=15)
 _PLAYBACK_TOKEN_NAME = "playback"
 
 
-@router.post("/{session_id}/playback", summary="Mint a short-lived audio playback token")
+@router.post("/{session_id}/playback", summary="Mint a short-lived media playback token")
 async def create_playback_token(session: OwnedSession, pipe: Pipe) -> PlaybackTokenRead:
-    """A token for the audio route's ``?token=`` parameter.
+    """A token for the media route's ``?token=`` parameter.
 
     Media elements (``<audio src>``) cannot send an Authorization header, so
-    the session-audio route also accepts a token in the URL. This mints one
+    the session-media route also accepts a token in the URL. This mints one
     whose lifetime is minutes; the player re-mints when it expires. It is a
     real API token, just time-boxed — expired ``playback`` rows are purged
     opportunistically on each mint.
@@ -114,15 +117,52 @@ async def create_playback_token(session: OwnedSession, pipe: Pipe) -> PlaybackTo
     )
 
 
-@router.get("/{session_id}/segments", summary="List a session's audio segments")
+@router.get("/{session_id}/segments", summary="List a session's segments")
 async def list_session_segments(
-    session: OwnedSession, pipe: Pipe, paging: Paging
+    session: OwnedSession,
+    pipe: Pipe,
+    paging: Paging,
+    resource: str | None = Query(None, description="Only segments of this resource."),
 ) -> Page[SegmentRead]:
-    """In capture order (by `sequence`)."""
+    """In capture order (by `sequence`), interleaved across resources."""
     rows = await pipe.segments.list_for_session(
-        session.id, limit=paging.probe_limit, offset=paging.offset
+        session.id, resource=resource, limit=paging.probe_limit, offset=paging.offset
     )
-    return Page.build(rows, paging, SegmentRead.from_model)
+    return Page.build(rows, paging, segment_read)
+
+
+@router.get("/{session_id}/resources", summary="What this session holds, per resource")
+async def list_session_resources(
+    session: OwnedSession, pipe: Pipe
+) -> list[SessionResourceRead]:
+    """One entry per resource with any segments, ordered by resource name."""
+    rows = await pipe.segments.resource_summary(session.id)
+    return [SessionResourceRead.from_model(row) for row in rows]
+
+
+@router.get(
+    "/{session_id}/resources/location/points",
+    summary="A session's location points by timeline position",
+)
+async def list_session_location_points(
+    session: OwnedSession,
+    pipe: Pipe,
+    paging: Paging,
+    window: Range,
+) -> Page[LocationPointRead]:
+    """The session's fixes in timeline order, windowed like the timeline —
+    adjacent windows partition the stream. A session with no location
+    resource yields an empty page, like an unprocessed session's timeline
+    serves just its frames.
+    """
+    rows = await pipe.locations.points_for_session(
+        session.id,
+        from_ms=window.from_ms,
+        to_ms=window.to_ms,
+        limit=paging.probe_limit,
+        offset=paging.offset,
+    )
+    return Page.build(rows, paging, LocationPointRead.from_model)
 
 
 @router.get("/{session_id}/artifacts", summary="List a session's pipeline artifacts")
@@ -130,14 +170,9 @@ async def list_session_artifacts(
     session: OwnedSession,
     pipe: Pipe,
     paging: Paging,
+    window: Range,
     pipeline: str | None = Query(None, description="Only artifacts of this pipeline."),
     kind: str | None = Query(None, description="Only artifacts of this kind."),
-    from_ms: int | None = Query(
-        None, ge=0, description="Only span artifacts overlapping at/after this time."
-    ),
-    to_ms: int | None = Query(
-        None, ge=0, description="Only span artifacts overlapping before this time."
-    ),
 ) -> Page[ArtifactRead]:
     """What the processing tiers attached to this session, in timeline order.
 
@@ -148,8 +183,8 @@ async def list_session_artifacts(
         session.id,
         pipeline=pipeline,
         kind=kind,
-        from_ms=from_ms,
-        to_ms=to_ms,
+        from_ms=window.from_ms,
+        to_ms=window.to_ms,
         limit=paging.probe_limit,
         offset=paging.offset,
     )
@@ -161,11 +196,10 @@ async def get_session_timeline(
     session: OwnedSession,
     pipe: Pipe,
     paging: Paging,
-    from_ms: int | None = Query(None, ge=0, description="Only events at/after this time."),
-    to_ms: int | None = Query(None, ge=0, description="Only events before this time."),
+    window: Range,
 ) -> Page[TimelineEvent]:
     """What happened when: session frames, speech starts/ends, transcripts,
-    sound tags and the sound spans built from them.
+    sound tags, the sound spans built from them, and location points.
 
     Events carry a ``type`` discriminator; clients must ignore types they do
     not recognise — future processing tiers add new ones. `limit`/`offset`
@@ -177,19 +211,33 @@ async def get_session_timeline(
 
     An unprocessed (or speechless) session serves just its session frames;
     processing status stays introspectable via `.../artifacts?kind=speech-map`.
+    Location points come straight from the stored segments — no pipeline —
+    so they appear live while the session is still streaming.
     """
     rows = await pipe.artifacts.list_for_session(
-        session.id, from_ms=from_ms, to_ms=to_ms, limit=_MAX_TIMELINE_ARTIFACTS
+        session.id, from_ms=window.from_ms, to_ms=window.to_ms, limit=_MAX_TIMELINE_ARTIFACTS
     )
+    segments = [
+        segment
+        for resource in timeline_events.timeline_resources()
+        for segment in await pipe.segments.list_for_session(
+            session.id, resource=resource, limit=_MAX_TIMELINE_ARTIFACTS
+        )
+    ]
     labels = await pipe.speakers.labels_for_session(session.id)
     speaker_map = {
         label.speaker: label for label in labels if label.speaker_id is not None
     }
     events = timeline_events.assemble(
-        session, rows, from_ms=from_ms, to_ms=to_ms, speakers=speaker_map
+        session,
+        rows,
+        segments=segments,
+        from_ms=window.from_ms,
+        to_ms=window.to_ms,
+        speakers=speaker_map,
     )
-    window = events[paging.offset : paging.offset + paging.probe_limit]
-    return Page.build(window, paging, lambda event: event)
+    sliced = events[paging.offset : paging.offset + paging.probe_limit]
+    return Page.build(sliced, paging, lambda event: event)
 
 
 @router.post("/{session_id}/transcripts/{artifact_id}", summary="Edit a transcript's text")
@@ -278,33 +326,56 @@ async def _stream_stitched(
 
 
 @router.get(
-    "/{session_id}/audio",
-    summary="Stream a session's audio as one WAV",
+    "/{session_id}/resources/{resource}/media",
+    summary="Stream a session's rendered media for one resource",
     response_class=StreamingResponse,
     responses={
-        200: {"content": {"audio/wav": {}}, "description": "The whole session, stitched."},
+        200: {"content": {"audio/wav": {}}, "description": "The whole session, rendered."},
         206: {"content": {"audio/wav": {}}, "description": "The requested byte range."},
         304: {"description": "The client's cached copy is still current."},
-        404: {"description": "The session holds no audio."},
+        404: {
+            "description": "Unknown or non-renderable resource, or the session holds none of it."
+        },
         409: {
             "model": ErrorResponse,
-            "description": "The session's segments do not form one continuous WAV.",
+            "description": "The session's segments do not form one continuous stream.",
         },
-        416: {"description": "The requested range lies outside the audio."},
+        416: {"description": "The requested range lies outside the media."},
     },
 )
-async def get_session_audio(session: PlayableSession, request: Request) -> Response:
-    """Every segment's PCM behind a single WAV header, in sequence order.
+async def get_session_media(
+    session: PlayableSession, resource: str, request: Request
+) -> Response:
+    """The session's whole stream of one resource as a single media object.
 
-    The stitched size is known from the rows alone, so `Range` (seeking) and
-    conditional requests work exactly as on the per-segment route. An open
-    session serves the audio ingested so far; re-request for more.
+    Only resources whose type is *renderable* serve media; today that is
+    audio — every segment's PCM behind a single WAV header, in sequence
+    order. The stitched size is known from the rows alone, so `Range`
+    (seeking) and conditional requests work exactly as on the per-segment
+    route. An open session serves what has been ingested so far; re-request
+    for more.
 
     The representation (header, plan, ETag) is cached per session and reused
     until its segments change, so a conditional check or a range seek costs one
     cheap fingerprint query rather than a full re-read. No pooled database
     connection is held while the body streams from the blob store.
     """
+    try:
+        rtype = resource_registry.get(resource)
+    except KeyError:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=ErrorResponse(detail=f"unknown resource {resource!r}").model_dump(),
+        )
+    if not rtype.renderable:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=ErrorResponse(
+                detail=f"resource {resource!r} has no rendered media"
+            ).model_dump(),
+        )
+    # Audio is the only renderable resource; a second one would dispatch on
+    # rtype here instead of falling through to the stitched-WAV path.
     try:
         audio = await session_audio.resolve_session_audio(session)
     except stitch.NotStitchable as exc:

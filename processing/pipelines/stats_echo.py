@@ -13,6 +13,8 @@ from processing.base import Pipeline
 
 
 class StatsEchoPipeline(Pipeline):
+    # Session-scoped like its parent: it echoes stats, whatever resources
+    # they cover.
     name = "stats-echo"
 
     async def discover(self, limit: int) -> Sequence[JobCreate]:

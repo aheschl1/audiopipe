@@ -18,6 +18,7 @@ from database.schema.artifacts import ArtifactCreate
 from database.schema.jobs import Job, JobCreate
 from processing.base import Pipeline
 from processing.config import get_settings
+from resources import Resource
 
 logger = logging.getLogger(__name__)
 
@@ -218,6 +219,7 @@ def select_spans(
 
 class SoundSpanPipeline(Pipeline):
     name = "sound-span"
+    resource = Resource.AUDIO
 
     async def setup(self) -> None:
         self._settings = get_settings()

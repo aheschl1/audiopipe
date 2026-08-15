@@ -3,7 +3,8 @@
 The protocol these implement is specified in docs/streaming-protocol.md.
 Text frames carry one JSON message discriminated on ``type``; the one binary
 frame is a chunk: a 4-byte big-endian header length, the JSON-encoded
-:class:`ChunkHeader`, then the audio payload.
+:class:`ChunkHeader`, then the resource payload (audio bytes, a location
+batch, ...).
 """
 
 from datetime import datetime
@@ -25,7 +26,12 @@ class FrameError(ValueError):
 
 
 class StreamDefaults(BaseModel):
-    """Per-connection defaults applied to chunks that omit them."""
+    """Per-connection defaults applied to **audio** chunks that omit them.
+
+    The field names say so: codec/sample_rate_hz/channels are PCM parameters.
+    A chunk of another resource resolves its content type from its own header
+    or its resource type's default, never from here.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -76,11 +82,17 @@ def parse_client_frame(text: str) -> Hello | Finish:
 
 
 class ChunkHeader(BaseModel):
-    """The JSON prefix inside a binary chunk frame."""
+    """The JSON prefix inside a binary chunk frame.
+
+    ``resource`` names the payload's resource type; the default keeps every
+    pre-resource client a valid audio stream. Sequences share one space per
+    session regardless of resource.
+    """
 
     model_config = ConfigDict(frozen=True)
 
     sequence: Annotated[int, Field(ge=0)]
+    resource: str = "audio"
     captured_at: datetime | None = None
     duration_ms: Annotated[int, Field(ge=0)] | None = None
     content_type: str | None = None  # overrides the hello default
@@ -137,6 +149,10 @@ class Welcome(BaseModel):
     ack_window: AckWindow
     limits: StreamLimits
     effects: tuple[str, ...] = ()
+    resources: tuple[str, ...] = Field(
+        default=(),
+        description="Resource types this server accepts in chunk headers.",
+    )
 
 
 class Ack(BaseModel):

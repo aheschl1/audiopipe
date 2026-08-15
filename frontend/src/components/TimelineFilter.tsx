@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react"
 
 // Which timeline event kinds are shown. "marker" covers session-start/end.
-export type EventKind = "transcript" | "sound-span" | "audio-tag" | "marker"
+export type EventKind = "transcript" | "sound-span" | "audio-tag" | "location-point" | "marker"
 
 export const ALL_KINDS: { key: EventKind; label: string }[] = [
   { key: "transcript", label: "Transcripts" },
   { key: "sound-span", label: "Sound spans" },
   { key: "audio-tag", label: "Sound tags" },
+  { key: "location-point", label: "Location" },
   { key: "marker", label: "Session markers" },
 ]
 

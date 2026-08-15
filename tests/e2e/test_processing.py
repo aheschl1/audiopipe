@@ -49,6 +49,13 @@ async def test_session_stats_discovers_processes_and_stores(
         "segments": len(payloads),
         "total_bytes": sum(len(p) for p in payloads),
         "duration_ms": 100 * len(payloads),
+        "resources": {
+            "audio": {
+                "segments": len(payloads),
+                "total_bytes": sum(len(p) for p in payloads),
+                "duration_ms": 100 * len(payloads),
+            }
+        },
     }
 
     async with DatabasePipe() as pipe:

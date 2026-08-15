@@ -14,21 +14,28 @@ from services.stitch import (
     plan,
     slices,
 )
-from database.schema.segments import AudioSegment
+from database.schema.segments import ResourceSegment
 from tests.wav import wav_bytes
 
 
-def segment(byte_size: int, content_type: str = "audio/wav", **overrides) -> AudioSegment:
-    return AudioSegment(
+def segment(byte_size: int, content_type: str = "audio/wav", **overrides) -> ResourceSegment:
+    attrs = {
+        key: overrides.pop(key)
+        for key in ("codec", "sample_rate_hz", "channels")
+        if key in overrides
+    }
+    return ResourceSegment(
         id=uuid4(),
         session_id=uuid4(),
         user_id=uuid4(),
+        resource="audio",
         sequence=overrides.pop("sequence", 0),
         ingested_at=datetime.now(UTC),
         bucket="test",
         object_key=f"k/{uuid4()}",
         byte_size=byte_size,
         content_type=content_type,
+        attrs=attrs,
         **overrides,
     )
 

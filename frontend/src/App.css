@@ -1498,6 +1498,16 @@ button.row:hover,
   border-radius: 4px;
 }
 
+/* A fix is an instant, not a stretch: a thin tick, no border. */
+.strip-block.location {
+  top: 7px;
+  bottom: 7px;
+  min-width: 2px;
+  border: none;
+  border-radius: 1px;
+  background: hsl(200 62% 58% / 0.85);
+}
+
 .strip-playhead {
   position: absolute;
   top: 0;

@@ -9,6 +9,7 @@ import {
 import type { AudioTagEvent, TimelineEvent, TranscriptEvent } from "../api/client"
 import { fmtClock } from "../format"
 import { usePlayhead } from "../hooks/usePlayhead"
+import { describePoint, locationPoints } from "../location"
 import { hue, localLabelTail } from "../speakers"
 import {
   SOUND_LANES_SHOWN,
@@ -138,6 +139,7 @@ export default function TimelineStrip({
     [events],
   )
   const soundLanes = useMemo(() => buildSoundLanes(events), [events])
+  const points = useMemo(() => locationPoints(events), [events])
   const visibleSoundLanes = useMemo(
     () => (showAllSounds ? soundLanes : soundLanes.slice(0, SOUND_LANES_SHOWN)),
     [soundLanes, showAllSounds],
@@ -343,6 +345,33 @@ export default function TimelineStrip({
             ))}
           </div>
         )}
+        {points.length > 0 && (
+          <div className="strip-lane location" style={{ height: LANE_H }}>
+            {points.map((point, i) => (
+              <div
+                key={`${point.segment_id}-${point.at_ms}-${i}`}
+                className="strip-block location"
+                style={{
+                  left: `${(Math.max(0, point.at_ms) / durationMs) * 100}%`,
+                  width: 2,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onSeek(Math.max(0, point.at_ms), true)
+                }}
+                onPointerMove={(e) =>
+                  showBlockTip(e, {
+                    color: null,
+                    title: "location",
+                    time: fmtClock(Math.max(0, point.at_ms)),
+                    text: describePoint(point),
+                  })
+                }
+                onPointerLeave={hideTip}
+              />
+            ))}
+          </div>
+        )}
       </>
     )
   }, [
@@ -350,6 +379,7 @@ export default function TimelineStrip({
     visibleSoundLanes,
     showTagLane,
     tagBlocks,
+    points,
     durationMs,
     viewportW,
     zoom,
@@ -360,12 +390,20 @@ export default function TimelineStrip({
 
   if (
     durationMs <= 0 ||
-    (lanes.length === 0 && soundLanes.length === 0 && tagBlocks.length === 0)
+    (lanes.length === 0 &&
+      soundLanes.length === 0 &&
+      tagBlocks.length === 0 &&
+      points.length === 0)
   )
     return null
 
   const canvasH =
-    RULER_H + LANE_H * (lanes.length + visibleSoundLanes.length + (showTagLane ? 1 : 0))
+    RULER_H +
+    LANE_H *
+      (lanes.length +
+        visibleSoundLanes.length +
+        (showTagLane ? 1 : 0) +
+        (points.length > 0 ? 1 : 0))
 
   return (
     <div className="strip">
@@ -460,6 +498,15 @@ export default function TimelineStrip({
           {showTagLane && (
             <div className="strip-head" style={{ height: LANE_H }}>
               <span className="strip-head-tags">sounds</span>
+            </div>
+          )}
+          {points.length > 0 && (
+            <div className="strip-head" style={{ height: LANE_H }}>
+              <span className="strip-head-sound" title={`${points.length} location points`}>
+                <span className="speaker-dot" style={{ background: "hsl(200 62% 58%)" }} />
+                location
+              </span>
+              <span className="strip-talk">{points.length}</span>
             </div>
           )}
         </div>

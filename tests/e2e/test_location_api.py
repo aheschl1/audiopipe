@@ -1,0 +1,191 @@
+"""The location query surface: in-session timeline windows and the
+cross-session wall-clock query."""
+
+from datetime import UTC, datetime
+
+import httpx
+
+from database.pipe import DatabasePipe
+from database.schema.sessions import SessionCreate
+from tests.e2e.conftest import Account, ingest_location, make_session
+
+
+def _ms(at: datetime) -> int:
+    return int(at.timestamp() * 1000)
+
+
+async def _session_started_at(account: Account, started_at: datetime):
+    async with DatabasePipe() as pipe:
+        return await pipe.sessions.create(
+            SessionCreate(user_id=account.user.id, started_at=started_at)
+        )
+
+
+async def test_session_points_window_partitions(
+    client: httpx.AsyncClient, account: Account
+) -> None:
+    start = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+    session = await _session_started_at(account, start)
+    base = _ms(start)
+    # Two batches: fixes at 1s, 2s and 10s, 11s into the session.
+    await ingest_location(
+        session.id,
+        [
+            {"lat": 51.0, "lon": -114.0, "t": base + 1_000},
+            {"lat": 51.1, "lon": -114.1, "t": base + 2_000},
+        ],
+    )
+    await ingest_location(
+        session.id,
+        [
+            {"lat": 51.2, "lon": -114.2, "t": base + 10_000},
+            {"lat": 51.3, "lon": -114.3, "t": base + 11_000},
+        ],
+    )
+
+    everything = await client.get(
+        f"/v1/sessions/{session.id}/resources/location/points", headers=account.headers
+    )
+    assert everything.status_code == 200
+    items = everything.json()["items"]
+    assert [item["at_ms"] for item in items] == [1_000, 2_000, 10_000, 11_000]
+    assert items[0]["lat"] == 51.0
+    assert items[0]["captured_at"].startswith("2026-08-14T12:00:01")
+
+    # Half-open windows partition: [0, 2000) and [2000, 12000) share nothing.
+    first = await client.get(
+        f"/v1/sessions/{session.id}/resources/location/points",
+        params={"from_ms": 0, "to_ms": 2_000},
+        headers=account.headers,
+    )
+    second = await client.get(
+        f"/v1/sessions/{session.id}/resources/location/points",
+        params={"from_ms": 2_000, "to_ms": 12_000},
+        headers=account.headers,
+    )
+    assert [i["at_ms"] for i in first.json()["items"]] == [1_000]
+    assert [i["at_ms"] for i in second.json()["items"]] == [2_000, 10_000, 11_000]
+
+
+async def test_session_points_paginate(
+    client: httpx.AsyncClient, account: Account
+) -> None:
+    start = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+    session = await _session_started_at(account, start)
+    base = _ms(start)
+    await ingest_location(
+        session.id,
+        [{"lat": 51.0, "lon": -114.0, "t": base + i * 1_000} for i in range(5)],
+    )
+
+    page_one = await client.get(
+        f"/v1/sessions/{session.id}/resources/location/points",
+        params={"limit": 3},
+        headers=account.headers,
+    )
+    body = page_one.json()
+    assert [i["at_ms"] for i in body["items"]] == [0, 1_000, 2_000]
+    assert body["has_more"] is True
+
+    page_two = await client.get(
+        f"/v1/sessions/{session.id}/resources/location/points",
+        params={"limit": 3, "offset": 3},
+        headers=account.headers,
+    )
+    body = page_two.json()
+    assert [i["at_ms"] for i in body["items"]] == [3_000, 4_000]
+    assert body["has_more"] is False
+
+
+async def test_session_without_location_serves_empty_page(
+    client: httpx.AsyncClient, account: Account
+) -> None:
+    session = await make_session(account)
+    response = await client.get(
+        f"/v1/sessions/{session.id}/resources/location/points", headers=account.headers
+    )
+    assert response.status_code == 200
+    assert response.json() == {"items": [], "limit": 50, "offset": 0, "has_more": False}
+
+
+async def test_wall_clock_query_spans_sessions(
+    client: httpx.AsyncClient, account: Account, other_account: Account
+) -> None:
+    noon = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+    one = await _session_started_at(account, noon)
+    two = await _session_started_at(account, datetime(2026, 8, 14, 15, 0, tzinfo=UTC))
+    await ingest_location(one.id, [{"lat": 51.0, "lon": -114.0, "t": _ms(noon) + 5_000}])
+    await ingest_location(
+        two.id,
+        [{"lat": 52.0, "lon": -113.0, "t": _ms(noon) + 3 * 3_600_000 + 5_000}],
+    )
+    # Someone else's fix in the same window must never surface.
+    theirs = await _session_started_at(other_account, noon)
+    await ingest_location(theirs.id, [{"lat": 0.0, "lon": 0.0, "t": _ms(noon) + 5_000}])
+
+    everything = await client.get(
+        "/v1/resources/location/points", headers=account.headers
+    )
+    items = everything.json()["items"]
+    assert [(i["session_id"], i["lat"]) for i in items] == [
+        (str(one.id), 51.0),
+        (str(two.id), 52.0),
+    ]
+
+    windowed = await client.get(
+        "/v1/resources/location/points",
+        params={
+            "from_ms": _ms(datetime(2026, 8, 14, 14, 0, tzinfo=UTC)),
+            "to_ms": _ms(datetime(2026, 8, 14, 16, 0, tzinfo=UTC)),
+        },
+        headers=account.headers,
+    )
+    assert [i["lat"] for i in windowed.json()["items"]] == [52.0]
+
+    narrowed = await client.get(
+        "/v1/resources/location/points",
+        params={"session_id": str(one.id)},
+        headers=account.headers,
+    )
+    assert [i["lat"] for i in narrowed.json()["items"]] == [51.0]
+
+    # A foreign session id filters within your scope: it matches nothing.
+    foreign = await client.get(
+        "/v1/resources/location/points",
+        params={"session_id": str(theirs.id)},
+        headers=account.headers,
+    )
+    assert foreign.json()["items"] == []
+
+
+async def test_wall_clock_query_rejects_negative_window(
+    client: httpx.AsyncClient, account: Account
+) -> None:
+    response = await client.get(
+        "/v1/resources/location/points",
+        params={"from_ms": -1},
+        headers=account.headers,
+    )
+    assert response.status_code == 422
+
+
+async def test_wall_clock_prefilter_trims_batch_edges(
+    client: httpx.AsyncClient, account: Account
+) -> None:
+    """A window inside one batch returns only the covered points — the
+    row-level span prefilter must not skip the batch, and the point-level
+    filter must trim it."""
+    noon = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+    session = await _session_started_at(account, noon)
+    base = _ms(noon)
+    await ingest_location(
+        session.id,
+        [{"lat": 51.0 + i, "lon": -114.0, "t": base + i * 60_000} for i in range(5)],
+    )
+
+    inside = await client.get(
+        "/v1/resources/location/points",
+        params={"from_ms": base + 60_000, "to_ms": base + 180_000},
+        headers=account.headers,
+    )
+    assert [i["lat"] for i in inside.json()["items"]] == [52.0, 53.0]

@@ -93,7 +93,7 @@ async def test_stream_happy_path(
     assert [item["sequence"] for item in items] == list(range(12))
     assert items[0]["content_type"] == "audio/wav"
 
-    audio = await client.get(f"/v1/segments/{items[3]['id']}/audio", headers=account.headers)
+    audio = await client.get(f"/v1/segments/{items[3]['id']}/media", headers=account.headers)
     assert audio.content == payloads[3]
 
     ended = await client.get(f"/v1/sessions/{session_id}", headers=account.headers)
@@ -373,3 +373,95 @@ async def test_stale_sessions_are_swept(
         async with _connect(server, session.id, account):
             pass
     assert err.value.response.status_code == 409
+
+
+def _location_chunk(sequence: int, points: list[dict[str, Any]], **fields: Any) -> bytes:
+    return encode_chunk(
+        ChunkHeader(sequence=sequence, resource="location", **fields),
+        json.dumps({"points": points}).encode(),
+    )
+
+
+async def test_stream_interleaves_location_with_audio(
+    server: str, client: httpx.AsyncClient, account: Account
+) -> None:
+    """Location batches ride the same socket, sequence space and acks.
+
+    The audio chunks must stitch exactly as they would alone — interleaved
+    location rows share the sequence counter but not the byte stream.
+    """
+    from database.pipe import DatabasePipe
+
+    session = await make_session(account)
+    payloads = [wav_bytes(seconds=0.05, freq=300 + 10 * i) for i in range(4)]
+    batches = [
+        [{"lat": 51.0, "lon": -114.0, "t": 1_000 + i, "accuracy_m": 5.0}] for i in range(2)
+    ]
+
+    async with _connect(server, session.id, account) as ws:
+        await ws.send(HELLO)
+        welcome = await _recv_until(ws, "welcome")
+        assert "location" in welcome["resources"]
+
+        await ws.send(_chunk(0, payloads[0]))
+        await ws.send(_location_chunk(1, batches[0]))
+        await ws.send(_chunk(2, payloads[1]))
+        await ws.send(_chunk(3, payloads[2]))
+        await ws.send(_location_chunk(4, batches[1]))
+        await ws.send(_chunk(5, payloads[3]))
+        await ws.send(FINISH)
+        events = await _drain_to_close(ws)
+
+    acks = [event for event in events if event["type"] == "ack"]
+    assert acks[-1]["through"] == 5
+    assert not [event for event in events if event["type"] == "error"]
+
+    async with DatabasePipe() as pipe:
+        rows = await pipe.segments.list_for_session(session.id)
+        location_rows = await pipe.segments.list_for_session(session.id, resource="location")
+    assert [row.resource for row in rows] == [
+        "audio", "location", "audio", "audio", "location", "audio",
+    ]
+    assert [row.sequence for row in location_rows] == [1, 4]
+    for row, batch in zip(location_rows, batches):
+        assert row.payload == {"points": batch}
+        assert row.bucket is None and row.object_key is None
+        assert row.content_type == "application/json"
+        assert row.captured_at is not None  # derived from the first point
+
+    # The stitched audio is untouched by the interleaved rows.
+    stitched = await client.get(f"/v1/sessions/{session.id}/resources/audio/media", headers=account.headers)
+    assert stitched.status_code == 200
+    body = stitched.content
+    assert body[:4] == b"RIFF"
+    assert len(body) == 44 + sum(len(p) - 44 for p in payloads)
+
+
+async def test_stream_rejects_bad_location_batch_and_unknown_resource(
+    server: str, client: httpx.AsyncClient, account: Account
+) -> None:
+    """A bad batch is a recoverable chunk error; the sequence retransmits."""
+    session = await make_session(account)
+
+    async with _connect(server, session.id, account) as ws:
+        await ws.send(HELLO)
+        await _recv_until(ws, "welcome")
+
+        await ws.send(_location_chunk(0, [{"lat": 99.0, "lon": 0.0, "t": 1}]))
+        error = await _recv_until(ws, "error")
+        assert (error["code"], error["scope"]) == ("invalid_payload", "chunk")
+        assert error["sequence"] == 0
+
+        head = json.dumps({"sequence": 1, "resource": "video"}).encode()
+        await ws.send(len(head).to_bytes(4, "big") + head + b"frame")
+        error = await _recv_until(ws, "error")
+        assert (error["code"], error["scope"]) == ("bad_header", "chunk")
+
+        # Both sequences retransmit fine — nothing was stored.
+        await ws.send(_location_chunk(0, [{"lat": 51.0, "lon": -114.0, "t": 1}]))
+        await ws.send(_chunk(1, wav_bytes(seconds=0.05)))
+        await ws.send(FINISH)
+        events = await _drain_to_close(ws)
+
+    acks = [event for event in events if event["type"] == "ack"]
+    assert acks[-1]["through"] == 1

@@ -11,7 +11,8 @@ import struct
 from dataclasses import dataclass
 from typing import Iterator
 
-from database.schema.segments import AudioSegment
+from database.schema.segments import ResourceSegment
+from resources.audio import AudioAttrs
 
 WAV_HEADER_BYTES = 44
 
@@ -46,18 +47,23 @@ class StitchPlan:
         return self.total_size - WAV_HEADER_BYTES
 
 
-def check_uniform(segments: list[AudioSegment]) -> None:
-    """Reject mixed formats before any byte is sent."""
+def check_uniform(segments: list[ResourceSegment]) -> None:
+    """Reject mixed formats before any byte is sent.
+
+    Callers pass audio segments only; other resources have no PCM stream to
+    join.
+    """
     types = {segment.content_type for segment in segments}
     if types != {"audio/wav"}:
         raise NotStitchable(f"session mixes content types {sorted(types)}; only audio/wav stitches")
+    attrs = [AudioAttrs.from_attrs(segment.attrs) for segment in segments]
     for field in ("sample_rate_hz", "channels", "codec"):
-        values = {getattr(segment, field) for segment in segments} - {None}
+        values = {getattr(item, field) for item in attrs} - {None}
         if len(values) > 1:
             raise NotStitchable(f"session mixes {field} values {sorted(values)}")
 
 
-def plan(segments: list[AudioSegment]) -> StitchPlan:
+def plan(segments: list[ResourceSegment]) -> StitchPlan:
     """Lay the segments' data chunks out behind one shared header.
 
     A segment shorter than its own header contributes nothing rather than
@@ -69,6 +75,7 @@ def plan(segments: list[AudioSegment]) -> StitchPlan:
         length = max(0, segment.byte_size - WAV_HEADER_BYTES)
         if length == 0:
             continue
+        assert segment.object_key is not None  # audio/wav (check_uniform) is blob-backed
         pieces.append(Piece(object_key=segment.object_key, start=at, data_length=length))
         at += length
     return StitchPlan(pieces=tuple(pieces), total_size=at)

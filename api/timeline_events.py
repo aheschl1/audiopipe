@@ -1,17 +1,23 @@
-"""Expand a session and its pipeline artifacts into the ordered event timeline.
+"""Expand a session, its pipeline artifacts and its raw resource segments
+into the ordered event timeline.
 
-Pure planning over rows, no I/O. Each ``(pipeline, kind)`` with a registered
-expander contributes events; everything else (``speech-map``,
-``session-stats``, kinds from tiers not yet surfaced) is skipped.
-Registering one expander is all a new tier needs to appear on the timeline.
+Pure planning over rows, no I/O. Two symmetric registries feed it: each
+``(pipeline, kind)`` with a registered artifact expander contributes events,
+and each *resource* with a registered segment expander contributes events
+straight from its stored segments (live while the session is open — no
+pipeline pass needed). Everything unregistered (``speech-map``,
+``session-stats``, audio segments, ...) is skipped. Registering one
+expander — artifact- or segment-keyed — is all a new tier or resource needs
+to appear on the timeline.
 """
 
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from itertools import chain
 
 from api.schema.timeline import (
     AudioTagEvent,
+    LocationPointEvent,
     SessionEndEvent,
     SessionStartEvent,
     SoundSpanEvent,
@@ -21,12 +27,15 @@ from api.schema.timeline import (
     TranscriptEvent,
 )
 from database.schema.artifacts import PipelineArtifact
+from database.schema.segments import ResourceSegment
 from database.schema.sessions import RecordingSession
 from database.schema.speakers import SessionSpeakerLabel
 
 Expander = Callable[[PipelineArtifact], Iterator[TimelineEvent]]
+SegmentExpander = Callable[[ResourceSegment, RecordingSession], Iterator[TimelineEvent]]
 
 _EXPANDERS: dict[tuple[str, str], Expander] = {}
+_SEGMENT_EXPANDERS: dict[str, SegmentExpander] = {}
 
 # At one timestamp: the session opens first; span A ends before adjacent
 # span B starts; a transcript follows its span's start; the session closes
@@ -38,6 +47,7 @@ _TYPE_RANK = {
     "transcript": 3,
     "audio-tag": 4,
     "sound-span": 5,
+    "location-point": 6,
     "session-end": 100,
 }
 _DEFAULT_RANK = 50
@@ -113,6 +123,33 @@ def _sound_span_events(artifact: PipelineArtifact) -> Iterator[TimelineEvent]:
     )
 
 
+def segment_expander(resource: str) -> Callable[[SegmentExpander], SegmentExpander]:
+    """Register the expander for one resource's raw segments."""
+
+    def register(fn: SegmentExpander) -> SegmentExpander:
+        _SEGMENT_EXPANDERS[resource] = fn
+        return fn
+
+    return register
+
+
+@segment_expander("location")
+def _location_events(
+    segment: ResourceSegment, session: RecordingSession
+) -> Iterator[TimelineEvent]:
+    base_epoch_ms = int(session.started_at.timestamp() * 1000)
+    for point in (segment.payload or {}).get("points", ()):
+        yield LocationPointEvent(
+            at_ms=point["t"] - base_epoch_ms,
+            segment_id=segment.id,
+            lat=point["lat"],
+            lon=point["lon"],
+            alt_m=point.get("alt_m"),
+            accuracy_m=point.get("accuracy_m"),
+            captured_at=datetime.fromtimestamp(point["t"] / 1000, tz=UTC),
+        )
+
+
 def _nothing(artifact: PipelineArtifact) -> Iterator[TimelineEvent]:
     return iter(())
 
@@ -124,12 +161,18 @@ def _session_events(session: RecordingSession) -> Iterator[TimelineEvent]:
         yield SessionEndEvent(at_ms=max(0, elapsed), ended_at=session.ended_at)
 
 
+def timeline_resources() -> tuple[str, ...]:
+    """The resources whose raw segments expand to events — what the timeline
+    route must fetch."""
+    return tuple(_SEGMENT_EXPANDERS)
+
+
 def _sort_key(event: TimelineEvent) -> tuple[int, int, str, str]:
-    artifact_id = getattr(event, "artifact_id", None)
+    source_id = getattr(event, "artifact_id", None) or getattr(event, "segment_id", None)
     return (
         event.at_ms,
         _TYPE_RANK.get(event.type, _DEFAULT_RANK),
-        "" if artifact_id is None else str(artifact_id),
+        "" if source_id is None else str(source_id),
         event.type,
     )
 
@@ -138,11 +181,16 @@ def assemble(
     session: RecordingSession,
     artifacts: Sequence[PipelineArtifact],
     *,
+    segments: Sequence[ResourceSegment] = (),
     from_ms: int | None = None,
     to_ms: int | None = None,
     speakers: Mapping[str, SessionSpeakerLabel] | None = None,
 ) -> list[TimelineEvent]:
     """Every event derivable from the rows, in timeline order.
+
+    ``segments`` are raw resource segments (of :func:`timeline_resources`
+    types) merged into the same ordered stream as artifact events; a segment
+    whose resource has no expander contributes nothing.
 
     ``from_ms``/``to_ms`` keep only events positioned in ``[from_ms, to_ms)``:
     an artifact overlapping the window contributes just the events inside it,
@@ -159,6 +207,12 @@ def assemble(
             event
             for artifact in artifacts
             for event in _EXPANDERS.get((artifact.pipeline, artifact.kind), _nothing)(artifact)
+        ),
+        (
+            event
+            for segment in segments
+            if (expand := _SEGMENT_EXPANDERS.get(segment.resource)) is not None
+            for event in expand(segment, session)
         ),
     )
     if from_ms is not None:

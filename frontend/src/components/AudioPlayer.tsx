@@ -25,7 +25,7 @@ export default function AudioPlayer({
       return false
     }
     setFailed(false)
-    setSrc(`/v1/sessions/${sessionId}/audio?token=${encodeURIComponent(data.token)}`)
+    setSrc(`/v1/sessions/${sessionId}/resources/audio/media?token=${encodeURIComponent(data.token)}`)
     return true
   }
 

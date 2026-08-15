@@ -83,36 +83,62 @@ recognise** — that is how new effect events arrive without a version bump.
 }
 ```
 
-`defaults` (all optional) apply to every chunk; a chunk may override
-`content_type` only. `effects` is reserved for requesting server-side effects;
-no effects exist yet, and the server echoes the enabled set in `welcome`.
-`token` is used only in hello-token mode (see *Connecting*). A `version` the
-server does not speak closes the socket with 4400.
+`defaults` (all optional) apply to every **audio** chunk — they are PCM
+parameters, and chunks of other resources ignore them, resolving content type
+from their own header or their resource type's default. An audio chunk may
+override `content_type` only. `effects` is reserved for requesting
+server-side effects; no effects exist yet, and the server echoes the enabled
+set in `welcome`. `token` is used only in hello-token mode (see *Connecting*).
+A `version` the server does not speak closes the socket with 4400.
 
 ### `chunk` (binary)
 
 ```
 +----------------------+------------------+------------------+
-| header length (u32,  | ChunkHeader JSON | audio payload    |
+| header length (u32,  | ChunkHeader JSON | resource payload |
 | big-endian, 4 bytes) | (header length   | (rest of message)|
 |                      |  bytes of UTF-8) |                  |
 +----------------------+------------------+------------------+
 ```
 
 One message per chunk — atomic by construction, nothing to pair across frames.
-The payload must be a complete, independently decodable audio object (a short
-WAV/Opus/WebM file, not a slice of a longer bitstream) and must not be empty.
+The payload must be a complete, independently decodable unit of its resource
+and must not be empty. For audio that means a whole short WAV/Opus/WebM file,
+not a slice of a longer bitstream; for location, one JSON batch of points
+(below).
 
 `ChunkHeader` fields:
 
 | field | required | meaning |
 |---|---|---|
 | `sequence` | yes | client-assigned, ≥ 0; consecutive from `welcome.next_sequence` |
+| `resource` | no | resource type of the payload; default `audio`. The server lists what it accepts in `welcome.resources` |
 | `captured_at` | no | ISO 8601 capture timestamp |
-| `duration_ms` | no | payload duration |
-| `content_type` | no | overrides the hello default for this chunk |
+| `duration_ms` | no | payload duration/span |
+| `content_type` | no | overrides the hello default (audio) or the resource default |
 | `checksum_sha256` | no | hex; the server verifies and rejects a mismatch |
 | `metadata` | no | JSON object, stored on the segment |
+
+Sequences share one per-session space across resources: interleaving location
+chunks between audio chunks consumes sequence numbers from the same counter,
+and acks stay cumulative over that single space.
+
+#### `location` payloads
+
+Content type `application/json`:
+
+```json
+{"points": [{"lat": 51.04732, "lon": -114.05829, "t": 1755205000123,
+             "alt_m": 1045.0, "accuracy_m": 8.5}]}
+```
+
+`t` is epoch **milliseconds**; points must be ordered by `t` (1–10 000 per
+batch); `alt_m`/`accuracy_m` are optional. The stored row spans its batch:
+`captured_at` defaults to the first point's time and `duration_ms` to the
+first-to-last span. On the session timeline a point's position is derived
+from wall clock (`t` minus the session start), which can drift from the
+audio-position time other events use when capture had gaps — the same caveat
+as `session-end`.
 
 ### `finish` (text)
 
@@ -136,12 +162,15 @@ session open for a resumed connection — see *Disconnects* below.
   "next_sequence": 0,
   "ack_window": {"chunks": 10, "seconds": 2.0},
   "limits": {"max_chunk_bytes": 8388608},
-  "effects": []
+  "effects": [],
+  "resources": ["audio", "location"]
 }
 ```
 
 `next_sequence` is one past the highest sequence already stored — 0 for a
-fresh session, the resume point after a reconnect.
+fresh session, the resume point after a reconnect. `resources` lists the
+resource types this server accepts in chunk headers — feature detection for
+clients that stream more than audio.
 
 ### `ack`
 
@@ -170,9 +199,10 @@ lists retransmitted sequences that were already stored (also durable). A
 
 | code | scope | meaning |
 |---|---|---|
-| `bad_header` | chunk | malformed binary envelope, header JSON, or empty payload |
+| `bad_header` | chunk | malformed binary envelope, header JSON, empty payload, or unknown `resource` |
 | `chunk_too_large` | chunk | payload exceeds `limits.max_chunk_bytes` |
 | `checksum_mismatch` | chunk | payload does not match `checksum_sha256` |
+| `invalid_payload` | chunk | the payload violates its resource's contract (e.g. a malformed location batch) |
 | `storage_failure` | chunk | store write failed; retransmit |
 | `session_ended` | session | session was ended (REST or sweeper) mid-stream |
 | `protocol_error` | session | unparseable text frame, or a second `hello` |

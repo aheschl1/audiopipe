@@ -5,21 +5,26 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
-from database.schema.segments import UserUsage
+from database.schema.segments import ResourceUsage
 from database.schema.users import User
 
 
-class UsageRead(BaseModel):
-    """How much audio the caller has stored."""
+class ResourceUsageRead(BaseModel):
+    """How much of one resource the caller has stored."""
 
     model_config = ConfigDict(frozen=True)
 
+    resource: str
     segments: int
     total_bytes: int
 
     @classmethod
-    def from_model(cls, usage: UserUsage) -> "UsageRead":
-        return cls(segments=usage.segments, total_bytes=usage.total_bytes)
+    def from_model(cls, usage: ResourceUsage) -> "ResourceUsageRead":
+        return cls(
+            resource=usage.resource,
+            segments=usage.segments,
+            total_bytes=usage.total_bytes,
+        )
 
 
 class UserRead(BaseModel):
@@ -43,9 +48,13 @@ class UserRead(BaseModel):
 
 
 class MeRead(BaseModel):
-    """`GET /v1/me`: who the token belongs to, and what they have stored."""
+    """`GET /v1/me`: who the token belongs to, and what they have stored.
+
+    ``usage`` holds one entry per resource the caller has captured, ordered by
+    resource name; a resource never captured has no entry.
+    """
 
     model_config = ConfigDict(frozen=True)
 
     user: UserRead
-    usage: UsageRead
+    usage: tuple[ResourceUsageRead, ...]

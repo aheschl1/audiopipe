@@ -17,7 +17,9 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from database.pipe import DatabasePipe
-from database.schema.segments import AudioSegment
+from database.schema.segments import ResourceSegment
+from resources import Resource
+from resources.audio import AudioAttrs
 from services import stitch
 from storage.pipe import BlobPipe
 
@@ -100,7 +102,9 @@ async def load_timeline(session_id: UUID) -> SessionTimeline | None:
     declared them, else from the first segment's WAV header.
     """
     async with DatabasePipe() as pipe:
-        segments = await pipe.segments.list_for_session(session_id, limit=_MAX_SEGMENTS)
+        segments = await pipe.segments.list_for_session(
+            session_id, resource=Resource.AUDIO, limit=_MAX_SEGMENTS
+        )
     if not segments:
         return None
     stitch.check_uniform(segments)
@@ -113,10 +117,12 @@ async def load_timeline(session_id: UUID) -> SessionTimeline | None:
     )
 
 
-async def _pcm_parameters(segments: list[AudioSegment]) -> tuple[int, int]:
+async def _pcm_parameters(segments: list[ResourceSegment]) -> tuple[int, int]:
     first = segments[0]
-    if first.sample_rate_hz and first.channels:
-        return first.sample_rate_hz, first.channels
+    attrs = AudioAttrs.from_attrs(first.attrs)
+    if attrs.sample_rate_hz and attrs.channels:
+        return attrs.sample_rate_hz, attrs.channels
+    assert first.object_key is not None  # audio/wav (check_uniform) is blob-backed
     async with BlobPipe() as blobs:
         header = b"".join(
             [

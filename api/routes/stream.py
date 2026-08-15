@@ -37,10 +37,12 @@ from api.schema.stream import (
     decode_chunk,
     parse_client_frame,
 )
+import resources
 from database.exceptions import DuplicateSequenceError, NotFoundError, SessionEndedError
 from database.pipe import DatabasePipe
 from database.schema.sessions import RecordingSession
-from services.audio import ChecksumMismatchError, stream_segment
+from resources import Resource, ResourceValidationError
+from services.segments import ChecksumMismatchError, stream_segment
 from storage.pipe import BlobPipe
 from storage.s3 import S3BlobStore
 
@@ -280,6 +282,7 @@ async def stream_session_audio(websocket: WebSocket, session_id: UUID) -> None:
                 next_sequence=next_sequence,
                 ack_window=window,
                 limits=StreamLimits(max_chunk_bytes=settings.stream_max_chunk_bytes),
+                resources=resources.names(),
             )
         )
         async with BlobPipe() as blobs:
@@ -544,25 +547,45 @@ async def _ingest_chunk(
         except ValueError:
             reject("bad_header", "checksum_sha256 is not hex", header.sequence)
             return
+    if header.resource not in resources.names():
+        # An invalid header field value, same as any other; only a client
+        # newer than the server can trigger it.
+        reject("bad_header", f"unknown resource {header.resource!r}", header.sequence)
+        return
 
+    # The hello defaults are PCM parameters — they apply to audio chunks only.
     defaults = hello.defaults
+    if header.resource == Resource.AUDIO:
+        content_type = header.content_type or defaults.content_type
+        attrs = {
+            "codec": defaults.codec,
+            "sample_rate_hz": defaults.sample_rate_hz,
+            "channels": defaults.channels,
+        }
+    else:
+        content_type = header.content_type
+        attrs = {}
     try:
         segment = await stream_segment(
             blobs,
             session,
             header.sequence,
             payload,
-            content_type=header.content_type or defaults.content_type,
+            resource=header.resource,
+            content_type=content_type,
             captured_at=header.captured_at,
             duration_ms=header.duration_ms,
-            codec=defaults.codec,
-            sample_rate_hz=defaults.sample_rate_hz,
-            channels=defaults.channels,
+            attrs=attrs,
             metadata=header.metadata,
             expected_checksum=expected_checksum,
         )
     except ChecksumMismatchError as exc:
         reject("checksum_mismatch", str(exc), header.sequence)
+        return
+    except ResourceValidationError as exc:
+        # Recoverable like checksum_mismatch: the chunk is dropped, the ack
+        # never advances past it, the stream carries on.
+        reject("invalid_payload", str(exc), header.sequence)
         return
     except DuplicateSequenceError:
         tracker.note_duplicate(header.sequence)

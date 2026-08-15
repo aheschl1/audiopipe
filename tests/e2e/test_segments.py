@@ -90,4 +90,6 @@ async def test_usage_totals_track_ingests(client: httpx.AsyncClient, account: Ac
         await ingest(session.id, payload)
 
     usage = (await client.get("/v1/me", headers=account.headers)).json()["usage"]
-    assert usage == {"segments": 2, "total_bytes": sum(len(p) for p in payloads)}
+    assert usage == [
+        {"resource": "audio", "segments": 2, "total_bytes": sum(len(p) for p in payloads)}
+    ]

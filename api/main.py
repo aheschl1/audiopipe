@@ -19,7 +19,18 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.config import get_settings
-from api.routes import ab, auth, health, search, segments, sessions, speakers, stream, users
+from api.routes import (
+    ab,
+    auth,
+    health,
+    resources,
+    search,
+    segments,
+    sessions,
+    speakers,
+    stream,
+    users,
+)
 from api.schema.common import ErrorResponse
 from api.schema.stream_export import build_schema
 from database.exceptions import DatabaseError, NotFoundError
@@ -129,6 +140,7 @@ def create_app() -> FastAPI:
     app.include_router(users.router, prefix=API_PREFIX)
     app.include_router(sessions.router, prefix=API_PREFIX)
     app.include_router(segments.router, prefix=API_PREFIX)
+    app.include_router(resources.router, prefix=API_PREFIX)
     app.include_router(speakers.router, prefix=API_PREFIX)
     app.include_router(search.router, prefix=API_PREFIX)
     app.include_router(stream.router, prefix=API_PREFIX)

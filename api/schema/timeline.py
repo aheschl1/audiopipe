@@ -33,6 +33,13 @@ class ArtifactEventBase(TimelineEventBase):
     )
 
 
+class SegmentEventBase(TimelineEventBase):
+    """An event derived directly from one resource segment — no pipeline
+    involved, so it is live while the session is still open."""
+
+    segment_id: UUID = Field(description="The resource segment this event derives from.")
+
+
 class SessionStartEvent(TimelineEventBase):
     """Opens every timeline at ``at_ms`` 0."""
 
@@ -145,6 +152,22 @@ class SoundSpanEvent(ArtifactEventBase):
     model: str | None = Field(None, description="The tagging model behind the scores.")
 
 
+class LocationPointEvent(SegmentEventBase):
+    """One GPS fix.
+
+    ``at_ms`` is wall-clock-derived (the fix's time minus the session start),
+    which can drift from the audio-position time other events use when
+    capture had gaps — the same caveat as ``session-end``.
+    """
+
+    type: Literal["location-point"] = "location-point"
+    lat: float
+    lon: float
+    alt_m: float | None = None
+    accuracy_m: float | None = None
+    captured_at: datetime = Field(description="Wall-clock time of the fix.")
+
+
 type TimelineEvent = Annotated[
     SessionStartEvent
     | SessionEndEvent
@@ -152,6 +175,7 @@ type TimelineEvent = Annotated[
     | SpeechStartEvent
     | TranscriptEvent
     | AudioTagEvent
-    | SoundSpanEvent,
+    | SoundSpanEvent
+    | LocationPointEvent,
     Field(discriminator="type"),
 ]

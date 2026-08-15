@@ -11,9 +11,9 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, Path, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from api.schema.common import PageParams
+from api.schema.common import PageParams, RangeParams
 from database.pipe import DatabasePipe
-from database.schema.segments import AudioSegment
+from database.schema.segments import ResourceSegment
 from database.schema.sessions import RecordingSession
 from database.schema.speakers import Speaker
 from database.schema.users import User
@@ -138,8 +138,8 @@ PlayableSession = Annotated[RecordingSession, Depends(get_playable_session)]
 
 async def get_owned_segment(
     user: CurrentUser,
-    segment_id: Annotated[UUID, Path(description="An audio segment belonging to you.")],
-) -> AudioSegment:
+    segment_id: Annotated[UUID, Path(description="A segment belonging to you.")],
+) -> ResourceSegment:
     """Load a segment the caller owns. Another user's segment raises 404.
 
     On its own short-lived connection (see :func:`get_owned_session`): the
@@ -149,12 +149,12 @@ async def get_owned_segment(
         segment = await pipe.segments.get(segment_id)
     if segment is None or segment.user_id != user.id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="audio segment not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="segment not found"
         )
     return segment
 
 
-OwnedSegment = Annotated[AudioSegment, Depends(get_owned_segment)]
+OwnedSegment = Annotated[ResourceSegment, Depends(get_owned_segment)]
 
 
 async def get_owned_speaker(
@@ -174,3 +174,4 @@ async def get_owned_speaker(
 OwnedSpeaker = Annotated[Speaker, Depends(get_owned_speaker)]
 
 Paging = Annotated[PageParams, Depends()]
+Range = Annotated[RangeParams, Depends()]

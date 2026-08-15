@@ -46,6 +46,7 @@ from processing.base import Pipeline
 # import; existing importers keep working.
 from processing.clustering import cluster_corpus  # noqa: F401
 from processing.config import ProcessingSettings, get_settings
+from resources import Resource
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +209,7 @@ def _match_identity(
 
 class SpeakerClusterPipeline(Pipeline):
     name = "speaker-cluster"
+    resource = Resource.AUDIO
 
     async def setup(self) -> None:
         self._settings = get_settings()
