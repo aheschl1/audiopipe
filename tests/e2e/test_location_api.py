@@ -14,10 +14,12 @@ def _ms(at: datetime) -> int:
     return int(at.timestamp() * 1000)
 
 
-async def _session_started_at(account: Account, started_at: datetime):
+async def _session_started_at(
+    account: Account, started_at: datetime, label: str | None = None
+):
     async with DatabasePipe() as pipe:
         return await pipe.sessions.create(
-            SessionCreate(user_id=account.user.id, started_at=started_at)
+            SessionCreate(user_id=account.user.id, started_at=started_at, label=label)
         )
 
 
@@ -189,3 +191,100 @@ async def test_wall_clock_prefilter_trims_batch_edges(
         headers=account.headers,
     )
     assert [i["lat"] for i in inside.json()["items"]] == [52.0, 53.0]
+
+
+async def test_tracks_group_per_session(
+    client: httpx.AsyncClient, account: Account
+) -> None:
+    noon = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+    later = datetime(2026, 8, 14, 15, 0, tzinfo=UTC)
+    one = await _session_started_at(account, noon, label="morning walk")
+    two = await _session_started_at(account, later)
+    await ingest_location(
+        one.id,
+        [
+            {"lat": 51.0, "lon": -114.0, "t": _ms(noon) + 1_000},
+            {"lat": 51.2, "lon": -114.4, "t": _ms(noon) + 2_000},
+        ],
+    )
+    await ingest_location(two.id, [{"lat": 52.0, "lon": -113.0, "t": _ms(later) + 5_000}])
+
+    response = await client.get("/v1/resources/location/tracks", headers=account.headers)
+    assert response.status_code == 200
+    tracks = response.json()
+    # A plain list, not a Page envelope; sessions contiguous, oldest first.
+    assert isinstance(tracks, list)
+    assert [t["session_id"] for t in tracks] == [str(one.id), str(two.id)]
+    first = tracks[0]
+    assert first["label"] == "morning walk"
+    assert first["point_count"] == 2
+    assert (first["min_lat"], first["max_lat"]) == (51.0, 51.2)
+    assert (first["min_lon"], first["max_lon"]) == (-114.4, -114.0)
+    assert [p["at_ms"] for p in first["points"]] == [1_000, 2_000]
+    assert tracks[1]["points"][0]["lat"] == 52.0
+
+
+async def test_tracks_decimate_keeping_endpoints(
+    client: httpx.AsyncClient, account: Account
+) -> None:
+    noon = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+    session = await _session_started_at(account, noon)
+    base = _ms(noon)
+    await ingest_location(
+        session.id,
+        [{"lat": 51.0 + i / 10, "lon": -114.0, "t": base + i * 1_000} for i in range(10)],
+    )
+
+    response = await client.get(
+        "/v1/resources/location/tracks",
+        params={"max_points": 4},
+        headers=account.headers,
+    )
+    (track,) = response.json()
+    # Stride ceil(10/4)=3 keeps fixes 0,3,6,9 — the last fix survives.
+    assert [p["at_ms"] for p in track["points"]] == [0, 3_000, 6_000, 9_000]
+    assert track["point_count"] == 10
+    # Bounds span every fix, not just the survivors.
+    assert (track["min_lat"], track["max_lat"]) == (51.0, 51.9)
+
+
+async def test_tracks_window_filters(
+    client: httpx.AsyncClient, account: Account
+) -> None:
+    noon = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+    inside = await _session_started_at(account, noon)
+    outside = await _session_started_at(account, datetime(2026, 8, 14, 18, 0, tzinfo=UTC))
+    base = _ms(noon)
+    await ingest_location(
+        inside.id,
+        [{"lat": 51.0 + i, "lon": -114.0, "t": base + i * 60_000} for i in range(5)],
+    )
+    await ingest_location(
+        outside.id, [{"lat": 60.0, "lon": -100.0, "t": base + 6 * 3_600_000}]
+    )
+
+    response = await client.get(
+        "/v1/resources/location/tracks",
+        params={"from_ms": base + 60_000, "to_ms": base + 180_000},
+        headers=account.headers,
+    )
+    (track,) = response.json()
+    assert track["session_id"] == str(inside.id)
+    assert [p["lat"] for p in track["points"]] == [52.0, 53.0]
+    # Count and bounds are exact for the window, not the whole session.
+    assert track["point_count"] == 2
+    assert (track["min_lat"], track["max_lat"]) == (52.0, 53.0)
+
+
+async def test_tracks_scoped_to_owner(
+    client: httpx.AsyncClient, account: Account, other_account: Account
+) -> None:
+    noon = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+    theirs = await _session_started_at(other_account, noon)
+    await ingest_location(theirs.id, [{"lat": 0.0, "lon": 0.0, "t": _ms(noon) + 1_000}])
+    # A session of our own with no location data must not appear either.
+    await make_session(account)
+
+    response = await client.get("/v1/resources/location/tracks", headers=account.headers)
+    assert response.status_code == 200
+    assert response.json() == []

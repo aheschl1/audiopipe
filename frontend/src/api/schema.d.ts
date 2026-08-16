@@ -505,6 +505,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/resources/location/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Per-session GPS tracks by wall-clock time
+         * @description Your sessions' tracks as decimated polylines, one entry per session.
+         *
+         *     The window is epoch milliseconds, half-open on ``captured_at``, exactly
+         *     like the sibling points route — but instead of paging raw fixes this
+         *     thins each session's in-window points to an even stride of at most
+         *     ``max_points`` (+1: the endpoint fix is kept), while ``point_count`` and
+         *     the lat/lon bounds stay exact. Only sessions with a fix in the window
+         *     appear; sessions come back oldest first. A windowless call scans every
+         *     stored batch you own.
+         */
+        get: operations["list_location_tracks_v1_resources_location_tracks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/speakers": {
         parameters: {
             query?: never;
@@ -1971,6 +1999,42 @@ export interface components {
             started_at: string;
         };
         /**
+         * SessionTrackRead
+         * @description One session's GPS track over the queried window.
+         *
+         *     ``point_count`` and the bounds are exact (computed before decimation);
+         *     ``points`` is the thinned polyline, oldest first, first and last fixes
+         *     always included.
+         */
+        SessionTrackRead: {
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Label */
+            label: string | null;
+            /** Device */
+            device: string | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Point Count */
+            point_count: number;
+            /** Min Lat */
+            min_lat: number;
+            /** Max Lat */
+            max_lat: number;
+            /** Min Lon */
+            min_lon: number;
+            /** Max Lon */
+            max_lon: number;
+            /** Points */
+            points: components["schemas"]["TrackPointRead"][];
+        };
+        /**
          * SimilarSpeakerRead
          * @description A merge candidate: another cluster in the same embedding model,
          *     with its centroid's cosine distance from the reference speaker.
@@ -2489,6 +2553,27 @@ export interface components {
              * @description Bearer token for the Authorization header.
              */
             token: string;
+        };
+        /**
+         * TrackPointRead
+         * @description One fix of a decimated track.
+         *
+         *     ``at_ms`` carries the same session-timeline semantics as
+         *     :class:`LocationPointRead.at_ms` (including possible negativity) — it is
+         *     the seek target for opening the session at this fix.
+         */
+        TrackPointRead: {
+            /** At Ms */
+            at_ms: number;
+            /**
+             * Captured At
+             * Format: date-time
+             */
+            captured_at: string;
+            /** Lat */
+            lat: number;
+            /** Lon */
+            lon: number;
         };
         /**
          * TranscriptEditRequest
@@ -3839,6 +3924,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_LocationPointRead_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_location_tracks_v1_resources_location_tracks_get: {
+        parameters: {
+            query?: {
+                /** @description Decimation cap per session; the first and last fixes always survive. */
+                max_points?: number;
+                from_ms?: number | null;
+                to_ms?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionTrackRead"][];
                 };
             };
             /** @description Unauthorized */
