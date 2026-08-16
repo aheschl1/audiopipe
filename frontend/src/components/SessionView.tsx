@@ -5,6 +5,7 @@ import { fmtDate, fmtDuration, shortId } from "../format"
 import { usePlayhead } from "../hooks/usePlayhead"
 import { useSessionEvents } from "../hooks/useSessionEvents"
 import AudioPlayer from "./AudioPlayer"
+import SessionMapPanel from "./SessionMapPanel"
 import TagSummary from "./TagSummary"
 import Timeline from "./Timeline"
 import TimelineStrip from "./TimelineStrip"
@@ -34,6 +35,7 @@ export default function SessionView({
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null)
   const [pendingSeek, setPendingSeek] = useState<number | undefined>(seekMs)
   const [follow, setFollow] = useState(true)
+  const [showMap, setShowMap] = useState(false)
   // Bumped after a speaker is labeled/merged anywhere on the page, so names
   // propagate to the strip, the transcript list, and the lane headers.
   const [refreshKey, setRefreshKey] = useState(0)
@@ -203,6 +205,17 @@ export default function SessionView({
           onFollowChange={setFollow}
           onSeek={seekTo}
           onSpeakersChanged={onSpeakersChanged}
+          mapOpen={showMap}
+          onMapToggle={() => setShowMap((v) => !v)}
+        />
+      )}
+      {showMap && (
+        <SessionMapPanel
+          sessionId={sessionId}
+          events={events}
+          truncated={truncated}
+          audioEl={audioEl}
+          onSeek={seekTo}
         />
       )}
       <TagSummary sessionId={sessionId} />

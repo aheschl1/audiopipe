@@ -4,6 +4,7 @@ import { api, type MeRead } from "./api/client"
 import AbOverview from "./components/AbOverview"
 import AbVoteView from "./components/AbVoteView"
 import Gate from "./components/Gate"
+import GeoMap from "./components/GeoMap"
 import SearchView from "./components/SearchView"
 import SessionList from "./components/SessionList"
 import SessionView from "./components/SessionView"
@@ -21,6 +22,8 @@ export default function App() {
   const [authed, setAuthed] = useState(() => getToken() !== null)
   const [view, setView] = useState<View>({ kind: "list", tab: "sessions" })
   const [me, setMe] = useState<MeRead | null>(null)
+  // The speakers tab hosts two faces: the list and the PCA voice map.
+  const [speakersSub, setSpeakersSub] = useState<"list" | "map">("list")
 
   useEffect(() => {
     setExpiryHandler(() => setAuthed(false))
@@ -71,7 +74,14 @@ export default function App() {
         </div>
       </header>
 
-      <main className={`main ${view.kind === "list" && view.tab === "map" ? "wide" : ""}`}>
+      <main
+        className={`main ${
+          view.kind === "list" &&
+          (view.tab === "map" || (view.tab === "speakers" && speakersSub === "map"))
+            ? "wide"
+            : ""
+        }`}
+      >
         {view.kind === "session" ? (
           <SessionView
             key={view.id}
@@ -92,11 +102,28 @@ export default function App() {
         ) : view.tab === "search" ? (
           <SearchView onOpen={openSession} />
         ) : view.tab === "map" ? (
-          <SpeakerMap onOpen={openSession} />
+          <GeoMap onOpen={openSession} />
         ) : view.tab === "ab" ? (
           <AbOverview onVote={(id) => setView({ kind: "ab", id })} />
         ) : (
-          <SpeakersView onOpen={openSession} />
+          <>
+            <div className="subtabs">
+              {(["list", "map"] as const).map((sub) => (
+                <button
+                  key={sub}
+                  className={`chip as-button ${speakersSub === sub ? "strong" : ""}`}
+                  onClick={() => setSpeakersSub(sub)}
+                >
+                  {sub === "list" ? "speakers" : "voice map"}
+                </button>
+              ))}
+            </div>
+            {speakersSub === "map" ? (
+              <SpeakerMap onOpen={openSession} />
+            ) : (
+              <SpeakersView onOpen={openSession} />
+            )}
+          </>
         )}
       </main>
     </div>

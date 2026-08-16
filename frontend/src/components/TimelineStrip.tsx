@@ -110,6 +110,8 @@ export default function TimelineStrip({
   onFollowChange,
   onSeek,
   onSpeakersChanged,
+  mapOpen,
+  onMapToggle,
 }: {
   events: TimelineEvent[]
   truncated: boolean
@@ -118,6 +120,8 @@ export default function TimelineStrip({
   onFollowChange: (follow: boolean) => void
   onSeek: (ms: number, play: boolean) => void
   onSpeakersChanged: () => void
+  mapOpen?: boolean
+  onMapToggle?: () => void
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const [zoom, setZoom] = useState(1)
@@ -425,6 +429,15 @@ export default function TimelineStrip({
             {showAllSounds
               ? `top ${SOUND_LANES_SHOWN} sounds`
               : `+${soundLanes.length - SOUND_LANES_SHOWN} more sounds`}
+          </button>
+        )}
+        {onMapToggle && (points.length > 0 || truncated) && (
+          <button
+            className={`chip as-button ${mapOpen ? "strong" : ""}`}
+            title="show where you were on the session's timeline"
+            onClick={onMapToggle}
+          >
+            {mapOpen ? "hide map" : "map"}
           </button>
         )}
         <button
