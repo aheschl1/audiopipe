@@ -35,6 +35,16 @@ export type TrackMapHandle = {
   destroy(): void
 }
 
+// Fetch the maplibre chunk ahead of need (the browser caches the modules;
+// createTrackMap's own imports then resolve instantly).
+export function preloadMapLibre(): void {
+  void Promise.all([
+    import("maplibre-gl"),
+    import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"),
+    import("maplibre-gl/dist/maplibre-gl.css"),
+  ]).catch(() => {})
+}
+
 // MapLibre dwarfs the rest of the app; the dynamic import keeps it in its own
 // chunk, fetched only when a map is first opened (same move as loadPlot()).
 export async function createTrackMap(
@@ -43,11 +53,14 @@ export async function createTrackMap(
 ): Promise<TrackMapHandle> {
   const [ml, worker] = await Promise.all([
     import("maplibre-gl"),
-    import("maplibre-gl/dist/maplibre-gl-worker.mjs?url"),
+    import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"),
     import("maplibre-gl/dist/maplibre-gl.css"),
   ])
   // MapLibre resolves its worker relative to its own module URL, which breaks
-  // once Vite pre-bundles/chunks it; hand it the asset URL Vite actually serves.
+  // once Vite pre-bundles/chunks it; hand it the asset URL Vite actually
+  // serves. `?worker&url` (not plain `?url`) so Vite bundles the worker's own
+  // imports — a verbatim copy would die on its relative maplibre-gl-shared
+  // import in production, killing all tile and GeoJSON parsing.
   ml.setWorkerUrl(worker.default)
 
   const map: MapLibreMap = new ml.Map({
@@ -59,9 +72,19 @@ export async function createTrackMap(
 
   // Wait for style.load, not load: sources/layers only need the style, and
   // the full load event stalls until every initial tile and glyph fetch
-  // settles — a single slow request would park the handle forever.
+  // settles — a single slow request would park the handle forever. A failed
+  // style fetch fires only `error`, so reject on it (and tear the map down)
+  // instead of hanging the promise and leaking the instance.
   if (!map.isStyleLoaded()) {
-    await new Promise<void>((resolve) => map.once("style.load", () => resolve()))
+    try {
+      await new Promise<void>((resolve, reject) => {
+        map.once("style.load", () => resolve())
+        map.once("error", (e) => reject(e.error ?? new Error("map style failed to load")))
+      })
+    } catch (err) {
+      map.remove()
+      throw err
+    }
   }
 
   map.addSource("tracks", { type: "geojson", data: emptyCollection() })

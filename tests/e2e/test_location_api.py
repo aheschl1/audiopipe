@@ -209,7 +209,11 @@ async def test_tracks_group_per_session(
     )
     await ingest_location(two.id, [{"lat": 52.0, "lon": -113.0, "t": _ms(later) + 5_000}])
 
-    response = await client.get("/v1/resources/location/tracks", headers=account.headers)
+    response = await client.get(
+        "/v1/resources/location/tracks",
+        params={"from_ms": _ms(noon), "to_ms": _ms(later) + 3_600_000},
+        headers=account.headers,
+    )
     assert response.status_code == 200
     tracks = response.json()
     # A plain list, not a Page envelope; sessions contiguous, oldest first.
@@ -237,7 +241,7 @@ async def test_tracks_decimate_keeping_endpoints(
 
     response = await client.get(
         "/v1/resources/location/tracks",
-        params={"max_points": 4},
+        params={"from_ms": base, "to_ms": base + 3_600_000, "max_points": 4},
         headers=account.headers,
     )
     (track,) = response.json()
@@ -285,6 +289,37 @@ async def test_tracks_scoped_to_owner(
     # A session of our own with no location data must not appear either.
     await make_session(account)
 
-    response = await client.get("/v1/resources/location/tracks", headers=account.headers)
+    response = await client.get(
+        "/v1/resources/location/tracks",
+        params={"from_ms": _ms(noon), "to_ms": _ms(noon) + 3_600_000},
+        headers=account.headers,
+    )
     assert response.status_code == 200
     assert response.json() == []
+
+
+async def test_tracks_window_required_and_capped(
+    client: httpx.AsyncClient, account: Account
+) -> None:
+    """The tracks query has no LIMIT, so the window is its only cost bound:
+    it must be present and at most 92 days wide."""
+    windowless = await client.get(
+        "/v1/resources/location/tracks", headers=account.headers
+    )
+    assert windowless.status_code == 422
+
+    base = _ms(datetime(2026, 1, 1, tzinfo=UTC))
+    day = 24 * 3_600_000
+    too_wide = await client.get(
+        "/v1/resources/location/tracks",
+        params={"from_ms": base, "to_ms": base + 93 * day},
+        headers=account.headers,
+    )
+    assert too_wide.status_code == 422
+
+    at_cap = await client.get(
+        "/v1/resources/location/tracks",
+        params={"from_ms": base, "to_ms": base + 92 * day},
+        headers=account.headers,
+    )
+    assert at_cap.status_code == 200

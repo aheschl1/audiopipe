@@ -1,15 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { api, type SessionTrackRead } from "../api/client"
 import { fmtDate, shortId } from "../format"
-import { fmtCoords, splitAtGaps } from "../location"
+import { fmtCoords, splitAtGaps, TRACK_GAP_MS } from "../location"
 import { createTrackMap, type TrackMapHandle, type TrackPt } from "../map/trackMap"
 import { hue } from "../speakers"
 
 const MAX_POINTS = 500
 
+// The backend caps the tracks window at 92 days; a [from, to] pair spans
+// to - from + 1 days, so the pickers keep the dates within 91 of each other.
+const MAX_RANGE_DAYS = 91
+
 function isoDate(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0")
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function shiftDays(day: string, delta: number): string {
+  const d = new Date(`${day}T00:00`)
+  d.setDate(d.getDate() + delta)
+  return isoDate(d)
 }
 
 function defaultRange(): { from: string; to: string } {
@@ -49,8 +59,7 @@ export default function GeoMap({
   const [selected, setSelected] = useState<{ sessionId: string; pt: TrackPt } | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [handle, setHandle] = useState<TrackMapHandle | null>(null)
-  const tracksRef = useRef<SessionTrackRead[] | null>(null)
-  tracksRef.current = tracks
+  const [mapFailed, setMapFailed] = useState(false)
 
   useEffect(() => {
     const el = containerRef.current
@@ -62,14 +71,18 @@ export default function GeoMap({
         const sessionId = trackId.split(":")[0] ?? trackId
         setSelected({ sessionId, pt })
       },
-    }).then((map) => {
-      if (dead) {
-        map.destroy()
-        return
-      }
-      created = map
-      setHandle(map)
     })
+      .then((map) => {
+        if (dead) {
+          map.destroy()
+          return
+        }
+        created = map
+        setHandle(map)
+      })
+      .catch(() => {
+        if (!dead) setMapFailed(true)
+      })
     return () => {
       dead = true
       created?.destroy()
@@ -81,6 +94,9 @@ export default function GeoMap({
     let stale = false
     setError(false)
     setSelected(null)
+    // Drop the old range's tracks up front so a failed reload can't leave
+    // them on the map under the new dates.
+    setTracks(null)
     void api
       .GET("/v1/resources/location/tracks", {
         params: { query: { ...epochWindow(range.from, range.to), max_points: MAX_POINTS } },
@@ -90,6 +106,9 @@ export default function GeoMap({
         if (data) setTracks(data)
         else setError(true)
       })
+      .catch(() => {
+        if (!stale) setError(true)
+      })
     return () => {
       stale = true
     }
@@ -98,14 +117,18 @@ export default function GeoMap({
   useEffect(() => {
     if (!handle || !tracks) return
     handle.setTracks(
-      tracks.flatMap((track) =>
-        splitAtGaps(track.points).map((segment, i) => ({
+      tracks.flatMap((track) => {
+        // The gap threshold is calibrated to raw capture spacing; decimation
+        // multiplies spacing by the stride, so scale it or a long gap-free
+        // track degrades into unconnected single-point segments.
+        const stride = Math.max(1, Math.ceil(track.point_count / MAX_POINTS))
+        return splitAtGaps(track.points, TRACK_GAP_MS * stride).map((segment, i) => ({
           id: `${track.session_id}:${i}`,
           color: trackColor(track),
           label: trackName(track),
           points: segment.map((p) => ({ atMs: p.at_ms, lat: p.lat, lon: p.lon })),
-        })),
-      ),
+        }))
+      }),
     )
     handle.fitTracks()
   }, [handle, tracks])
@@ -127,6 +150,7 @@ export default function GeoMap({
             type="date"
             className="input slim"
             value={range.from}
+            min={shiftDays(range.to, -MAX_RANGE_DAYS)}
             max={range.to}
             onChange={(e) => e.target.value && setRange((r) => ({ ...r, from: e.target.value }))}
           />
@@ -138,6 +162,7 @@ export default function GeoMap({
             className="input slim"
             value={range.to}
             min={range.from}
+            max={shiftDays(range.from, MAX_RANGE_DAYS)}
             onChange={(e) => e.target.value && setRange((r) => ({ ...r, to: e.target.value }))}
           />
         </label>
@@ -154,6 +179,7 @@ export default function GeoMap({
             <div className="geo-empty">no location data between these dates</div>
           )}
           {error && <div className="geo-empty">couldn't load tracks</div>}
+          {mapFailed && <div className="geo-empty">couldn't load the map</div>}
         </div>
         <aside className="geo-legend">
           {selected && selectedTrack && (

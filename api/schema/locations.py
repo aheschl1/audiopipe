@@ -43,23 +43,25 @@ class LocationPointRead(BaseModel):
 
 
 class TrackPointRead(BaseModel):
-    """One fix of a decimated track.
+    """One fix of a decimated track, as lean as the map needs.
 
     ``at_ms`` carries the same session-timeline semantics as
     :class:`LocationPointRead.at_ms` (including possible negativity) — it is
-    the seek target for opening the session at this fix.
+    the seek target for opening the session at this fix. Wall-clock time is
+    the session's ``started_at`` plus ``at_ms``; coordinates are rounded to
+    5 decimals (~1 m, at the limit of consumer GPS). Tracks return thousands
+    of these per response, so every field earns its bytes.
     """
 
     model_config = ConfigDict(frozen=True)
 
     at_ms: int
-    captured_at: datetime
     lat: float
     lon: float
 
     @classmethod
     def from_model(cls, row: TrackPointRow) -> "TrackPointRead":
-        return cls(at_ms=row.at_ms, captured_at=row.captured_at, lat=row.lat, lon=row.lon)
+        return cls(at_ms=row.at_ms, lat=round(row.lat, 5), lon=round(row.lon, 5))
 
 
 class SessionTrackRead(BaseModel):

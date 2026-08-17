@@ -9,7 +9,7 @@ wall-clock location query. Session-scoped resource routes live under
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from api.deps import CurrentUser, Paging, Pipe, Range
 from api.schema.common import Page
@@ -17,6 +17,10 @@ from api.schema.locations import LocationPointRead, SessionTrackRead, TrackPoint
 from database.repos.locations import TrackPointRow
 
 router = APIRouter(prefix="/resources", tags=["resources"])
+
+# The tracks query unnests every in-window batch before decimating, so its
+# cost scales with window width, not response size — hence the hard cap.
+MAX_TRACK_WINDOW_MS = 92 * 24 * 60 * 60 * 1000
 
 
 @router.get("/location/points", summary="Query your location by wall-clock time")
@@ -53,7 +57,8 @@ async def list_location_points(
 async def list_location_tracks(
     user: CurrentUser,
     pipe: Pipe,
-    window: Range,
+    from_ms: int = Query(ge=0, description="Window start, epoch ms."),
+    to_ms: int = Query(ge=0, description="Window end, epoch ms, exclusive."),
     max_points: int = Query(
         500,
         ge=2,
@@ -68,13 +73,18 @@ async def list_location_tracks(
     thins each session's in-window points to an even stride of at most
     ``max_points`` (+1: the endpoint fix is kept), while ``point_count`` and
     the lat/lon bounds stay exact. Only sessions with a fix in the window
-    appear; sessions come back oldest first. A windowless call scans every
-    stored batch you own.
+    appear; sessions come back oldest first. Unlike the paged points route
+    the window is required and at most 92 days wide: decimation caps the
+    response, not the scan.
     """
+    if to_ms - from_ms > MAX_TRACK_WINDOW_MS:
+        raise HTTPException(
+            status_code=422, detail="window wider than 92 days; narrow the range"
+        )
     rows = await pipe.locations.track_points_for_user(
         user.id,
-        from_at=_at(window.from_ms),
-        to_at=_at(window.to_ms),
+        from_at=_at(from_ms),
+        to_at=_at(to_ms),
         max_points=max_points,
     )
     tracks: list[SessionTrackRead] = []

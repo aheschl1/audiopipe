@@ -175,8 +175,8 @@ class LocationsRepo(BaseRepo):
     async def track_points_for_user(
         self,
         user_id: UUID,
-        from_at: datetime | None = None,
-        to_at: datetime | None = None,
+        from_at: datetime,
+        to_at: datetime,
         max_points: int = 500,
     ) -> list[TrackPointRow]:
         """Per-session decimated tracks by wall clock, half-open ``[from_at, to_at)``.
@@ -185,27 +185,10 @@ class LocationsRepo(BaseRepo):
         ``max_points`` (+1: the last fix always survives, so a track never
         loses its endpoint). Aggregates ride along on every row computed over
         the *full* in-window point set. Sessions come back contiguous, oldest
-        first by their first in-window fix.
+        first by their first in-window fix. The window is required: unlike
+        the paged siblings there is no LIMIT, so the window is the only
+        bound on how many points get unnested and aggregated.
         """
-        row_filters = ""
-        params: list[object] = [user_id]
-        if from_at is not None:
-            row_filters += (
-                " AND s.captured_at"
-                "     + make_interval(secs => COALESCE(s.duration_ms, 0) / 1000.0) >= %s"
-            )
-            params.append(from_at)
-        if to_at is not None:
-            row_filters += " AND s.captured_at < %s"
-            params.append(to_at)
-        point_filters = ""
-        if from_at is not None:
-            point_filters += " AND q.captured_at >= %s"
-            params.append(from_at)
-        if to_at is not None:
-            point_filters += " AND q.captured_at < %s"
-            params.append(to_at)
-        params += [max_points, max_points]
         return await self._fetch_all(
             TrackPointRow,
             f"""
@@ -226,9 +209,12 @@ class LocationsRepo(BaseRepo):
                         SELECT {_POINT_COLUMNS},
                             rs.label, rs.device, rs.started_at
                         {_POINT_SOURCE}
-                        WHERE s.user_id = %s AND s.resource = 'location' {row_filters}
+                        WHERE s.user_id = %s AND s.resource = 'location'
+                          AND s.captured_at
+                              + make_interval(secs => COALESCE(s.duration_ms, 0) / 1000.0) >= %s
+                          AND s.captured_at < %s
                     ) q
-                    WHERE TRUE {point_filters}
+                    WHERE q.captured_at >= %s AND q.captured_at < %s
                     WINDOW p AS (PARTITION BY q.session_id),
                            w AS (PARTITION BY q.session_id
                                  ORDER BY q.captured_at, q.segment_id, q.idx)
@@ -237,5 +223,5 @@ class LocationsRepo(BaseRepo):
                    OR t.rn = t.total_points
                 ORDER BY t.first_at, t.session_id, t.rn
             """,
-            tuple(params),
+            (user_id, from_at, to_at, from_at, to_at, max_points, max_points),
         )

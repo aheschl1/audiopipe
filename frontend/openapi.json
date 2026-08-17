@@ -1968,7 +1968,7 @@
           "resources"
         ],
         "summary": "Per-session GPS tracks by wall-clock time",
-        "description": "Your sessions' tracks as decimated polylines, one entry per session.\n\nThe window is epoch milliseconds, half-open on ``captured_at``, exactly\nlike the sibling points route \u2014 but instead of paging raw fixes this\nthins each session's in-window points to an even stride of at most\n``max_points`` (+1: the endpoint fix is kept), while ``point_count`` and\nthe lat/lon bounds stay exact. Only sessions with a fix in the window\nappear; sessions come back oldest first. A windowless call scans every\nstored batch you own.",
+        "description": "Your sessions' tracks as decimated polylines, one entry per session.\n\nThe window is epoch milliseconds, half-open on ``captured_at``, exactly\nlike the sibling points route \u2014 but instead of paging raw fixes this\nthins each session's in-window points to an even stride of at most\n``max_points`` (+1: the endpoint fix is kept), while ``point_count`` and\nthe lat/lon bounds stay exact. Only sessions with a fix in the window\nappear; sessions come back oldest first. Unlike the paged points route\nthe window is required and at most 92 days wide: decimation caps the\nresponse, not the scan.",
         "operationId": "list_location_tracks_v1_resources_location_tracks_get",
         "security": [
           {
@@ -1976,6 +1976,30 @@
           }
         ],
         "parameters": [
+          {
+            "name": "from_ms",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Window start, epoch ms.",
+              "title": "From Ms"
+            },
+            "description": "Window start, epoch ms."
+          },
+          {
+            "name": "to_ms",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Window end, epoch ms, exclusive.",
+              "title": "To Ms"
+            },
+            "description": "Window end, epoch ms, exclusive."
+          },
           {
             "name": "max_points",
             "in": "query",
@@ -1989,40 +2013,6 @@
               "title": "Max Points"
             },
             "description": "Decimation cap per session; the first and last fixes always survive."
-          },
-          {
-            "name": "from_ms",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "From Ms"
-            }
-          },
-          {
-            "name": "to_ms",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "To Ms"
-            }
           }
         ],
         "responses": {
@@ -6907,11 +6897,6 @@
             "type": "integer",
             "title": "At Ms"
           },
-          "captured_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Captured At"
-          },
           "lat": {
             "type": "number",
             "title": "Lat"
@@ -6924,12 +6909,11 @@
         "type": "object",
         "required": [
           "at_ms",
-          "captured_at",
           "lat",
           "lon"
         ],
         "title": "TrackPointRead",
-        "description": "One fix of a decimated track.\n\n``at_ms`` carries the same session-timeline semantics as\n:class:`LocationPointRead.at_ms` (including possible negativity) \u2014 it is\nthe seek target for opening the session at this fix."
+        "description": "One fix of a decimated track, as lean as the map needs.\n\n``at_ms`` carries the same session-timeline semantics as\n:class:`LocationPointRead.at_ms` (including possible negativity) \u2014 it is\nthe seek target for opening the session at this fix. Wall-clock time is\nthe session's ``started_at`` plus ``at_ms``; coordinates are rounded to\n5 decimals (~1 m, at the limit of consumer GPS). Tracks return thousands\nof these per response, so every field earns its bytes."
       },
       "TranscriptEditRequest": {
         "properties": {

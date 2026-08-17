@@ -521,8 +521,9 @@ export interface paths {
          *     thins each session's in-window points to an even stride of at most
          *     ``max_points`` (+1: the endpoint fix is kept), while ``point_count`` and
          *     the lat/lon bounds stay exact. Only sessions with a fix in the window
-         *     appear; sessions come back oldest first. A windowless call scans every
-         *     stored batch you own.
+         *     appear; sessions come back oldest first. Unlike the paged points route
+         *     the window is required and at most 92 days wide: decimation caps the
+         *     response, not the scan.
          */
         get: operations["list_location_tracks_v1_resources_location_tracks_get"];
         put?: never;
@@ -2556,20 +2557,18 @@ export interface components {
         };
         /**
          * TrackPointRead
-         * @description One fix of a decimated track.
+         * @description One fix of a decimated track, as lean as the map needs.
          *
          *     ``at_ms`` carries the same session-timeline semantics as
          *     :class:`LocationPointRead.at_ms` (including possible negativity) — it is
-         *     the seek target for opening the session at this fix.
+         *     the seek target for opening the session at this fix. Wall-clock time is
+         *     the session's ``started_at`` plus ``at_ms``; coordinates are rounded to
+         *     5 decimals (~1 m, at the limit of consumer GPS). Tracks return thousands
+         *     of these per response, so every field earns its bytes.
          */
         TrackPointRead: {
             /** At Ms */
             at_ms: number;
-            /**
-             * Captured At
-             * Format: date-time
-             */
-            captured_at: string;
             /** Lat */
             lat: number;
             /** Lon */
@@ -3957,11 +3956,13 @@ export interface operations {
     };
     list_location_tracks_v1_resources_location_tracks_get: {
         parameters: {
-            query?: {
+            query: {
+                /** @description Window start, epoch ms. */
+                from_ms: number;
+                /** @description Window end, epoch ms, exclusive. */
+                to_ms: number;
                 /** @description Decimation cap per session; the first and last fixes always survive. */
                 max_points?: number;
-                from_ms?: number | null;
-                to_ms?: number | null;
             };
             header?: never;
             path?: never;
