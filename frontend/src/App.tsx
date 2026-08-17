@@ -5,6 +5,7 @@ import AbOverview from "./components/AbOverview"
 import AbVoteView from "./components/AbVoteView"
 import Gate from "./components/Gate"
 import GeoMap from "./components/GeoMap"
+import { preloadMapLibre } from "./map/trackMap"
 import SearchView from "./components/SearchView"
 import SessionList from "./components/SessionList"
 import SessionView from "./components/SessionView"
@@ -37,6 +38,15 @@ export default function App() {
     void api.GET("/v1/me").then(({ data }) => {
       if (data) setMe(data)
     })
+  }, [authed])
+
+  // Warm the maplibre chunk (~1.5 MB with its worker) once the app is idle,
+  // so the first map open doesn't stack the download on top of style, tiles,
+  // and track data.
+  useEffect(() => {
+    if (!authed) return
+    const timer = window.setTimeout(() => preloadMapLibre(), 3000)
+    return () => window.clearTimeout(timer)
   }, [authed])
 
   if (!authed) return <Gate onAuthed={() => setAuthed(true)} />

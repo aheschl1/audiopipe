@@ -6897,11 +6897,6 @@
             "type": "integer",
             "title": "At Ms"
           },
-          "captured_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Captured At"
-          },
           "lat": {
             "type": "number",
             "title": "Lat"
@@ -6914,12 +6909,11 @@
         "type": "object",
         "required": [
           "at_ms",
-          "captured_at",
           "lat",
           "lon"
         ],
         "title": "TrackPointRead",
-        "description": "One fix of a decimated track.\n\n``at_ms`` carries the same session-timeline semantics as\n:class:`LocationPointRead.at_ms` (including possible negativity) \u2014 it is\nthe seek target for opening the session at this fix."
+        "description": "One fix of a decimated track, as lean as the map needs.\n\n``at_ms`` carries the same session-timeline semantics as\n:class:`LocationPointRead.at_ms` (including possible negativity) \u2014 it is\nthe seek target for opening the session at this fix. Wall-clock time is\nthe session's ``started_at`` plus ``at_ms``; coordinates are rounded to\n5 decimals (~1 m, at the limit of consumer GPS). Tracks return thousands\nof these per response, so every field earns its bytes."
       },
       "TranscriptEditRequest": {
         "properties": {

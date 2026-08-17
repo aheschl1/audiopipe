@@ -35,6 +35,16 @@ export type TrackMapHandle = {
   destroy(): void
 }
 
+// Fetch the maplibre chunk ahead of need (the browser caches the modules;
+// createTrackMap's own imports then resolve instantly).
+export function preloadMapLibre(): void {
+  void Promise.all([
+    import("maplibre-gl"),
+    import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"),
+    import("maplibre-gl/dist/maplibre-gl.css"),
+  ]).catch(() => {})
+}
+
 // MapLibre dwarfs the rest of the app; the dynamic import keeps it in its own
 // chunk, fetched only when a map is first opened (same move as loadPlot()).
 export async function createTrackMap(

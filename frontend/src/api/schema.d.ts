@@ -2557,20 +2557,18 @@ export interface components {
         };
         /**
          * TrackPointRead
-         * @description One fix of a decimated track.
+         * @description One fix of a decimated track, as lean as the map needs.
          *
          *     ``at_ms`` carries the same session-timeline semantics as
          *     :class:`LocationPointRead.at_ms` (including possible negativity) — it is
-         *     the seek target for opening the session at this fix.
+         *     the seek target for opening the session at this fix. Wall-clock time is
+         *     the session's ``started_at`` plus ``at_ms``; coordinates are rounded to
+         *     5 decimals (~1 m, at the limit of consumer GPS). Tracks return thousands
+         *     of these per response, so every field earns its bytes.
          */
         TrackPointRead: {
             /** At Ms */
             at_ms: number;
-            /**
-             * Captured At
-             * Format: date-time
-             */
-            captured_at: string;
             /** Lat */
             lat: number;
             /** Lon */

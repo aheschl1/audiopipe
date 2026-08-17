@@ -11,6 +11,9 @@ COPY frontend/ ./
 # `tsc --noEmit && vite build` — the typecheck fails on openapi.json drift,
 # which is deliberate: a stale committed spec must not ship.
 RUN npm run build
+# Precompress for nginx's gzip_static: the maplibre chunk alone drops ~4x.
+RUN find dist -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.css' \
+    -o -name '*.html' -o -name '*.svg' \) -exec gzip -k -9 {} +
 
 FROM nginx:stable
 COPY deploy/web/nginx.conf /etc/nginx/conf.d/default.conf
