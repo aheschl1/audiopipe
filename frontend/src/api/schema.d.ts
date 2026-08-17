@@ -134,6 +134,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sessions/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Split every open session
+         * @description End all of your open sessions as rotations: processing starts on each,
+         *     and any connected client is told to reopen and keep recording.
+         */
+        post: operations["split_all_sessions_v1_sessions_split_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/sessions/{session_id}": {
         parameters: {
             query?: never;
@@ -145,6 +166,28 @@ export interface paths {
         get: operations["get_session_v1_sessions__session_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sessions/{session_id}/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Split a recording session
+         * @description End the session so processing starts, telling a connected client to
+         *     open a successor. Unlike ``end``, this signals "keep recording"; splitting
+         *     an already-ended session returns it unchanged.
+         */
+        post: operations["split_session_v1_sessions__session_id__split_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2467,6 +2510,17 @@ export interface components {
             confidence?: number | null;
         };
         /**
+         * SplitAllResponse
+         * @description Result of ``POST /sessions/split``.
+         */
+        SplitAllResponse: {
+            /**
+             * Split
+             * @description How many open sessions were ended.
+             */
+            split: number;
+        };
+        /**
          * TagLabelRead
          * @description One class present in the caller's windows.
          */
@@ -3057,7 +3111,95 @@ export interface operations {
             };
         };
     };
+    split_all_sessions_v1_sessions_split_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SplitAllResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_session_v1_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A recording session belonging to you. */
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    split_session_v1_sessions__session_id__split_post: {
         parameters: {
             query?: never;
             header?: never;

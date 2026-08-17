@@ -177,6 +177,21 @@ class StreamError(BaseModel):
     sequence: int | None = None
 
 
+class Rotate(BaseModel):
+    """The session was split on purpose: open a fresh one and reconnect.
+
+    Sent just before the ``session_ended`` error and the 4409 close, so a
+    client that predates this event still lands on the close path it already
+    handles. Chunks above ``through`` were not stored; retransmit them into
+    the successor session's sequence space.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["rotate"] = "rotate"
+    through: int
+
+
 class Bye(BaseModel):
     """The last event before the server closes the socket."""
 
@@ -187,7 +202,7 @@ class Bye(BaseModel):
     through: int
 
 
-ServerEvent = Welcome | Ack | StreamError | Bye
+ServerEvent = Welcome | Ack | StreamError | Rotate | Bye
 
 _server_event: TypeAdapter[ServerEvent] = TypeAdapter(
     Annotated[ServerEvent, Field(discriminator="type")]

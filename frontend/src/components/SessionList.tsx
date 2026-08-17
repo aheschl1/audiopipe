@@ -10,6 +10,7 @@ export default function SessionList({ onOpen }: { onOpen: (id: string) => void }
   const [sessions, setSessions] = useState<SessionRead[] | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [splitting, setSplitting] = useState(false)
 
   // The poll refreshes the first page only; pages loaded via "more" stay as
   // they are (newest-first offsets shift as sessions arrive — good enough
@@ -55,8 +56,25 @@ export default function SessionList({ onOpen }: { onOpen: (id: string) => void }
     )
   if (sessions.length === 0) return <div className="empty">No sessions yet.</div>
 
+  const splitAll = async () => {
+    setSplitting(true)
+    await api.POST("/v1/sessions/split", {})
+    setSplitting(false)
+    void refresh()
+  }
+
   return (
     <div className="list">
+      {sessions.some((s) => s.is_open) && (
+        <button
+          className="btn ghost full"
+          title="end every live session and start processing; connected recorders reopen"
+          disabled={splitting}
+          onClick={() => void splitAll()}
+        >
+          {splitting ? "splitting…" : "split all live"}
+        </button>
+      )}
       {sessions.map((session) => (
         <button key={session.id} className="row" onClick={() => onOpen(session.id)}>
           <div className="row-main">

@@ -63,6 +63,11 @@ curl -s -F file=@meeting.wav http://127.0.0.1:8034/v1/audio/diarizations | pytho
   voice-print.
 - `DIAR_BATCH_SIZE` (default 8; 0 keeps the model card's own 32). This is the
   load-bearing memory knob — see below.
+- `IDLE_UNLOAD_SECONDS` (0 = keep resident; the deploy sets 1800) — drop the
+  pipeline and embedder from CUDA after that long without inference. The next
+  request **blocks** while they reload (minutes, from the cache volume);
+  `PROCESSING_DIARIZER_TIMEOUT_SECONDS` (900) covers it. `/health` stays 200
+  (`"idle-unloaded"`) while evicted so the compose gate never flaps.
 - Weights cache in the `diar-pyannote-hf-cache` volume. The `-s80` checkpoints
   are 80% structurally pruned (WavLM Large 316.6M → 63.3M params), so the
   segmentation weights are 278 MB.

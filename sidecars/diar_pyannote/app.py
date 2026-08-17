@@ -13,7 +13,8 @@ code changes.
          "embeddings": {"SPEAKER_00": [floats], ...},
          "model": "...", "embedding_model": "..."}
     GET  /v1/models               the loaded model id
-    GET  /health                  503 while the model is still loading
+    GET  /health                  503 while the model is still loading;
+                                  200 "idle-unloaded" after an idle eviction
 
 Per-turn ``embedding`` is computed with overlapping speech masked out (turns
 under ``EMBED_MIN_CLEAN_MS`` of clean audio get ``null``); per-label
@@ -23,14 +24,20 @@ embedded unmasked. Rationale in README.md.
 The model loads in a background thread so the port binds immediately and the
 compose healthcheck gates readiness. Inference is serialized with a lock: one
 GPU, one request at a time.
+
+With IDLE_UNLOAD_SECONDS set, a watchdog frees the CUDA memory after that
+long without inference; the next request blocks while the model reloads
+(minutes from the HF cache — callers must budget their timeout for that).
 """
 
 import asyncio
+import gc
 import logging
 import math
 import os
 import tempfile
 import threading
+import time
 
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
@@ -44,6 +51,10 @@ EMBED_MODEL = os.environ.get("EMBED_MODEL", "pyannote/wespeaker-voxceleb-resnet3
 EMBED_MIN_CLEAN_MS = int(os.environ.get("EMBED_MIN_CLEAN_MS", "1000"))
 # Segmentation/embedding batch. 0 keeps the model card's own value.
 BATCH_SIZE = int(os.environ.get("DIAR_BATCH_SIZE", "8"))
+# Release CUDA memory after this long without inference; 0 keeps the model
+# resident forever.
+IDLE_UNLOAD_SECONDS = int(os.environ.get("IDLE_UNLOAD_SECONDS", "0"))
+_WATCHDOG_TICK_SECONDS = 30
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("diar")
@@ -55,10 +66,21 @@ _embedding = None
 _audio = None
 _load_error: str | None = None
 _gpu_lock = threading.Lock()
+# Load/unload transitions. The helpers below read the module globals, so the
+# reload check runs inside _gpu_lock (_diarize_file): the watchdog needs that
+# lock to evict, so the globals cannot vanish mid-inference. No deadlock: the
+# watchdog only ever tries _gpu_lock without blocking.
+_lifecycle = threading.Lock()
+_last_used = time.monotonic()
+_state = "loading"  # "loading" | "loaded" | "idle" | "failed"
+
+
+class ModelsUnavailable(RuntimeError):
+    """The model is missing and could not be (re)loaded."""
 
 
 def _load_model() -> None:
-    global _pipeline, _embedding, _audio, _load_error
+    global _pipeline, _embedding, _audio, _load_error, _state, _last_used
     try:
         token = os.environ.get("HF_TOKEN")
         if not token:
@@ -95,19 +117,78 @@ def _load_model() -> None:
         _audio = Audio(sample_rate=embedding.sample_rate, mono="downmix")
         # Last: /health and the request path gate readiness on _pipeline.
         _pipeline = pipeline
+        _load_error = None
+        _state = "loaded"
+        _last_used = time.monotonic()
         logger.info("model ready (pipeline=%s)", type(pipeline).__name__)
     except Exception as exc:  # surfaced via /health; the container stays up
         _load_error = f"{type(exc).__name__}: {exc}"
+        _state = "failed"
         logger.exception("model load failed")
+
+
+def _ensure_loaded() -> None:
+    """Reload after an idle unload; call while holding ``_gpu_lock``.
+
+    Reload failures leave the state ``idle`` so the next request retries
+    instead of bricking the container.
+    """
+    global _state, _last_used
+    with _lifecycle:
+        if _state == "idle":
+            logger.info("reloading model after idle unload ...")
+            _load_model()
+            if _state != "loaded":
+                _state = "idle"
+                raise ModelsUnavailable(f"model reload failed: {_load_error}")
+        if _state != "loaded":
+            raise ModelsUnavailable(_load_error or "model is not loaded yet")
+        _last_used = time.monotonic()
+
+
+def _idle_watchdog() -> None:
+    global _pipeline, _embedding, _audio, _state
+    while True:
+        time.sleep(_WATCHDOG_TICK_SECONDS)
+        with _lifecycle:
+            if _state != "loaded" or time.monotonic() - _last_used < IDLE_UNLOAD_SECONDS:
+                continue
+            if not _gpu_lock.acquire(blocking=False):
+                continue  # inference in flight; not idle after all
+            try:
+                import torch
+
+                _pipeline = None
+                _embedding = None
+                _audio = None
+                gc.collect()
+                torch.cuda.empty_cache()
+                _state = "idle"
+                logger.info("idle for %ss; model unloaded", IDLE_UNLOAD_SECONDS)
+            finally:
+                _gpu_lock.release()
 
 
 @app.on_event("startup")
 def _startup() -> None:
     threading.Thread(target=_load_model, daemon=True).start()
+    if IDLE_UNLOAD_SECONDS > 0:
+        threading.Thread(target=_idle_watchdog, daemon=True).start()
 
 
 @app.get("/health")
 def health() -> JSONResponse:
+    # An idle unload is deliberate, so it stays 200: compose gates the worker
+    # on this endpoint, and an evicted-but-healthy container must not flap it.
+    if _state == "idle":
+        return JSONResponse(
+            {
+                "status": "idle-unloaded",
+                "model": MODEL_ID,
+                "embedding_model": EMBED_MODEL,
+                "idle_unload_seconds": IDLE_UNLOAD_SECONDS,
+            }
+        )
     if _pipeline is not None:
         return JSONResponse(
             {
@@ -116,6 +197,7 @@ def health() -> JSONResponse:
                 "embedding_model": EMBED_MODEL,
                 "pipeline_class": type(_pipeline).__name__,
                 "per_turn_embeddings": _embedding is not None and _audio is not None,
+                "idle_unload_seconds": IDLE_UNLOAD_SECONDS,
             }
         )
     body = {"status": "loading" if _load_error is None else "failed"}
@@ -214,9 +296,11 @@ def _label_embedding(path: str, segments, duration_s: float):
 
 
 def _diarize_file(path: str) -> dict:
+    global _last_used
     from pyannote.core import Timeline
 
     with _gpu_lock:
+        _ensure_loaded()
         try:
             diarization = _pipeline(path)
         except ValueError as exc:
@@ -226,6 +310,7 @@ def _diarize_file(path: str) -> dict:
             if "negative dimensions" not in str(exc):
                 raise
             logger.warning("no speakers detected; returning an empty diarization")
+            _last_used = time.monotonic()
             return {
                 "turns": [],
                 "embeddings": {},
@@ -281,6 +366,7 @@ def _diarize_file(path: str) -> dict:
             if vector is not None:
                 by_speaker[label] = vector
 
+    _last_used = time.monotonic()  # the idle clock starts after the work
     return {
         "turns": turns,
         "embeddings": by_speaker,
@@ -291,7 +377,7 @@ def _diarize_file(path: str) -> dict:
 
 @app.post("/v1/audio/diarizations")
 async def diarizations(file: UploadFile) -> dict:
-    if _pipeline is None:
+    if _state in ("loading", "failed"):
         raise HTTPException(status_code=503, detail="model is not loaded yet")
     data = await file.read()
     if not data:
@@ -303,6 +389,8 @@ async def diarizations(file: UploadFile) -> dict:
         path = handle.name
     try:
         return await asyncio.to_thread(_diarize_file, path)
+    except ModelsUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("diarization failed")
         raise HTTPException(status_code=500, detail=f"diarization failed: {exc}") from exc

@@ -4,8 +4,10 @@ Everything here tunes the streaming websocket (docs/streaming-protocol.md);
 the HTTP routes need no configuration of their own.
 """
 
+from datetime import time
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +32,11 @@ class ApiSettings(BaseSettings):
     # The protocol's cumulative acks are gap-aware, so out-of-order completion
     # is already handled; 1 restores strictly sequential storage.
     stream_ingest_concurrency: int = 4
+    # How often a quiet-but-connected stream re-checks its session row, so a
+    # split (or any external end) reaches the client promptly instead of on
+    # its next chunk. Keep well under session_stale_seconds: a rotated client
+    # must reconnect long before its successor session could be swept.
+    stream_session_check_seconds: float = 5.0
 
     # An open session with no activity for this long is ended by the sweeper.
     # Keep it at or above the idle timeout, or a quiet-but-connected client's
@@ -39,11 +46,25 @@ class ApiSettings(BaseSettings):
     session_stale_seconds: float = 300.0
     session_sweep_interval_seconds: float = 60.0
 
+    # Split every open session at this local wall-clock time ("HH:MM") each
+    # day, so long-running captures close and enter processing on a schedule.
+    # Unset disables. The container's TZ decides what "local" means.
+    session_rotate_at: str | None = None
+
+    @field_validator("session_rotate_at")
+    @classmethod
+    def _valid_rotate_at(cls, value: str | None) -> str | None:
+        if value is not None:
+            time.fromisoformat(value)  # bad config fails at boot, not at 03:30
+        return value
+
     # Text->audio search embeds its query via the classifier sidecar (the
     # audio_tagger container, same default the worker uses). A text encode is
-    # fast; the timeout only covers a cold or contended GPU.
+    # fast, but with IDLE_UNLOAD_SECONDS set the sidecar may first have to
+    # reload CLAP from disk — the timeout must cover that, not just a
+    # contended GPU.
     classifier_base_url: str = "http://127.0.0.1:8035/v1"
-    classifier_timeout_seconds: float = 30.0
+    classifier_timeout_seconds: float = 180.0
 
 
 @lru_cache(maxsize=1)

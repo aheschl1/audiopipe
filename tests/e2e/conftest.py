@@ -109,6 +109,9 @@ def test_env(
         "API_STREAM_HELLO_TIMEOUT_SECONDS": "5",
         "API_STREAM_IDLE_TIMEOUT_SECONDS": "30",
         "API_STREAM_INGEST_CONCURRENCY": "4",
+        # Fast enough that stream tests observe an external end/split without
+        # waiting out the production 5s check.
+        "API_STREAM_SESSION_CHECK_SECONDS": "0.2",
         "API_SESSION_STALE_SECONDS": "300",
         # Effectively parks the server's sweeper so test_stream can drive
         # end_stale deterministically.

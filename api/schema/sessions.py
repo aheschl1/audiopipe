@@ -43,6 +43,14 @@ class TranscriptEditRequest(BaseModel):
     text: str = Field(description="The corrected transcript text.", min_length=1)
 
 
+class SplitAllResponse(BaseModel):
+    """Result of ``POST /sessions/split``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    split: int = Field(description="How many open sessions were ended.")
+
+
 class SessionRead(BaseModel):
     """A recording session as served over HTTP.
 
