@@ -43,11 +43,14 @@ export async function createTrackMap(
 ): Promise<TrackMapHandle> {
   const [ml, worker] = await Promise.all([
     import("maplibre-gl"),
-    import("maplibre-gl/dist/maplibre-gl-worker.mjs?url"),
+    import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"),
     import("maplibre-gl/dist/maplibre-gl.css"),
   ])
   // MapLibre resolves its worker relative to its own module URL, which breaks
-  // once Vite pre-bundles/chunks it; hand it the asset URL Vite actually serves.
+  // once Vite pre-bundles/chunks it; hand it the asset URL Vite actually
+  // serves. `?worker&url` (not plain `?url`) so Vite bundles the worker's own
+  // imports — a verbatim copy would die on its relative maplibre-gl-shared
+  // import in production, killing all tile and GeoJSON parsing.
   ml.setWorkerUrl(worker.default)
 
   const map: MapLibreMap = new ml.Map({

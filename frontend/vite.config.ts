@@ -13,6 +13,9 @@ export default defineConfig({
   // are CommonJS and reference Node's `global`; the prebuilt dists don't, but
   // they are all-or-nothing about which traces they carry.
   define: { global: "globalThis" },
+  // MapLibre's worker is loaded as a module worker (`?worker&url` in
+  // trackMap.ts); emit it as ES so its bundled imports stay valid.
+  worker: { format: "es" },
   server: {
     proxy: {
       "/v1": target,
