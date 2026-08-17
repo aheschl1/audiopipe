@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from database.repos.locations import LocationPointRow
+from database.repos.locations import LocationPointRow, TrackPointRow
 
 
 class LocationPointRead(BaseModel):
@@ -40,3 +40,45 @@ class LocationPointRead(BaseModel):
             alt_m=row.alt_m,
             accuracy_m=row.accuracy_m,
         )
+
+
+class TrackPointRead(BaseModel):
+    """One fix of a decimated track.
+
+    ``at_ms`` carries the same session-timeline semantics as
+    :class:`LocationPointRead.at_ms` (including possible negativity) — it is
+    the seek target for opening the session at this fix.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    at_ms: int
+    captured_at: datetime
+    lat: float
+    lon: float
+
+    @classmethod
+    def from_model(cls, row: TrackPointRow) -> "TrackPointRead":
+        return cls(at_ms=row.at_ms, captured_at=row.captured_at, lat=row.lat, lon=row.lon)
+
+
+class SessionTrackRead(BaseModel):
+    """One session's GPS track over the queried window.
+
+    ``point_count`` and the bounds are exact (computed before decimation);
+    ``points`` is the thinned polyline, oldest first, first and last fixes
+    always included.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    session_id: UUID
+    label: str | None
+    device: str | None
+    started_at: datetime
+    point_count: int
+    min_lat: float
+    max_lat: float
+    min_lon: float
+    max_lon: float
+    points: list[TrackPointRead]

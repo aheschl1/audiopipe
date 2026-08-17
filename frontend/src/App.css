@@ -1838,3 +1838,200 @@ button.row:hover,
   background: var(--accent-soft);
   color: var(--text);
 }
+
+/* ── Location maps (session panel + global geo view) ─────────────────── */
+
+.session-map {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #0b0d12;
+}
+
+.session-map-canvas {
+  width: 100%;
+  height: 320px;
+}
+
+.session-map-note {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 5;
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  background: rgb(13 17 23 / 0.85);
+  color: var(--text-muted);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+/* The playhead's position on the track. `stale` = clamped or snapped across
+   a capture gap rather than interpolated between nearby fixes. */
+.track-marker {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+  box-shadow: 0 0 6px rgb(0 0 0 / 0.6);
+}
+
+.track-marker.stale {
+  background: transparent;
+  border-color: var(--accent);
+  box-shadow: none;
+}
+
+.subtabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: var(--gap);
+}
+
+.geo-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.geo-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  flex-wrap: wrap;
+}
+
+.geo-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.geo-body {
+  display: flex;
+  gap: var(--gap);
+  align-items: flex-start;
+}
+
+.geo-map-wrap {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+}
+
+.geo-map {
+  width: 100%;
+  height: 62vh;
+  min-height: 380px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #0b0d12;
+}
+
+.geo-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: rgb(13 17 23 / 0.6);
+  border-radius: var(--radius);
+  pointer-events: none;
+}
+
+.geo-legend {
+  width: 260px;
+  flex: none;
+  padding: var(--pad);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 62vh;
+  overflow-y: auto;
+}
+
+.geo-session {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.geo-session:hover {
+  background: var(--surface2);
+}
+
+.geo-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.geo-session-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.geo-session-name {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.geo-point-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #0b0d12;
+}
+
+.geo-point-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* The liberty style is daylight-bright; pull it toward the theme. */
+.session-map .maplibregl-canvas,
+.geo-map .maplibregl-canvas {
+  filter: brightness(0.82) saturate(0.85);
+}
+
+@media (max-width: 640px) {
+  .geo-body {
+    flex-direction: column;
+  }
+
+  .geo-legend {
+    width: 100%;
+    max-height: none;
+  }
+
+  .geo-map {
+    height: 48vh;
+    min-height: 300px;
+  }
+
+  .session-map-canvas {
+    height: 240px;
+  }
+}

@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@types/react-plotly.js": "^2.6.4",
+    "maplibre-gl": "^6.4.0",
     "openapi-fetch": "^0.13.4",
     "plotly.js": "^3.7.0",
     "react": "^19.0.0",

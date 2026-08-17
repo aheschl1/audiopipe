@@ -1962,6 +1962,117 @@
         }
       }
     },
+    "/v1/resources/location/tracks": {
+      "get": {
+        "tags": [
+          "resources"
+        ],
+        "summary": "Per-session GPS tracks by wall-clock time",
+        "description": "Your sessions' tracks as decimated polylines, one entry per session.\n\nThe window is epoch milliseconds, half-open on ``captured_at``, exactly\nlike the sibling points route \u2014 but instead of paging raw fixes this\nthins each session's in-window points to an even stride of at most\n``max_points`` (+1: the endpoint fix is kept), while ``point_count`` and\nthe lat/lon bounds stay exact. Only sessions with a fix in the window\nappear; sessions come back oldest first. A windowless call scans every\nstored batch you own.",
+        "operationId": "list_location_tracks_v1_resources_location_tracks_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "max_points",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2000,
+              "minimum": 2,
+              "description": "Decimation cap per session; the first and last fixes always survive.",
+              "default": 500,
+              "title": "Max Points"
+            },
+            "description": "Decimation cap per session; the first and last fixes always survive."
+          },
+          {
+            "name": "from_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From Ms"
+            }
+          },
+          {
+            "name": "to_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To Ms"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionTrackRead"
+                  },
+                  "title": "Response List Location Tracks V1 Resources Location Tracks Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/speakers": {
       "get": {
         "tags": [
@@ -5826,6 +5937,84 @@
         "title": "SessionStartEvent",
         "description": "Opens every timeline at ``at_ms`` 0."
       },
+      "SessionTrackRead": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count"
+          },
+          "min_lat": {
+            "type": "number",
+            "title": "Min Lat"
+          },
+          "max_lat": {
+            "type": "number",
+            "title": "Max Lat"
+          },
+          "min_lon": {
+            "type": "number",
+            "title": "Min Lon"
+          },
+          "max_lon": {
+            "type": "number",
+            "title": "Max Lon"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/TrackPointRead"
+            },
+            "type": "array",
+            "title": "Points"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "label",
+          "device",
+          "started_at",
+          "point_count",
+          "min_lat",
+          "max_lat",
+          "min_lon",
+          "max_lon",
+          "points"
+        ],
+        "title": "SessionTrackRead",
+        "description": "One session's GPS track over the queried window.\n\n``point_count`` and the bounds are exact (computed before decimation);\n``points`` is the thinned polyline, oldest first, first and last fixes\nalways included."
+      },
       "SimilarSpeakerRead": {
         "properties": {
           "id": {
@@ -6711,6 +6900,36 @@
         ],
         "title": "TokenIssued",
         "description": "The plaintext exists exactly once, here; the server stores only a hash."
+      },
+      "TrackPointRead": {
+        "properties": {
+          "at_ms": {
+            "type": "integer",
+            "title": "At Ms"
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Captured At"
+          },
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at_ms",
+          "captured_at",
+          "lat",
+          "lon"
+        ],
+        "title": "TrackPointRead",
+        "description": "One fix of a decimated track.\n\n``at_ms`` carries the same session-timeline semantics as\n:class:`LocationPointRead.at_ms` (including possible negativity) \u2014 it is\nthe seek target for opening the session at this fix."
       },
       "TranscriptEditRequest": {
         "properties": {

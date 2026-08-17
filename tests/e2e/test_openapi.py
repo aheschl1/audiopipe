@@ -12,6 +12,7 @@ EXPECTED_METHODS = {
     "/v1/sessions/{session_id}": {"get"},
     "/v1/sessions/{session_id}/artifacts": {"get"},
     "/v1/resources/location/points": {"get"},
+    "/v1/resources/location/tracks": {"get"},
     "/v1/sessions/{session_id}/resources": {"get"},
     "/v1/sessions/{session_id}/resources/location/points": {"get"},
     "/v1/sessions/{session_id}/resources/{resource}/media": {"get"},
