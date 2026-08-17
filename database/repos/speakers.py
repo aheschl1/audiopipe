@@ -8,6 +8,7 @@ Vector literals cross the wire in text form with ``::vector`` casts, same as
 """
 
 from collections.abc import Sequence
+from datetime import datetime
 from uuid import UUID
 
 from psycopg.rows import dict_row
@@ -22,6 +23,7 @@ from database.schema.speakers import (
     SpeakerCreate,
     SpeakerMember,
     SpeakerSummary,
+    SpeakerTalkTime,
     SpeakerTranscript,
 )
 
@@ -30,7 +32,8 @@ COLUMNS = "id, user_id, name, model, centroid::text AS centroid, created_at, upd
 _TRANSCRIPT_COLUMNS = """
     t.id AS artifact_id, t.session_id, e.speaker_id, e.speaker,
     t.start_ms, t.end_ms,
-    coalesce(t.metadata->>'text', '') AS text, t.metadata->>'model' AS model
+    coalesce(t.metadata->>'text', '') AS text, t.metadata->>'model' AS model,
+    rs.started_at + make_interval(secs => t.start_ms / 1000.0) AS occurred_at
 """
 
 
@@ -416,6 +419,40 @@ class SpeakersRepo(BaseRepo):
         )
 
     # ------------------------------------------------------------- read side
+
+    async def talk_time(
+        self,
+        user_id: UUID,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> list[SpeakerTalkTime]:
+        """Total talk time per clustered speaker, most-talkative first,
+        bounded at session granularity by ``since``/``until``."""
+        conditions = ["rs.user_id = %s"]
+        params: list = [user_id]
+        if since is not None:
+            conditions.append("(rs.ended_at IS NULL OR rs.ended_at > %s)")
+            params.append(since)
+        if until is not None:
+            conditions.append("rs.started_at < %s")
+            params.append(until)
+        return await self._fetch_all(
+            SpeakerTalkTime,
+            f"""
+                SELECT sp.id AS speaker_id, sp.name,
+                       sum(coalesce((a.metadata->>'clean_talk_ms')::bigint,
+                                    (a.metadata->>'talk_ms')::bigint)) AS talk_ms
+                FROM speaker_embeddings e
+                JOIN recording_sessions rs ON rs.id = e.session_id
+                JOIN speakers sp ON sp.id = e.speaker_id
+                LEFT JOIN pipeline_artifacts a ON a.id = e.artifact_id
+                WHERE {" AND ".join(conditions)}
+                GROUP BY sp.id, sp.name
+                ORDER BY talk_ms DESC NULLS LAST, sp.id
+            """,
+            params,
+        )
 
     async def labels_for_session(self, session_id: UUID) -> list[SessionSpeakerLabel]:
         """Every block-local label of a session with its cluster resolution

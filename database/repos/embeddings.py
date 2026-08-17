@@ -92,6 +92,8 @@ class AudioSearchHit(BaseModel):
     distance: float
     metadata: dict[str, Any]
     created_at: datetime
+    occurred_at: datetime | None = None  # wall-clock moment of start_ms
+    session_label: str | None = None
 
 
 class AudioEmbeddingsRepo(BaseRepo):
@@ -124,24 +126,40 @@ class AudioEmbeddingsRepo(BaseRepo):
         *,
         user_id: UUID,
         session_id: UUID | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
         limit: int = 20,
     ) -> list[AudioSearchHit]:
         """Windows nearest a CLAP text embedding, closest first — the
         retrieval primitive behind text->audio search. Scoped to one user's
         sessions (embeddings inherit session ownership); an exact scan is fine
-        at current volumes — see the ANN note in migration 0008."""
+        at current volumes — see the ANN note in migration 0008.
+        ``since``/``until`` bound the window's wall-clock moment."""
         conditions = ["s.user_id = %s"]
         params: list = [_literal(vector), user_id]
         if session_id is not None:
             conditions.append("e.session_id = %s")
             params.append(session_id)
+        if since is not None:
+            conditions.append("(s.ended_at IS NULL OR s.ended_at > %s)")
+            params.append(since)
+            conditions.append("s.started_at + make_interval(secs => a.end_ms / 1000.0) > %s")
+            params.append(since)
+        if until is not None:
+            conditions.append("s.started_at < %s")
+            params.append(until)
+            conditions.append("s.started_at + make_interval(secs => a.start_ms / 1000.0) < %s")
+            params.append(until)
         params += [_literal(vector), limit]
         return await self._fetch_all(
             AudioSearchHit,
             f"""
                 SELECT e.artifact_id, e.session_id, a.start_ms, a.end_ms,
                        e.embedding <=> %s::vector AS distance,
-                       a.metadata, e.created_at
+                       a.metadata, e.created_at,
+                       s.started_at + make_interval(secs => a.start_ms / 1000.0)
+                           AS occurred_at,
+                       s.label AS session_label
                 FROM audio_embeddings e
                 JOIN pipeline_artifacts a ON a.id = e.artifact_id
                 JOIN recording_sessions s ON s.id = e.session_id

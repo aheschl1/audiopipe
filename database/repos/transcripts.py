@@ -13,6 +13,9 @@ text in ``metadata->>'text'``):
 
 Snippets come from ``ts_headline`` with bracket delimiters the API layer
 splits into typed segments — markers never reach a browser as HTML.
+
+Hits carry their wall-clock moment (``occurred_at``) and speaker-cluster
+resolution, so cross-session consumers (the MCP tools) need no second join.
 """
 
 from datetime import datetime
@@ -31,6 +34,16 @@ _HEADLINE_OPTIONS = "StartSel=[[, StopSel=]], MaxWords=30, MinWords=10"
 # spelling. 0.35 keeps one-edit words and drops coincidental overlap.
 _FUZZY_FLOOR = 0.35
 
+# One embedding per (session, label) — UNIQUE in the schema — so these LEFT
+# JOINs cannot duplicate transcript rows.
+_SPEAKER_JOIN = """
+    LEFT JOIN speaker_embeddings e ON e.session_id = a.session_id
+         AND e.speaker = a.metadata->>'speaker'
+    LEFT JOIN speakers sp ON sp.id = e.speaker_id
+"""
+
+_OCCURRED_AT = "s.started_at + make_interval(secs => a.start_ms / 1000.0)"
+
 
 class TranscriptHit(BaseModel):
     """One utterance matching the query."""
@@ -46,6 +59,38 @@ class TranscriptHit(BaseModel):
     score: float
     metadata: dict[str, Any]
     created_at: datetime
+    occurred_at: datetime | None = None  # wall-clock moment of start_ms
+    session_label: str | None = None
+    speaker_name: str | None = None  # cluster label, when the voice resolved
+
+
+def _add_filters(
+    conditions: list[str],
+    params: list,
+    *,
+    session_id: UUID | None,
+    since: datetime | None,
+    until: datetime | None,
+    speaker: str | None,
+) -> None:
+    """Shared optional filters; the wall-clock bounds pair a session-level
+    overlap predicate (index-served) with the exact span check."""
+    if session_id is not None:
+        conditions.append("a.session_id = %s")
+        params.append(session_id)
+    if since is not None:
+        conditions.append("(s.ended_at IS NULL OR s.ended_at > %s)")
+        params.append(since)
+        conditions.append("s.started_at + make_interval(secs => a.end_ms / 1000.0) > %s")
+        params.append(since)
+    if until is not None:
+        conditions.append("s.started_at < %s")
+        params.append(until)
+        conditions.append(f"{_OCCURRED_AT} < %s")
+        params.append(until)
+    if speaker is not None:
+        conditions.append("sp.name = %s")
+        params.append(speaker)
 
 
 class TranscriptSearchRepo(BaseRepo):
@@ -55,6 +100,9 @@ class TranscriptSearchRepo(BaseRepo):
         user_id: UUID,
         q: str,
         session_id: UUID | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        speaker: str | None = None,
         limit: int = 20,
     ) -> list[TranscriptHit]:
         """Strict full-text matches, best cover-density rank first.
@@ -66,9 +114,10 @@ class TranscriptSearchRepo(BaseRepo):
         """
         conditions = ["s.user_id = %s"]
         params: list = [q, user_id]
-        if session_id is not None:
-            conditions.append("a.session_id = %s")
-            params.append(session_id)
+        _add_filters(
+            conditions, params,
+            session_id=session_id, since=since, until=until, speaker=speaker,
+        )
         params.append(limit)
         return await self._fetch_all(
             TranscriptHit,
@@ -79,9 +128,12 @@ class TranscriptSearchRepo(BaseRepo):
                                    '{_HEADLINE_OPTIONS}') AS snippet,
                        ts_rank_cd(to_tsvector('english', a.metadata->>'text'),
                                   query, 2) AS score,
-                       a.metadata, a.created_at
+                       a.metadata, a.created_at,
+                       {_OCCURRED_AT} AS occurred_at,
+                       s.label AS session_label, sp.name AS speaker_name
                 FROM pipeline_artifacts a
-                JOIN recording_sessions s ON s.id = a.session_id,
+                JOIN recording_sessions s ON s.id = a.session_id
+                {_SPEAKER_JOIN},
                      websearch_to_tsquery('english', %s) query
                 WHERE a.pipeline = 'transcribe' AND a.kind = 'transcript'
                   AND to_tsvector('english', a.metadata->>'text') @@ query
@@ -98,6 +150,9 @@ class TranscriptSearchRepo(BaseRepo):
         user_id: UUID,
         q: str,
         session_id: UUID | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        speaker: str | None = None,
         limit: int = 20,
     ) -> list[TranscriptHit]:
         """Trigram close-spelling matches, most similar first.
@@ -108,9 +163,10 @@ class TranscriptSearchRepo(BaseRepo):
         """
         conditions = ["s.user_id = %s"]
         params: list = [q, user_id]
-        if session_id is not None:
-            conditions.append("a.session_id = %s")
-            params.append(session_id)
+        _add_filters(
+            conditions, params,
+            session_id=session_id, since=since, until=until, speaker=speaker,
+        )
         params += [q, _FUZZY_FLOOR, limit]
         return await self._fetch_all(
             TranscriptHit,
@@ -119,9 +175,12 @@ class TranscriptSearchRepo(BaseRepo):
                        a.metadata->>'text' AS text,
                        a.metadata->>'text' AS snippet,
                        word_similarity(%s, a.metadata->>'text') AS score,
-                       a.metadata, a.created_at
+                       a.metadata, a.created_at,
+                       {_OCCURRED_AT} AS occurred_at,
+                       s.label AS session_label, sp.name AS speaker_name
                 FROM pipeline_artifacts a
                 JOIN recording_sessions s ON s.id = a.session_id
+                {_SPEAKER_JOIN}
                 WHERE a.pipeline = 'transcribe' AND a.kind = 'transcript'
                   AND {" AND ".join(conditions)}
                   AND word_similarity(%s, a.metadata->>'text') >= %s

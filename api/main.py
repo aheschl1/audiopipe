@@ -18,8 +18,11 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.routing import Route
 
 from api.config import get_settings
+from api.mcp.server import mcp as mcp_server
+from api.mcp.server import streamable_app as mcp_streamable_app
 from api.routes import (
     ab,
     auth,
@@ -93,12 +96,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     async with DatabasePipe() as pipe:
         await pipe.ping()
     sweeper = asyncio.create_task(_sweep_sessions())
-    yield
-    sweeper.cancel()
-    with suppress(asyncio.CancelledError):
-        await sweeper
-    await close_blob_client()
-    await close_pool()
+    try:
+        # The mounted /mcp transport serves nothing until its session manager
+        # runs; failing to start it surfaces only on the first MCP request.
+        async with mcp_server.session_manager.run():
+            yield
+    finally:
+        sweeper.cancel()
+        with suppress(asyncio.CancelledError):
+            await sweeper
+        await close_blob_client()
+        await close_pool()
 
 
 def _error(status_code: int, detail: str) -> JSONResponse:
@@ -121,7 +129,11 @@ def create_app() -> FastAPI:
     # nothing beyond what any HTTP client already has — and the miniapp
     # WebView's fetches arrive cross-origin.
     app.add_middleware(
-        CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["Mcp-Session-Id"],
     )
 
     # Domain errors from the repositories and services map to HTTP here, so no
@@ -168,6 +180,11 @@ def create_app() -> FastAPI:
     app.include_router(search.router, prefix=API_PREFIX)
     app.include_router(stream.router, prefix=API_PREFIX)
     app.include_router(ab.router, prefix=API_PREFIX)
+
+    # MCP rides the same process and tokens: tools read the repos directly
+    # and authenticate per call from the Authorization header. An exact
+    # Route, not a Mount — see api.mcp.server.streamable_app.
+    app.router.routes.append(Route("/mcp", mcp_streamable_app()))
     return app
 
 

@@ -58,6 +58,29 @@ class SessionsRepo(BaseRepo):
         sql += " ORDER BY started_at DESC LIMIT %s OFFSET %s"
         return await self._fetch_all(RecordingSession, sql, (user_id, limit, offset))
 
+    async def overlapping(
+        self,
+        user_id: UUID,
+        start: datetime,
+        end: datetime,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[RecordingSession]:
+        """Sessions touching the wall-clock window ``[start, end)``, oldest
+        first; an open session counts as extending to now. Served by
+        ``recording_sessions_user_ended_idx`` (0015)."""
+        return await self._fetch_all(
+            RecordingSession,
+            f"""
+                SELECT {COLUMNS} FROM recording_sessions
+                WHERE user_id = %s AND started_at < %s
+                  AND (ended_at IS NULL OR ended_at > %s)
+                ORDER BY started_at
+                LIMIT %s OFFSET %s
+            """,
+            (user_id, end, start, limit, offset),
+        )
+
     async def touch(self, session_id: UUID) -> bool:
         """Record activity on an open session, keeping the sweeper away.
 

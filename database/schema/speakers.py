@@ -145,3 +145,14 @@ class SpeakerTranscript(BaseModel):
     end_ms: int
     text: str
     model: str | None = None  # transcription model
+    occurred_at: datetime | None = None  # wall-clock moment of start_ms
+
+
+class SpeakerTalkTime(BaseModel):
+    """One speaker's total talk time over a wall-clock window."""
+
+    model_config = ConfigDict(frozen=True)
+
+    speaker_id: UUID
+    name: str | None = None
+    talk_ms: int | None = None  # None when no member carries talk_ms yet

@@ -16,6 +16,8 @@ class TagWindowHit(BaseModel):
     score: float
     metadata: dict[str, Any]
     created_at: datetime
+    occurred_at: datetime | None = None  # wall-clock moment of start_ms
+    session_label: str | None = None
 
 
 class TagLabelCount(BaseModel):
