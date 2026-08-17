@@ -521,8 +521,9 @@ export interface paths {
          *     thins each session's in-window points to an even stride of at most
          *     ``max_points`` (+1: the endpoint fix is kept), while ``point_count`` and
          *     the lat/lon bounds stay exact. Only sessions with a fix in the window
-         *     appear; sessions come back oldest first. A windowless call scans every
-         *     stored batch you own.
+         *     appear; sessions come back oldest first. Unlike the paged points route
+         *     the window is required and at most 92 days wide: decimation caps the
+         *     response, not the scan.
          */
         get: operations["list_location_tracks_v1_resources_location_tracks_get"];
         put?: never;
@@ -3957,11 +3958,13 @@ export interface operations {
     };
     list_location_tracks_v1_resources_location_tracks_get: {
         parameters: {
-            query?: {
+            query: {
+                /** @description Window start, epoch ms. */
+                from_ms: number;
+                /** @description Window end, epoch ms, exclusive. */
+                to_ms: number;
                 /** @description Decimation cap per session; the first and last fixes always survive. */
                 max_points?: number;
-                from_ms?: number | null;
-                to_ms?: number | null;
             };
             header?: never;
             path?: never;

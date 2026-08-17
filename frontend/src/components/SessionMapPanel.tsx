@@ -24,11 +24,13 @@ export default function SessionMapPanel({
   audioEl: HTMLAudioElement | null
   onSeek: (ms: number, play: boolean) => void
 }) {
-  const { points, partial, loading } = useSessionTrack(sessionId, events, truncated)
+  const { points, partial, loading, failed } = useSessionTrack(sessionId, events, truncated)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [handle, setHandle] = useState<TrackMapHandle | null>(null)
+  const [mapFailed, setMapFailed] = useState(false)
   const onSeekRef = useRef(onSeek)
   onSeekRef.current = onSeek
+  const lastFit = useRef<{ handle: TrackMapHandle; sessionId: string } | null>(null)
 
   useEffect(() => {
     const el = containerRef.current
@@ -37,14 +39,18 @@ export default function SessionMapPanel({
     let created: TrackMapHandle | null = null
     void createTrackMap(el, {
       onPointClick: (_track, pt) => onSeekRef.current(Math.max(0, pt.atMs), true),
-    }).then((map) => {
-      if (dead) {
-        map.destroy()
-        return
-      }
-      created = map
-      setHandle(map)
     })
+      .then((map) => {
+        if (dead) {
+          map.destroy()
+          return
+        }
+        created = map
+        setHandle(map)
+      })
+      .catch(() => {
+        if (!dead) setMapFailed(true)
+      })
     return () => {
       dead = true
       created?.destroy()
@@ -61,14 +67,27 @@ export default function SessionMapPanel({
         points: segment.map((p) => ({ atMs: p.at_ms, lat: p.lat, lon: p.lon })),
       })),
     )
+    // Fit once per session per map instance — refitting on every points
+    // update would yank the camera back while the user pans.
+    const prev = lastFit.current
+    if (points.length === 0 || (prev?.handle === handle && prev.sessionId === sessionId))
+      return
     handle.fitTracks()
+    lastFit.current = { handle, sessionId }
   }, [handle, points, sessionId])
 
   return (
     <div className="session-map">
       <div ref={containerRef} className="session-map-canvas" />
       {handle && <MapPlayheadMarker handle={handle} points={points} audioEl={audioEl} />}
+      {mapFailed && <div className="session-map-note">couldn't load the map</div>}
       {loading && <div className="session-map-note">loading track…</div>}
+      {failed && (
+        <div className="session-map-note">couldn't load the track — try reopening</div>
+      )}
+      {!loading && !failed && points.length === 0 && (
+        <div className="session-map-note">no location data for this session</div>
+      )}
       {partial && (
         <div className="session-map-note">long track — showing the first 5000 fixes</div>
       )}

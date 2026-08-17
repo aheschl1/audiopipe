@@ -59,9 +59,19 @@ export async function createTrackMap(
 
   // Wait for style.load, not load: sources/layers only need the style, and
   // the full load event stalls until every initial tile and glyph fetch
-  // settles — a single slow request would park the handle forever.
+  // settles — a single slow request would park the handle forever. A failed
+  // style fetch fires only `error`, so reject on it (and tear the map down)
+  // instead of hanging the promise and leaking the instance.
   if (!map.isStyleLoaded()) {
-    await new Promise<void>((resolve) => map.once("style.load", () => resolve()))
+    try {
+      await new Promise<void>((resolve, reject) => {
+        map.once("style.load", () => resolve())
+        map.once("error", (e) => reject(e.error ?? new Error("map style failed to load")))
+      })
+    } catch (err) {
+      map.remove()
+      throw err
+    }
   }
 
   map.addSource("tracks", { type: "geojson", data: emptyCollection() })
