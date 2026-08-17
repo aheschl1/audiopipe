@@ -207,6 +207,9 @@ services:
       - asr-parakeet-hf-cache:/root/.cache/huggingface
     environment:
       HF_HOME: /root/.cache/huggingface
+      # Free CUDA memory after this long idle; the next request blocks while
+      # the models reload. 0 keeps them resident.
+      IDLE_UNLOAD_SECONDS: ${SIDECAR_IDLE_UNLOAD_SECONDS:-1800}
     healthcheck:
       <<: *sidecar-healthcheck
       start_period: 300s
@@ -224,6 +227,7 @@ services:
       - diar-pyannote-hf-cache:/root/.cache/huggingface
     environment:
       HF_HOME: /root/.cache/huggingface
+      IDLE_UNLOAD_SECONDS: ${SIDECAR_IDLE_UNLOAD_SECONDS:-1800}
       # The embedding weights are gated; without this the container starts and
       # then fails to load a model.
       HF_TOKEN: ${HF_TOKEN:?set HF_TOKEN in deploy/.env — see deploy/.env.example}
@@ -244,6 +248,7 @@ services:
       - audio-tagger-hf-cache:/root/.cache/huggingface
     environment:
       HF_HOME: /root/.cache/huggingface
+      IDLE_UNLOAD_SECONDS: ${SIDECAR_IDLE_UNLOAD_SECONDS:-1800}
     healthcheck:
       <<: *sidecar-healthcheck
       start_period: 900s

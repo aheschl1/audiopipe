@@ -7,9 +7,11 @@ from api.schema.stream import (
     Finish,
     FrameError,
     Hello,
+    Rotate,
     decode_chunk,
     encode_chunk,
     parse_client_frame,
+    parse_server_event,
 )
 
 
@@ -110,3 +112,9 @@ def test_parse_hello_with_token() -> None:
 def test_parse_client_frame_rejects_invalid(text: str) -> None:
     with pytest.raises(FrameError):
         parse_client_frame(text)
+
+
+def test_rotate_round_trip() -> None:
+    event = parse_server_event(Rotate(through=12).model_dump_json())
+    assert isinstance(event, Rotate)
+    assert event.through == 12

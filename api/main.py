@@ -9,6 +9,7 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
+from datetime import datetime, time, timedelta
 from typing import AsyncIterator
 
 import click
@@ -43,24 +44,46 @@ logger = logging.getLogger(__name__)
 API_PREFIX = "/v1"
 
 
-async def _sweep_stale_sessions() -> None:
-    """End sessions abandoned mid-stream (docs/streaming-protocol.md).
+def _last_rotation_instant(now: datetime, rotate_at: time) -> datetime:
+    """The most recent occurrence of ``rotate_at`` at or before ``now``."""
+    candidate = now.replace(
+        hour=rotate_at.hour, minute=rotate_at.minute, second=0, microsecond=0
+    )
+    return candidate if candidate <= now else candidate - timedelta(days=1)
+
+
+async def _sweep_sessions() -> None:
+    """End sessions abandoned mid-stream, and rotate on the daily schedule.
 
     Streaming and ingest heartbeat ``updated_at``; a session that stops
     heartbeating was dropped without a ``finish``, and is closed here once the
-    stale window passes. Every pass is idempotent, so multi-worker deploys
-    sweep concurrently without coordination.
+    stale window passes. With API_SESSION_ROTATE_AT set, every open session
+    started before the day's rotation instant is split too, which starts its
+    processing and tells a connected client to reopen. Every pass is
+    idempotent — rotation only matches sessions started before the cutoff —
+    so multi-worker deploys sweep concurrently without coordination, and a
+    restart catches up on the first pass.
     """
     settings = get_settings()
+    rotate_at = (
+        time.fromisoformat(settings.session_rotate_at)
+        if settings.session_rotate_at is not None
+        else None
+    )
     while True:
         await asyncio.sleep(settings.session_sweep_interval_seconds)
         try:
             async with DatabasePipe() as pipe:
                 ended = await pipe.sessions.end_stale(settings.session_stale_seconds)
-            if ended:
-                logger.info("ended %d stale recording session(s)", ended)
+                if ended:
+                    logger.info("ended %d stale recording session(s)", ended)
+                if rotate_at is not None:
+                    cutoff = _last_rotation_instant(datetime.now().astimezone(), rotate_at)
+                    split = await pipe.sessions.split_started_before(cutoff)
+                    if split:
+                        logger.info("rotated %d recording session(s)", split)
         except Exception:
-            logger.exception("stale-session sweep failed; will retry")
+            logger.exception("session sweep failed; will retry")
 
 
 @asynccontextmanager
@@ -69,7 +92,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # first request.
     async with DatabasePipe() as pipe:
         await pipe.ping()
-    sweeper = asyncio.create_task(_sweep_stale_sessions())
+    sweeper = asyncio.create_task(_sweep_sessions())
     yield
     sweeper.cancel()
     with suppress(asyncio.CancelledError):

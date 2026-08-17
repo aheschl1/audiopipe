@@ -402,6 +402,53 @@
         }
       }
     },
+    "/v1/sessions/split": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Split every open session",
+        "description": "End all of your open sessions as rotations: processing starts on each,\nand any connected client is told to reopen and keep recording.",
+        "operationId": "split_all_sessions_v1_sessions_split_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SplitAllResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/v1/sessions/{session_id}": {
       "get": {
         "tags": [
@@ -409,6 +456,77 @@
         ],
         "summary": "Fetch one recording session",
         "operationId": "get_session_v1_sessions__session_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "A recording session belonging to you.",
+              "title": "Session Id"
+            },
+            "description": "A recording session belonging to you."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}/split": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Split a recording session",
+        "description": "End the session so processing starts, telling a connected client to\nopen a successor. Unlike ``end``, this signals \"keep recording\"; splitting\nan already-ended session returns it unchanged.",
+        "operationId": "split_session_v1_sessions__session_id__split_post",
         "security": [
           {
             "HTTPBearer": []
@@ -6710,6 +6828,21 @@
         ],
         "title": "SpeechStartEvent",
         "description": "Coarse audio activity begins here (high-recall VAD, not verified speech)."
+      },
+      "SplitAllResponse": {
+        "properties": {
+          "split": {
+            "type": "integer",
+            "title": "Split",
+            "description": "How many open sessions were ended."
+          }
+        },
+        "type": "object",
+        "required": [
+          "split"
+        ],
+        "title": "SplitAllResponse",
+        "description": "Result of ``POST /sessions/split``."
       },
       "TagLabelRead": {
         "properties": {

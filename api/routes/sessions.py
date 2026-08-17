@@ -26,6 +26,7 @@ from api.schema.sessions import (
     SessionCreateRequest,
     SessionLabelRequest,
     SessionRead,
+    SplitAllResponse,
     TranscriptEditRequest,
 )
 from api.schema.speakers import SessionSpeakerRead
@@ -71,9 +72,28 @@ async def list_sessions(
     return Page.build(rows, paging, SessionRead.from_model)
 
 
+# Declared before the /{session_id} routes: "split" is not a UUID, but keeping
+# the static segment first spares the router the 422-vs-404 ambiguity.
+@router.post("/split", summary="Split every open session")
+async def split_all_sessions(user: CurrentUser, pipe: Pipe) -> SplitAllResponse:
+    """End all of your open sessions as rotations: processing starts on each,
+    and any connected client is told to reopen and keep recording."""
+    return SplitAllResponse(split=await pipe.sessions.split_all_open(user.id))
+
+
 @router.get("/{session_id}", summary="Fetch one recording session")
 async def get_session(session: OwnedSession) -> SessionRead:
     return SessionRead.from_model(session)
+
+
+@router.post("/{session_id}/split", summary="Split a recording session")
+async def split_session(session: OwnedSession, pipe: Pipe) -> SessionRead:
+    """End the session so processing starts, telling a connected client to
+    open a successor. Unlike ``end``, this signals "keep recording"; splitting
+    an already-ended session returns it unchanged."""
+    if not session.is_open:
+        return SessionRead.from_model(session)
+    return SessionRead.from_model(await pipe.sessions.split(session.id))
 
 
 @router.post("/{session_id}/label", summary="Rename (or unname) a session")

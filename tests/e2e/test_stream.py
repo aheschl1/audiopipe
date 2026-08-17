@@ -272,14 +272,65 @@ async def test_session_ended_mid_stream_closes_4409(
         ended = await client.post(f"/v1/sessions/{session.id}/end", headers=account.headers)
         assert ended.status_code == 200
 
-        await ws.send(_chunk(1, wav_bytes(seconds=0.05)))
+        # Inside the raises block: the periodic session check may close the
+        # socket before the chunk goes out, and that path is equally valid.
         with pytest.raises(ConnectionClosedError) as err:
+            await ws.send(_chunk(1, wav_bytes(seconds=0.05)))
             while True:
                 event = await _recv_event(ws)
                 if event["type"] == "error":
                     assert (event["scope"], event["code"]) == ("session", "session_ended")
         assert err.value.rcvd is not None
         assert err.value.rcvd.code == 4409
+
+
+async def test_split_pushes_rotate_to_a_quiet_stream(
+    server: str, client: httpx.AsyncClient, account: Account
+) -> None:
+    """A split reaches a connected-but-silent client through the periodic
+    session check: `rotate`, then `session_ended`, then close 4409."""
+    session = await make_session(account)
+    async with _connect(server, session.id, account) as ws:
+        await ws.send(HELLO)
+        await _recv_until(ws, "welcome")
+
+        split = await client.post(f"/v1/sessions/{session.id}/split", headers=account.headers)
+        assert split.status_code == 200
+        assert split.json()["metadata"]["rotated"] is True
+
+        events: list[dict[str, Any]] = []
+        with pytest.raises(ConnectionClosedError) as err:
+            while True:
+                events.append(await _recv_event(ws))
+        assert err.value.rcvd is not None
+        assert err.value.rcvd.code == 4409
+
+    assert [event["type"] for event in events] == ["rotate", "error"]
+    assert events[0]["through"] == -1  # nothing was stored
+    assert (events[1]["scope"], events[1]["code"]) == ("session", "session_ended")
+
+
+async def test_plain_end_reaches_a_quiet_stream_without_rotate(
+    server: str, client: httpx.AsyncClient, account: Account
+) -> None:
+    """An explicit end must not tell the device to re-record: no `rotate`."""
+    session = await make_session(account)
+    async with _connect(server, session.id, account) as ws:
+        await ws.send(HELLO)
+        await _recv_until(ws, "welcome")
+
+        ended = await client.post(f"/v1/sessions/{session.id}/end", headers=account.headers)
+        assert ended.status_code == 200
+
+        events: list[dict[str, Any]] = []
+        with pytest.raises(ConnectionClosedError) as err:
+            while True:
+                events.append(await _recv_event(ws))
+        assert err.value.rcvd is not None
+        assert err.value.rcvd.code == 4409
+
+    assert [event["type"] for event in events] == ["error"]
+    assert events[0]["code"] == "session_ended"
 
 
 def _hello_with_token(token: str) -> str:

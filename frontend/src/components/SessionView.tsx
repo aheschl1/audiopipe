@@ -30,6 +30,7 @@ export default function SessionView({
   // Rename draft; null while the title is just being displayed.
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [splitting, setSplitting] = useState(false)
   // The audio element as state (not a ref): the strip and playhead hooks
   // need to re-subscribe when it mounts.
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null)
@@ -127,6 +128,15 @@ export default function SessionView({
     setDraft(null)
   }
 
+  const splitSession = async () => {
+    setSplitting(true)
+    const { data } = await api.POST("/v1/sessions/{session_id}/split", {
+      params: { path: { session_id: sessionId } },
+    })
+    setSplitting(false)
+    if (data) setSession(data)
+  }
+
   if (!session) return <div className="loading">Loading session…</div>
 
   return (
@@ -147,6 +157,16 @@ export default function SessionView({
               >
                 rename
               </button>
+              {session.is_open && (
+                <button
+                  className="btn ghost slim"
+                  title="end this session and start processing; a connected recorder reopens"
+                  disabled={splitting}
+                  onClick={() => void splitSession()}
+                >
+                  {splitting ? "splitting…" : "split"}
+                </button>
+              )}
               {onAb && (
                 <button
                   className="btn ghost slim"

@@ -12,7 +12,16 @@ from api.schema.stream_export import build_schema
 def test_schema_exposes_every_root() -> None:
     schema = build_schema()
     assert set(schema["properties"]) == {"clientFrame", "serverEvent", "chunkHeader"}
-    for frame in ("Hello", "Finish", "Welcome", "Ack", "StreamError", "Bye", "ChunkHeader"):
+    for frame in (
+        "Hello",
+        "Finish",
+        "Welcome",
+        "Ack",
+        "StreamError",
+        "Rotate",
+        "Bye",
+        "ChunkHeader",
+    ):
         assert frame in schema["$defs"], f"{frame} missing from $defs"
 
 

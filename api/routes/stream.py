@@ -30,6 +30,7 @@ from api.schema.stream import (
     Finish,
     FrameError,
     Hello,
+    Rotate,
     ServerEvent,
     StreamError,
     StreamLimits,
@@ -423,8 +424,34 @@ async def _pump(
         await pool.drain()
 
 
+async def _session_state(session_id: UUID) -> RecordingSession | None:
+    async with DatabasePipe() as pipe:
+        return await pipe.sessions.get(session_id)
+
+
+async def _ended_teardown(
+    outbox: _Outbox, tracker: _AckTracker, session_id: UUID
+) -> tuple[str | None, int | None]:
+    """The session ended under this stream; tell the client and close.
+
+    A ``rotated`` marker means the end was a planned split: a ``rotate``
+    event precedes the error so a current client reopens immediately, while
+    one that predates the event ignores it and handles the close it already
+    knows. A plain end (REST, sweeper, deletion) stays a bare
+    ``session_ended`` — an explicit stop must not restart recording.
+    """
+    tracker.flush()
+    current = await _session_state(session_id)
+    if current is not None and current.metadata.get("rotated"):
+        outbox.publish(Rotate(through=tracker.through))
+    outbox.publish(
+        StreamError(scope="session", code="session_ended", detail="the session has ended")
+    )
+    return None, CLOSE_SESSION_ENDED
+
+
 async def _settle(
-    pool: _ChunkPool, outbox: _Outbox, tracker: _AckTracker
+    pool: _ChunkPool, outbox: _Outbox, tracker: _AckTracker, session_id: UUID
 ) -> tuple[str | None, int | None] | None:
     """Drain the pool and translate what its tasks reported.
 
@@ -436,13 +463,7 @@ async def _settle(
     if pool.failure is not None:
         raise pool.failure
     if pool.fatal is not None:
-        # Ended by REST or the sweeper — or deleted outright — since the
-        # handshake; either way this stream is over.
-        tracker.flush()
-        outbox.publish(
-            StreamError(scope="session", code="session_ended", detail="the session has ended")
-        )
-        return None, CLOSE_SESSION_ENDED
+        return await _ended_teardown(outbox, tracker, session_id)
     return None
 
 
@@ -456,20 +477,30 @@ async def _pump_frames(
     settings: ApiSettings,
     pool: _ChunkPool,
 ) -> tuple[str | None, int | None]:
+    loop = asyncio.get_running_loop()
+    idle_deadline = loop.time() + settings.stream_idle_timeout_seconds
     while True:
-        if pool.settled and (outcome := await _settle(pool, outbox, tracker)) is not None:
+        if pool.settled and (outcome := await _settle(pool, outbox, tracker, session.id)) is not None:
             return outcome
 
+        # Receive in short slices so a quiet stream still notices its session
+        # being split (or otherwise ended) within the check interval, not only
+        # on its next chunk or at the idle timeout.
+        timeout = min(settings.stream_session_check_seconds, idle_deadline - loop.time())
         try:
-            message = await asyncio.wait_for(
-                websocket.receive(), timeout=settings.stream_idle_timeout_seconds
-            )
+            message = await asyncio.wait_for(websocket.receive(), timeout=max(timeout, 0.0))
         except TimeoutError:
-            if (outcome := await _settle(pool, outbox, tracker)) is not None:
+            if (outcome := await _settle(pool, outbox, tracker, session.id)) is not None:
                 return outcome
-            tracker.flush()
-            return "idle", 1000
+            if loop.time() >= idle_deadline:
+                tracker.flush()
+                return "idle", 1000
+            current = await _session_state(session.id)
+            if current is None or current.ended_at is not None:
+                return await _ended_teardown(outbox, tracker, session.id)
+            continue
 
+        idle_deadline = loop.time() + settings.stream_idle_timeout_seconds
         if message["type"] == "websocket.disconnect":
             # In-flight stores finish and count; the session stays open for a
             # reconnect, and the sweeper ends it if none arrives in time.
@@ -496,7 +527,7 @@ async def _pump_frames(
             )
             return None, CLOSE_PROTOCOL_ERROR
         if isinstance(frame, Finish):
-            if (outcome := await _settle(pool, outbox, tracker)) is not None:
+            if (outcome := await _settle(pool, outbox, tracker, session.id)) is not None:
                 return outcome
             tracker.flush()
             async with DatabasePipe() as pipe:

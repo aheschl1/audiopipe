@@ -27,7 +27,14 @@ curl -s -F file=@clip.wav 'http://127.0.0.1:8033/v1/audio/transcriptions?model=w
 ```
 
 - Env: `ASR_MODEL` (parakeet id), `ASR_WHISPER_MODEL` (`large-v3`),
-  `ASR_WHISPER_COMPUTE` (`int8_float16`)
+  `ASR_WHISPER_COMPUTE` (`int8_float16`), `IDLE_UNLOAD_SECONDS` (0 = keep
+  resident; the deploy sets 1800)
+- With `IDLE_UNLOAD_SECONDS` set, the models are dropped from CUDA after that
+  long without inference; the next request **blocks** while they reload from
+  the cache. `/health` stays 200 (`"idle-unloaded"`) while evicted. Whisper is
+  CTranslate2, not torch: its memory frees on object destruction, and
+  `torch.cuda.empty_cache()` cannot touch it. The process's CUDA context
+  (~0.5 GB) stays resident either way — only weights are reclaimed.
 - Weights cache in the `asr-parakeet-hf-cache` volume.
 - Response: `{"text", "model", "language"?, "words": [{"word", "start_ms",
   "end_ms"}], "segments": [{"text", "start_ms", "end_ms"}]}` — timestamps

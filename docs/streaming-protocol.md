@@ -204,9 +204,29 @@ lists retransmitted sequences that were already stored (also durable). A
 | `checksum_mismatch` | chunk | payload does not match `checksum_sha256` |
 | `invalid_payload` | chunk | the payload violates its resource's contract (e.g. a malformed location batch) |
 | `storage_failure` | chunk | store write failed; retransmit |
-| `session_ended` | session | session was ended (REST or sweeper) mid-stream |
+| `session_ended` | session | session was ended (REST, sweeper, or a split) mid-stream |
 | `protocol_error` | session | unparseable text frame, or a second `hello` |
 | `internal` | session | unexpected server failure |
+
+### `rotate`
+
+```json
+{"type": "rotate", "through": 24}
+```
+
+The session was **split** on purpose — by the dashboard or the daily rotation
+schedule — so its audio can enter processing while recording continues. The
+client should create a fresh session (`POST /v1/sessions`), reconnect to its
+stream, and keep recording. Chunks above `through` were not stored in the old
+session; retransmit them into the successor, using the new session's sequence
+space (`welcome.next_sequence`) — `captured_at` in each chunk header is what
+preserves the true timeline across the boundary.
+
+`rotate` is always followed by the `session_ended` error and a 4409 close, so
+a client that predates this event ignores it and lands on the ended-session
+handling it already has. Only a split emits `rotate`; an explicit REST end or
+a sweeper end stays a bare `session_ended`, because a deliberate stop must
+not make the device immediately re-record.
 
 ### `bye`
 
@@ -247,6 +267,13 @@ Reconnecting after that is a 409, and a new session must be created. The
 sweeper is also why a well-behaved client sends `finish`: it closes the
 session at the true end of recording rather than a sweep interval later.
 
+A session can also be ended out from under a live stream — by REST, the
+sweeper, or a split (`POST /v1/sessions/{id}/split`, or the daily
+`API_SESSION_ROTATE_AT` schedule). A connected stream notices within
+`API_STREAM_SESSION_CHECK_SECONDS` even when quiet: a split delivers
+`rotate` → `session_ended` → close 4409, any other end just
+`session_ended` → 4409.
+
 ## Limits and configuration
 
 All server-side, env-configurable (`api/config.py`), advertised in `welcome`
@@ -260,8 +287,10 @@ where the client needs them:
 | `API_STREAM_HELLO_TIMEOUT_SECONDS` | 10 | AWAITING_HELLO deadline |
 | `API_STREAM_IDLE_TIMEOUT_SECONDS` | 300 | close idle sockets (`bye reason=idle`) |
 | `API_STREAM_INGEST_CONCURRENCY` | 4 | chunk stores in flight at once per connection |
+| `API_STREAM_SESSION_CHECK_SECONDS` | 5.0 | how often a quiet stream re-checks its session for an external end/split |
 | `API_SESSION_STALE_SECONDS` | 300 | auto-end sessions with no activity |
 | `API_SESSION_SWEEP_INTERVAL_SECONDS` | 60 | sweeper cadence |
+| `API_SESSION_ROTATE_AT` | unset | split every open session at this local time (`HH:MM`) daily |
 
 ## Example session
 

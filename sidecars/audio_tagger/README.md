@@ -20,10 +20,18 @@ windows of audio.
 | `POST /v1/audio/analyze` | multipart WAV → per-window `{start_ms, end_ms, labels:[{label,score}], embedding}` (windowing 10 s / 5 s hop happens here; times are clip-relative) |
 | `POST /v1/text/embeddings` | `{"texts": [...]}` → CLAP text embeddings (for search queries) |
 | `GET /v1/models` | both model ids |
-| `GET /health` | 503 until both models are loaded |
+| `GET /health` | 503 until both models are loaded; 200 `"idle-unloaded"` after an idle eviction |
 
 Env knobs: `TAGGER_MODEL`, `CLAP_MODEL`, `WINDOW_MS` (10000), `HOP_MS` (5000),
-`BATCH` (16), `TOP_K` (20), `MIN_WINDOW_MS` (2000).
+`BATCH` (16), `TOP_K` (20), `MIN_WINDOW_MS` (2000), `IDLE_UNLOAD_SECONDS`
+(0 = keep resident; the deploy sets 1800).
+
+With `IDLE_UNLOAD_SECONDS` set, both models are dropped from CUDA after that
+long without inference and reload on the next request — which **blocks** for
+the reload (tens of seconds from the cache) instead of erroring. Callers must
+budget their timeout for that; the API's search path does via
+`API_CLASSIFIER_TIMEOUT_SECONDS`. Health stays 200 while evicted so the
+compose gate never flaps.
 
 ## Deploy
 

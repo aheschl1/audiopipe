@@ -130,6 +130,58 @@ class SessionsRepo(BaseRepo):
             raise NotFoundError("recording session", session_id)
         return session
 
+    async def split(self, session_id: UUID) -> RecordingSession:
+        """End a session as a planned rotation.
+
+        The ``rotated`` metadata marker is what tells a still-connected
+        streaming client to reopen (a plain :meth:`end` must not make a
+        device immediately re-record). Splitting an already-ended session
+        returns it unchanged.
+        """
+        session = await self._fetch_one(
+            RecordingSession,
+            f"""
+                UPDATE recording_sessions
+                SET ended_at = now(), metadata = metadata || '{{"rotated": true}}'::jsonb
+                WHERE id = %s AND ended_at IS NULL
+                RETURNING {COLUMNS}
+            """,
+            (session_id,),
+        )
+        if session is not None:
+            return session
+        session = await self.get(session_id)
+        if session is None:
+            raise NotFoundError("recording session", session_id)
+        return session
+
+    async def split_all_open(self, user_id: UUID) -> int:
+        """Split every open session of one user; returns how many ended."""
+        return await self._execute(
+            """
+                UPDATE recording_sessions
+                SET ended_at = now(), metadata = metadata || '{"rotated": true}'::jsonb
+                WHERE user_id = %s AND ended_at IS NULL
+            """,
+            (user_id,),
+        )
+
+    async def split_started_before(self, cutoff: datetime) -> int:
+        """Split every open session started before the cutoff, any user.
+
+        The scheduled-rotation primitive: bounding by ``started_at`` makes
+        re-runs no-ops, so concurrent sweepers and restarts are safe without
+        coordination.
+        """
+        return await self._execute(
+            """
+                UPDATE recording_sessions
+                SET ended_at = now(), metadata = metadata || '{"rotated": true}'::jsonb
+                WHERE ended_at IS NULL AND started_at < %s
+            """,
+            (cutoff,),
+        )
+
     async def set_label(self, session_id: UUID, label: str | None) -> RecordingSession:
         """Rename a session, or clear the name with ``None``.
 

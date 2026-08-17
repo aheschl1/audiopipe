@@ -76,6 +76,69 @@ async def test_ended_session_reports_closed(client: httpx.AsyncClient, account: 
     assert body["ended_at"] is not None
 
 
+async def test_split_ends_a_session_with_the_rotated_marker(
+    client: httpx.AsyncClient, account: Account
+) -> None:
+    created = await make_session(account)
+
+    response = await client.post(f"/v1/sessions/{created.id}/split", headers=account.headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["is_open"] is False
+    assert body["ended_at"] is not None
+    assert body["metadata"]["rotated"] is True
+
+
+async def test_split_of_an_ended_session_is_a_no_op(
+    client: httpx.AsyncClient, account: Account
+) -> None:
+    created = await make_session(account)
+    async with DatabasePipe() as pipe:
+        ended = await pipe.sessions.end(created.id)
+
+    response = await client.post(f"/v1/sessions/{created.id}/split", headers=account.headers)
+    assert response.status_code == 200
+    body = response.json()
+    # A plain end stays a plain end: no rotated marker, timestamp unmoved.
+    assert body["metadata"] == {}
+    assert datetime.fromisoformat(body["ended_at"]) == ended.ended_at
+
+
+async def test_split_on_another_users_session_is_404(
+    client: httpx.AsyncClient, account: Account, other_account: Account
+) -> None:
+    theirs = await make_session(other_account)
+
+    response = await client.post(f"/v1/sessions/{theirs.id}/split", headers=account.headers)
+    assert response.status_code == 404
+
+    body = (await client.get(f"/v1/sessions/{theirs.id}", headers=other_account.headers)).json()
+    assert body["is_open"] is True
+
+
+async def test_split_all_ends_only_the_callers_open_sessions(
+    client: httpx.AsyncClient, account: Account, other_account: Account
+) -> None:
+    open_a = await make_session(account, label="a")
+    open_b = await make_session(account, label="b")
+    already_ended = await make_session(account, label="ended")
+    theirs = await make_session(other_account)
+    async with DatabasePipe() as pipe:
+        await pipe.sessions.end(already_ended.id)
+
+    response = await client.post("/v1/sessions/split", headers=account.headers)
+    assert response.status_code == 200
+    assert response.json() == {"split": 2}
+
+    async with DatabasePipe() as pipe:
+        for session_id in (open_a.id, open_b.id):
+            session = await pipe.sessions.get(session_id)
+            assert session.ended_at is not None
+            assert session.metadata["rotated"] is True
+        assert (await pipe.sessions.get(already_ended.id)).metadata == {}
+        assert (await pipe.sessions.get(theirs.id)).is_open
+
+
 async def test_label_renames_a_session(client: httpx.AsyncClient, account: Account) -> None:
     created = await make_session(account, device="glasses-01", label="walk")
 
