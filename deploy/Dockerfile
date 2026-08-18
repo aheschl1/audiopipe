@@ -33,6 +33,7 @@ COPY alembic.ini ./
 COPY api api
 COPY cli cli
 COPY database database
+COPY live live
 COPY processing processing
 COPY resources resources
 COPY services services
