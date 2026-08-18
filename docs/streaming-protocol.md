@@ -10,12 +10,13 @@ normative here.
 
 `hello.version` selects the protocol. **v2** clients stream raw PCM audio in
 small, fast frames with a fixed 6-byte header; the server pools frames into
-stored WAV segments (`api/stream_pool.py`). **v1** clients upload short,
-self-contained audio files, each stored 1:1 as a segment — deprecated: new
-clients must implement v2, and v1 receives no new features (no live tap, no
-effects). Either way the server answers with typed JSON events over the same
-connection: cumulative acknowledgements today, effect output (the live
-processing layer) next.
+stored WAV segments (`api/stream_pool.py`) and forwards each frame to the
+live processing layer (docs/processing-pipelines.md, *Live pipelines*).
+**v1** clients upload short, self-contained audio files, each stored 1:1 as a
+segment — deprecated: new clients must implement v2, and v1 receives no new
+features (no live tap, no effects). Either way the server answers with typed
+JSON events over the same connection: cumulative acknowledgements, and — v2
+only — effect output from live pipelines the client enabled.
 
 ## Connecting
 
@@ -101,9 +102,10 @@ header or their resource type's default. An audio chunk may override
 nothing without them (missing/other values close with 4400). `content_type`
 is ignored for v2 audio; pooled segments are always stored as `audio/wav`.
 
-`effects` requests server-side effects by name; the live processing layer
-that serves them is landing next (v2-only), and until then the echoed
-`welcome.effects` set is always empty.
+`effects` requests live pipelines by name; the server echoes the enabled
+intersection in `welcome.effects` (unknown names are silently dropped, and
+the set is always empty on v1 or when the live layer is disabled). Enabled
+effects publish `effect` events onto this socket.
 
 ### v2 binary frames
 
@@ -390,18 +392,30 @@ S→ {"type": "bye", "reason": "finished", "through": 11}
 S  close 1000
 ```
 
-## Extending with effects
+## Effects (live pipelines)
 
-Effects are server-side consumers of the v2 audio stream that publish their
-own event types onto the same socket (v2-only). The contract that keeps them
-compatible:
+Effects are the live processing layer's output: server-side consumers of the
+v2 audio stream (docs/processing-pipelines.md, *Live pipelines*) that publish
+`effect` events onto the same socket. `hello.effects` requests them by name,
+`welcome.effects` confirms the enabled set. v2-only.
 
-- new event types appear without a `version` bump; old clients ignore them;
+### `effect`
+
+```json
+{"type": "effect", "effect": "live-counter", "event": "finished",
+ "sequence": null, "data": {"frames": 14, "bytes": 22400}}
+```
+
+`event` and `data` mean whatever the named effect says they mean (the stub
+counter emits `started` and `finished`). The compatibility contract:
+
+- new event and effect types appear without a `version` bump; clients ignore
+  types and effects they do not recognise;
 - effect events may reference `sequence` values or ranges, and may arrive
   before *or* after the `ack` covering those frames;
-- `hello.effects` requests effects by name, `welcome.effects` confirms the
-  enabled set (empty until the live layer lands).
+- the live path is **best-effort**: frames can be dropped under pressure or a
+  worker restart, so effects can miss audio the durable store kept.
 
-Server-side, an effect publishes to the connection's outbox
-(`api/routes/stream.py`), which already serializes all writers onto the
-socket.
+Server-side, effect events arrive from the live worker over its UDS and are
+published to the connection's outbox (`api/routes/stream.py`), which already
+serializes all writers onto the socket.

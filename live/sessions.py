@@ -2,26 +2,49 @@
 
 import asyncio
 import logging
+from typing import Any
 
+from live import registry
+from live.base import LiveFrame
 from live.config import LiveSettings
-from live.protocol import SessionHello
+from live.detect import StubWakewordDetector
+from live.gate import WakewordGate
+from live.protocol import MSG_EVENT, Event, SessionHello, encode_message
 
 logger = logging.getLogger(__name__)
 
 
 class SessionStream:
-    """One attached stream. Consumes frames; the wakeword gate lands next."""
+    """One attached stream: its gate and the event write-back path."""
 
     def __init__(
         self, hello: SessionHello, settings: LiveSettings, writer: asyncio.StreamWriter
     ) -> None:
-        self._hello = hello
-        self._frames = 0
+        self._writer = writer
+        pipelines = tuple(
+            cls for cls in registry.LIVE_PIPELINES if cls.name in hello.effects
+        )
+        self._gate = WakewordGate(
+            StubWakewordDetector(settings.wakeword),
+            settings,
+            pipelines,
+            session_id=hello.session_id,
+            user_id=hello.user_id,
+            sample_rate_hz=hello.sample_rate_hz,
+            channels=hello.channels,
+            emit=self._emit,
+        )
+
+    def _emit(self, effect: str, event: str, data: dict[str, Any]) -> None:
+        # One write() call per message keeps concurrent emitters from
+        # interleaving; the tap always reads, so no drain is needed.
+        if self._writer.is_closing():
+            return
+        body = Event(effect=effect, event=event, data=data).model_dump_json().encode()
+        self._writer.write(encode_message(MSG_EVENT, body))
 
     async def feed(self, sequence: int, pcm: bytes) -> None:
-        self._frames += 1
+        await self._gate.feed(LiveFrame(sequence=sequence, pcm=pcm))
 
     async def close(self) -> None:
-        logger.info(
-            "detached session %s after %d frames", self._hello.session_id, self._frames
-        )
+        await self._gate.close()

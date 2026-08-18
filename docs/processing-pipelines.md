@@ -398,23 +398,54 @@ succeed transaction instead - nothing in the schema prevents that.
   priorities yet; chained jobs inherit their parent's. Constant load at a
   high priority will starve lower ones - there is no aging.
 
-## Future: live pipelines
+## Live pipelines
 
-Live processing (acting on a session *while* it streams) is a different kind,
-deliberately not built yet. The decided direction:
+Live processing (acting on a session *while* it streams) is its own kind,
+built in `live/` and deliberately not part of the batch machinery above: no
+jobs, no artifacts, no queue contention. It is **best-effort by contract** —
+the durable path is the websocket's segment pooler; the live path may drop
+frames under pressure and misses audio across a worker restart.
 
-- A **live pipeline** runs a *follower per live session*: its worker watches
-  for open sessions and runs one follower loop each, consuming new data at
-  its own pace via its own queries/cursor until the session ends, then
-  finalizing. Priority is inherent - live pipelines are their own processes
-  and never contend with the batch queue.
-- A **UDS control plane** (one Unix domain socket per live worker) will carry
-  API ⇄ worker communication, e.g. pushing live results to the session's
-  websocket clients via the protocol's reserved `Hello.effects` /
-  `Welcome.effects` negotiation (docs/streaming-protocol.md).
-- A live pipeline may share its core code with a paired background pipeline
-  (live transcription and batch transcription wrapping one transcriber).
+```
+                  websocket (v2)                    live worker (child process)
+ client ──frames──▶ api ──┬─ pooler ─▶ blob+rows    ┌──────────────────────────┐
+                          └─ tap ── UDS per conn ──▶│ hello → SessionStream    │
+                                        ◀── events ─│  └ WakewordGate          │
+                                                    │     └ LivePipeline × N   │
+                                                    └──────────────────────────┘
+```
 
-Nothing in the current design blocks this: the jobs/artifacts tables and blob
-spaces are shared infrastructure, live followers simply bypass the queue, and
-the callback seam stays the background side's extension point.
+- The API spawns **one live worker child** at startup (`live/supervisor.py`,
+  spawn context — never fork a running uvicorn — restart with the same
+  backoff/reset scheme as the batch supervisor). The worker listens on a Unix
+  domain socket (`LIVE_SOCKET_PATH`, default pid-suffixed under
+  `/tmp/audio-pipeline/`).
+- The **tap** (`live/tap.py`) opens **one UDS connection per v2 websocket
+  connection**: connect = attach (a JSON `HELLO` with session, PCM params,
+  and negotiated effects), close = detach, and `EVENT` messages flow back on
+  the same socket into the connection's outbox as `effect` events
+  (docs/streaming-protocol.md). `send_frame` never blocks the ingest path: a
+  bounded per-connection queue drops its oldest under pressure, and while the
+  worker is down frames simply drop as the tap reconnects with backoff.
+- Worker-side (`live/worker.py`, `live/sessions.py`), each connection gets a
+  `SessionStream` holding a **wakeword gate** (`live/gate.py`): idle, it
+  feeds a detector (`live/detect.py` — a stub matching `LIVE_WAKEWORD`'s
+  bytes in the PCM, existing only so tests can trigger deterministically) and
+  a `LIVE_PREROLL_MS` ring; on a trigger it starts one instance of each
+  effects-enabled pipeline and feeds pre-roll then live frames until
+  `LIVE_GATE_WINDOW_MS` of audio has passed (silence-based close is a future
+  detector hook), then re-arms.
+- A **live pipeline** (`live/base.py`) is `async run(ctx, frames)` over an
+  async iterator of PCM frames — it owns its loop, may await inference
+  freely (the gate's bounded queue drops behind a slow consumer), and knows
+  nothing about wakewords. `ctx.emit(event, data)` publishes an effect event.
+  Register in `live/registry.py`; `live-counter` (`live/pipelines.py`) is the
+  stub template. A live pipeline may share its core code with a paired batch
+  pipeline (live transcription and batch transcription wrapping one
+  transcriber) — that pairing is still future work, as is the
+  follower-per-session pattern for live consumers that need the stores
+  rather than the socket.
+
+`LIVE_*` environment (see `.env.example`): wakeword, socket path, pre-roll
+and window sizes, queue bounds, restart/shutdown tuning; `LIVE_ENABLED=false`
+turns the whole layer off (v2 streaming is unaffected).

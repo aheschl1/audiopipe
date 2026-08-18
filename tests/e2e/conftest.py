@@ -120,6 +120,13 @@ def test_env(
         "API_STREAM_POOL_MAX_LATENCY_SECONDS": "0.3",
         "API_STREAM_POOL_FLUSH_RETRIES": "2",
         "API_STREAM_POOL_RETRY_BACKOFF_SECONDS": "0.05",
+        # Live layer: a deterministic marker wakeword (the stub detector
+        # matches its bytes inside PCM) and a window short enough that a
+        # test's stream sees started AND finished while still connected.
+        "LIVE_ENABLED": "true",
+        "LIVE_WAKEWORD": "wakemarker",
+        "LIVE_PREROLL_MS": "200",
+        "LIVE_GATE_WINDOW_MS": "500",
         "API_SESSION_STALE_SECONDS": "300",
         # Effectively parks the server's sweeper so test_stream can drive
         # end_stale deterministically.

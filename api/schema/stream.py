@@ -262,7 +262,23 @@ class Bye(BaseModel):
     through: int
 
 
-ServerEvent = Welcome | Ack | StreamError | Rotate | Bye
+class EffectEvent(BaseModel):
+    """Output of a live pipeline the client enabled via ``hello.effects``.
+
+    ``event`` and ``data`` mean whatever the effect says they mean; the stub
+    counter emits ``started`` and ``finished``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["effect"] = "effect"
+    effect: str
+    event: str
+    sequence: int | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
+ServerEvent = Welcome | Ack | StreamError | Rotate | Bye | EffectEvent
 
 _server_event: TypeAdapter[ServerEvent] = TypeAdapter(
     Annotated[ServerEvent, Field(discriminator="type")]

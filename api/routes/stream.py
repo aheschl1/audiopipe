@@ -2,9 +2,9 @@
 
 Implements the protocol in docs/streaming-protocol.md: a client attaches to an
 open session it owns, sends audio as binary frames — v2 raw PCM frames pooled
-into stored segments, or v1 self-contained chunks stored 1:1 — and receives
-typed JSON events (cumulative acks, errors, and eventually effect output)
-back.
+into stored segments and tapped into the live layer, or v1 self-contained
+chunks stored 1:1 — and receives typed JSON events (cumulative acks, errors,
+and effect output) back.
 
 None of the application's HTTP machinery applies here — no global exception
 handlers, no ``HTTPBearer`` — so this module authenticates the upgrade request
@@ -29,6 +29,7 @@ from api.schema.stream import (
     AudioFrame,
     Bye,
     ChunkHeader,
+    EffectEvent,
     Finish,
     FrameError,
     Hello,
@@ -43,6 +44,7 @@ from api.schema.stream import (
 )
 from api.stream_pool import PcmPooler
 import resources
+from live import registry as live_registry
 from live.tap import LiveSessionHandle
 from database.exceptions import DuplicateSequenceError, NotFoundError, SessionEndedError
 from database.pipe import DatabasePipe
@@ -282,18 +284,28 @@ async def stream_session_audio(websocket: WebSocket, session_id: UUID) -> None:
     tracker = _AckTracker(outbox, next_sequence - 1, window)
     close_code = None
 
-    # The live tap is best-effort and v2-only. Effects negotiation (and any
-    # events coming back) lands with the wakeword gate; frames flow already.
+    # The live tap is best-effort and v2-only: every audio frame is forwarded
+    # while live is enabled; `effects` only selects which pipelines run and
+    # whose events come back.
     tap = getattr(websocket.app.state, "live_tap", None)
     live_handle = None
+    effects: tuple[str, ...] = ()
     if tap is not None and hello.version >= 2:
+        effects = tuple(name for name in hello.effects if name in live_registry.names())
         live_handle = tap.attach(
             session_id=session.id,
             user_id=session.user_id,
             sample_rate_hz=hello.defaults.sample_rate_hz,
             channels=hello.defaults.channels,
-            effects=(),
-            on_event=lambda event: None,
+            effects=effects,
+            on_event=lambda event: outbox.publish(
+                EffectEvent(
+                    effect=event.effect,
+                    event=event.event,
+                    sequence=event.sequence,
+                    data=event.data,
+                )
+            ),
         )
     try:
         outbox.publish(
@@ -308,6 +320,7 @@ async def stream_session_audio(websocket: WebSocket, session_id: UUID) -> None:
                         settings.stream_max_audio_frame_bytes if hello.version >= 2 else None
                     ),
                 ),
+                effects=effects,
                 resources=resources.names(),
             )
         )
