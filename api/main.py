@@ -36,6 +36,9 @@ from api.schema.common import ErrorResponse
 from api.schema.stream_export import build_schema
 from database.exceptions import DatabaseError, NotFoundError
 from database.pipe import DatabasePipe, close_pool
+from live import config as live_config
+from live.supervisor import LiveWorkerSupervisor
+from live.tap import LiveTap
 from storage.base import BlobNotFoundError
 from storage.pipe import close_blob_client
 
@@ -93,10 +96,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     async with DatabasePipe() as pipe:
         await pipe.ping()
     sweeper = asyncio.create_task(_sweep_sessions())
+    live_settings = live_config.get_settings()
+    supervisor = None
+    app.state.live_tap = None
+    if live_settings.enabled:
+        path = live_config.socket_path(live_settings)
+        supervisor = LiveWorkerSupervisor(live_settings, path)
+        supervisor.start()
+        app.state.live_tap = LiveTap(live_settings, path)
     yield
     sweeper.cancel()
     with suppress(asyncio.CancelledError):
         await sweeper
+    if supervisor is not None:
+        await supervisor.stop()
     await close_blob_client()
     await close_pool()
 

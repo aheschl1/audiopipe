@@ -43,6 +43,7 @@ from api.schema.stream import (
 )
 from api.stream_pool import PcmPooler
 import resources
+from live.tap import LiveSessionHandle
 from database.exceptions import DuplicateSequenceError, NotFoundError, SessionEndedError
 from database.pipe import DatabasePipe
 from database.schema.sessions import RecordingSession
@@ -280,6 +281,20 @@ async def stream_session_audio(websocket: WebSocket, session_id: UUID) -> None:
     )
     tracker = _AckTracker(outbox, next_sequence - 1, window)
     close_code = None
+
+    # The live tap is best-effort and v2-only. Effects negotiation (and any
+    # events coming back) lands with the wakeword gate; frames flow already.
+    tap = getattr(websocket.app.state, "live_tap", None)
+    live_handle = None
+    if tap is not None and hello.version >= 2:
+        live_handle = tap.attach(
+            session_id=session.id,
+            user_id=session.user_id,
+            sample_rate_hz=hello.defaults.sample_rate_hz,
+            channels=hello.defaults.channels,
+            effects=(),
+            on_event=lambda event: None,
+        )
     try:
         outbox.publish(
             Welcome(
@@ -298,7 +313,7 @@ async def stream_session_audio(websocket: WebSocket, session_id: UUID) -> None:
         )
         async with BlobPipe() as blobs:
             bye_reason, close_code = await _pump(
-                websocket, outbox, tracker, blobs, session, hello, settings
+                websocket, outbox, tracker, blobs, session, hello, settings, live_handle
             )
         if bye_reason is not None:
             outbox.publish(Bye(reason=bye_reason, through=tracker.through))
@@ -320,6 +335,8 @@ async def stream_session_audio(websocket: WebSocket, session_id: UUID) -> None:
         )
         close_code = CLOSE_INTERNAL
     finally:
+        if live_handle is not None:
+            live_handle.detach()
         tracker.shutdown()
         try:
             await outbox.close()
@@ -428,6 +445,7 @@ async def _pump(
     session: RecordingSession,
     hello: Hello,
     settings: ApiSettings,
+    live_handle: LiveSessionHandle | None = None,
 ) -> tuple[str | None, int | None]:
     """The STREAMING state. Returns (bye reason, close code) for the teardown."""
     pool = _ChunkPool(settings.stream_ingest_concurrency)
@@ -446,7 +464,8 @@ async def _pump(
         )
     try:
         return await _pump_frames(
-            websocket, outbox, tracker, blobs, session, hello, settings, pool, pooler
+            websocket, outbox, tracker, blobs, session, hello, settings, pool, pooler,
+            live_handle,
         )
     except asyncio.CancelledError:
         pool.cancel_all()
@@ -511,6 +530,7 @@ async def _pump_frames(
     settings: ApiSettings,
     pool: _ChunkPool,
     pooler: PcmPooler | None,
+    live_handle: LiveSessionHandle | None = None,
 ) -> tuple[str | None, int | None]:
     loop = asyncio.get_running_loop()
     idle_deadline = loop.time() + settings.stream_idle_timeout_seconds
@@ -564,7 +584,8 @@ async def _pump_frames(
                 )
             else:
                 await _ingest_v2_frame(
-                    outbox, tracker, blobs, session, hello, settings, pool, pooler, data
+                    outbox, tracker, blobs, session, hello, settings, pool, pooler,
+                    live_handle, data,
                 )
             continue
 
@@ -604,6 +625,7 @@ async def _ingest_v2_frame(
     settings: ApiSettings,
     pool: _ChunkPool,
     pooler: PcmPooler,
+    live_handle: LiveSessionHandle | None,
     data: bytes,
 ) -> None:
     """Route one v2 binary frame: audio into the pooler, envelopes as chunks."""
@@ -642,6 +664,10 @@ async def _ingest_v2_frame(
         else:
             reject("bad_sequence", "audio frame sequences must be strictly increasing")
         return
+    if live_handle is not None:
+        # Before the pooler: the live path must see the frame even when the
+        # durable path is applying backpressure.
+        live_handle.send_frame(decoded.sequence, decoded.pcm)
     await pooler.add(decoded)
 
 

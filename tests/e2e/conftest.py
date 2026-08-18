@@ -165,11 +165,13 @@ def test_env(
 
     from api.config import get_settings as api_settings
     from database.config import get_settings as db_settings
+    from live.config import get_settings as live_settings
     from processing.config import get_settings as processing_settings
     from storage.config import get_settings as storage_settings
 
     api_settings.cache_clear()
     db_settings.cache_clear()
+    live_settings.cache_clear()
     processing_settings.cache_clear()
     storage_settings.cache_clear()
     return env
