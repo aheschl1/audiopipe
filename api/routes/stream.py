@@ -1,9 +1,10 @@
 """The streaming upload websocket.
 
 Implements the protocol in docs/streaming-protocol.md: a client attaches to an
-open session it owns, sends self-contained audio chunks as binary frames, and
-receives typed JSON events (cumulative acks, errors, and eventually effect
-output) back.
+open session it owns, sends audio as binary frames — v2 raw PCM frames pooled
+into stored segments, or v1 self-contained chunks stored 1:1 — and receives
+typed JSON events (cumulative acks, errors, and eventually effect output)
+back.
 
 None of the application's HTTP machinery applies here — no global exception
 handlers, no ``HTTPBearer`` — so this module authenticates the upgrade request
@@ -22,9 +23,10 @@ from api.config import ApiSettings, get_settings
 from api.deps import authenticate_token
 from api.schema.common import ErrorResponse
 from api.schema.stream import (
-    PROTOCOL_VERSION,
+    SUPPORTED_VERSIONS,
     Ack,
     AckWindow,
+    AudioFrame,
     Bye,
     ChunkHeader,
     Finish,
@@ -36,8 +38,10 @@ from api.schema.stream import (
     StreamLimits,
     Welcome,
     decode_chunk,
+    decode_v2_frame,
     parse_client_frame,
 )
+from api.stream_pool import PcmPooler
 import resources
 from database.exceptions import DuplicateSequenceError, NotFoundError, SessionEndedError
 from database.pipe import DatabasePipe
@@ -279,10 +283,16 @@ async def stream_session_audio(websocket: WebSocket, session_id: UUID) -> None:
     try:
         outbox.publish(
             Welcome(
+                version=hello.version,
                 session_id=session.id,
                 next_sequence=next_sequence,
                 ack_window=window,
-                limits=StreamLimits(max_chunk_bytes=settings.stream_max_chunk_bytes),
+                limits=StreamLimits(
+                    max_chunk_bytes=settings.stream_max_chunk_bytes,
+                    max_audio_frame_bytes=(
+                        settings.stream_max_audio_frame_bytes if hello.version >= 2 else None
+                    ),
+                ),
                 resources=resources.names(),
             )
         )
@@ -342,7 +352,14 @@ async def _await_hello(
         frame = parse_client_frame(text)
     except FrameError:
         return None, CLOSE_PROTOCOL_ERROR
-    if not isinstance(frame, Hello) or frame.version != PROTOCOL_VERSION:
+    if not isinstance(frame, Hello) or frame.version not in SUPPORTED_VERSIONS:
+        return None, CLOSE_PROTOCOL_ERROR
+    if frame.version >= 2 and (
+        frame.defaults.codec != "pcm_s16le"
+        or frame.defaults.sample_rate_hz is None
+        or frame.defaults.channels is None
+    ):
+        # v2 audio frames are raw PCM; without these the payloads mean nothing.
         return None, CLOSE_PROTOCOL_ERROR
     return frame, None
 
@@ -414,12 +431,29 @@ async def _pump(
 ) -> tuple[str | None, int | None]:
     """The STREAMING state. Returns (bye reason, close code) for the teardown."""
     pool = _ChunkPool(settings.stream_ingest_concurrency)
+    pooler = None
+    if hello.version >= 2:
+        # _await_hello guaranteed the PCM parameters are present.
+        pooler = PcmPooler(
+            blobs,
+            session,
+            sample_rate_hz=hello.defaults.sample_rate_hz,
+            channels=hello.defaults.channels,
+            tracker=tracker,
+            chunk_pool=pool,
+            outbox=outbox,
+            settings=settings,
+        )
     try:
-        return await _pump_frames(websocket, outbox, tracker, blobs, session, hello, settings, pool)
+        return await _pump_frames(
+            websocket, outbox, tracker, blobs, session, hello, settings, pool, pooler
+        )
     except asyncio.CancelledError:
         pool.cancel_all()
         raise
     finally:
+        if pooler is not None:
+            pooler.shutdown()
         # Every return path drained already; this covers the exception paths.
         await pool.drain()
 
@@ -476,12 +510,17 @@ async def _pump_frames(
     hello: Hello,
     settings: ApiSettings,
     pool: _ChunkPool,
+    pooler: PcmPooler | None,
 ) -> tuple[str | None, int | None]:
     loop = asyncio.get_running_loop()
     idle_deadline = loop.time() + settings.stream_idle_timeout_seconds
     while True:
         if pool.settled and (outcome := await _settle(pool, outbox, tracker, session.id)) is not None:
             return outcome
+        if pooler is not None and pooler.failed:
+            # The pooler already published the session-scoped storage_failure.
+            await pool.drain()
+            return None, CLOSE_INTERNAL
 
         # Receive in short slices so a quiet stream still notices its session
         # being split (or otherwise ended) within the check interval, not only
@@ -493,6 +532,10 @@ async def _pump_frames(
             if (outcome := await _settle(pool, outbox, tracker, session.id)) is not None:
                 return outcome
             if loop.time() >= idle_deadline:
+                if pooler is not None:
+                    await pooler.flush()
+                    if (outcome := await _settle(pool, outbox, tracker, session.id)) is not None:
+                        return outcome
                 tracker.flush()
                 return "idle", 1000
             current = await _session_state(session.id)
@@ -504,6 +547,8 @@ async def _pump_frames(
         if message["type"] == "websocket.disconnect":
             # In-flight stores finish and count; the session stays open for a
             # reconnect, and the sweeper ends it if none arrives in time.
+            if pooler is not None:
+                await pooler.flush()
             await pool.drain()
             if pool.failure is not None:
                 raise pool.failure
@@ -511,11 +556,16 @@ async def _pump_frames(
 
         data = message.get("bytes")
         if data is not None:
-            await pool.submit(
-                lambda data=data: _ingest_chunk(
-                    outbox, tracker, blobs, session, hello, settings, data
+            if pooler is None:
+                await pool.submit(
+                    lambda data=data: _ingest_chunk(
+                        outbox, tracker, blobs, session, hello, settings, data
+                    )
                 )
-            )
+            else:
+                await _ingest_v2_frame(
+                    outbox, tracker, blobs, session, hello, settings, pool, pooler, data
+                )
             continue
 
         try:
@@ -527,8 +577,13 @@ async def _pump_frames(
             )
             return None, CLOSE_PROTOCOL_ERROR
         if isinstance(frame, Finish):
+            if pooler is not None:
+                await pooler.flush()
             if (outcome := await _settle(pool, outbox, tracker, session.id)) is not None:
                 return outcome
+            if pooler is not None and pooler.failed:
+                await pool.drain()
+                return None, CLOSE_INTERNAL
             tracker.flush()
             async with DatabasePipe() as pipe:
                 await pipe.sessions.end(session.id, frame.ended_at)
@@ -540,6 +595,56 @@ async def _pump_frames(
         return None, CLOSE_PROTOCOL_ERROR
 
 
+async def _ingest_v2_frame(
+    outbox: _Outbox,
+    tracker: _AckTracker,
+    blobs: S3BlobStore,
+    session: RecordingSession,
+    hello: Hello,
+    settings: ApiSettings,
+    pool: _ChunkPool,
+    pooler: PcmPooler,
+    data: bytes,
+) -> None:
+    """Route one v2 binary frame: audio into the pooler, envelopes as chunks."""
+    try:
+        decoded = decode_v2_frame(data)
+    except FrameError as exc:
+        outbox.publish(StreamError(scope="chunk", code="bad_frame", detail=str(exc)))
+        return
+    if not isinstance(decoded, AudioFrame):
+        header, payload = decoded
+        await pool.submit(
+            lambda: _ingest_decoded(
+                outbox, tracker, blobs, session, hello, settings, header, payload
+            )
+        )
+        return
+
+    def reject(code: str, detail: str) -> None:
+        outbox.publish(
+            StreamError(scope="chunk", code=code, detail=detail, sequence=decoded.sequence)
+        )
+
+    sample_width = hello.defaults.channels * 2
+    if not decoded.pcm or len(decoded.pcm) % sample_width:
+        reject("bad_frame", f"payload must be a non-empty multiple of {sample_width} bytes")
+        return
+    if len(decoded.pcm) > settings.stream_max_audio_frame_bytes:
+        reject(
+            "frame_too_large",
+            f"payload of {len(decoded.pcm)} bytes exceeds {settings.stream_max_audio_frame_bytes}",
+        )
+        return
+    if decoded.sequence <= pooler.highest_sequence:
+        if decoded.sequence <= tracker.through:
+            tracker.note_duplicate(decoded.sequence)
+        else:
+            reject("bad_sequence", "audio frame sequences must be strictly increasing")
+        return
+    await pooler.add(decoded)
+
+
 async def _ingest_chunk(
     outbox: _Outbox,
     tracker: _AckTracker,
@@ -549,18 +654,32 @@ async def _ingest_chunk(
     settings: ApiSettings,
     data: bytes,
 ) -> None:
-    """Store one chunk, reporting recoverable problems as chunk-scoped errors."""
+    """Store one v1 chunk, reporting recoverable problems as chunk-scoped errors."""
+    try:
+        header, payload = decode_chunk(data)
+    except FrameError as exc:
+        outbox.publish(StreamError(scope="chunk", code="bad_header", detail=str(exc)))
+        return
+    await _ingest_decoded(outbox, tracker, blobs, session, hello, settings, header, payload)
+
+
+async def _ingest_decoded(
+    outbox: _Outbox,
+    tracker: _AckTracker,
+    blobs: S3BlobStore,
+    session: RecordingSession,
+    hello: Hello,
+    settings: ApiSettings,
+    header: ChunkHeader,
+    payload: bytes,
+) -> None:
+    """Store one decoded enveloped chunk (the v1 path, and v2 envelopes)."""
 
     def reject(code: str, detail: str, sequence: int | None = None) -> None:
         outbox.publish(
             StreamError(scope="chunk", code=code, detail=detail, sequence=sequence)
         )
 
-    try:
-        header, payload = decode_chunk(data)
-    except FrameError as exc:
-        reject("bad_header", str(exc))
-        return
     if not payload:
         reject("bad_header", "empty payload", header.sequence)
         return

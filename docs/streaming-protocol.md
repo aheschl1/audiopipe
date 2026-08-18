@@ -1,15 +1,21 @@
 # Streaming upload protocol
 
-Version 1. Server frame models live in `api/schema/stream.py`; the handler in
-`api/routes/stream.py`. The server publishes the frame schema as JSON Schema
-at **`GET /stream-schema.json`** (next to `/openapi.json`) — clients generate
-their frame types from that document rather than transcribing this file.
+**Version 2 (current); version 1 accepted but deprecated.** Server frame
+models live in `api/schema/stream.py`; the handler in `api/routes/stream.py`.
+The server publishes the frame schema as JSON Schema at
+**`GET /stream-schema.json`** (next to `/openapi.json`) — clients generate
+their frame types from that document rather than transcribing this file. The
+v2 binary frame layouts cannot be expressed in JSON Schema; they are
+normative here.
 
-Clients record short, self-contained audio chunks and upload each one as a
-single websocket message. The server stores every chunk as one `AudioSegment`
-(visible immediately through the REST API) and answers with typed JSON events:
-cumulative acknowledgements today, effect output (transcription, VAD, …)
-tomorrow, over the same connection.
+`hello.version` selects the protocol. **v2** clients stream raw PCM audio in
+small, fast frames with a fixed 6-byte header; the server pools frames into
+stored WAV segments (`api/stream_pool.py`). **v1** clients upload short,
+self-contained audio files, each stored 1:1 as a segment — deprecated: new
+clients must implement v2, and v1 receives no new features (no live tap, no
+effects). Either way the server answers with typed JSON events over the same
+connection: cumulative acknowledgements today, effect output (the live
+processing layer) next.
 
 ## Connecting
 
@@ -83,15 +89,80 @@ recognise** — that is how new effect events arrive without a version bump.
 }
 ```
 
-`defaults` (all optional) apply to every **audio** chunk — they are PCM
-parameters, and chunks of other resources ignore them, resolving content type
-from their own header or their resource type's default. An audio chunk may
-override `content_type` only. `effects` is reserved for requesting
-server-side effects; no effects exist yet, and the server echoes the enabled
-set in `welcome`. `token` is used only in hello-token mode (see *Connecting*).
-A `version` the server does not speak closes the socket with 4400.
+`defaults` apply to every **audio** chunk — they are PCM parameters, and
+chunks of other resources ignore them, resolving content type from their own
+header or their resource type's default. An audio chunk may override
+`content_type` only. `token` is used only in hello-token mode (see
+*Connecting*). A `version` the server does not speak closes the socket with
+4400.
 
-### `chunk` (binary)
+**v2 requirements**: `defaults` MUST declare `codec: "pcm_s16le"`,
+`sample_rate_hz`, and `channels` — v2 audio frames are raw PCM and mean
+nothing without them (missing/other values close with 4400). `content_type`
+is ignored for v2 audio; pooled segments are always stored as `audio/wav`.
+
+`effects` requests server-side effects by name; the live processing layer
+that serves them is landing next (v2-only), and until then the echoed
+`welcome.effects` set is always empty.
+
+### v2 binary frames
+
+On a v2 connection every binary message starts with a one-byte discriminator.
+
+**`0x01` audio frame** — the fast path:
+
+```
++------+-------+---------------+---------------------------+--------------+
+| 0x01 | flags | sequence      | captured_at (u64 BE epoch | raw PCM      |
+| (u8) | (u8)  | (u32 BE)      | ms; only if flags & 0x01) | s16le        |
++------+-------+---------------+---------------------------+--------------+
+```
+
+The payload is raw PCM in the hello's declared parameters — no container.
+It must be non-empty, a multiple of the PCM frame size (`channels * 2`
+bytes), and at most `limits.max_audio_frame_bytes`. Unknown flag bits are
+rejected (`bad_frame`).
+
+**Ordering rule**: audio frame sequences MUST be strictly increasing on a
+connection (websocket delivery is ordered, so this costs a client nothing; it
+is what lets the server pool payloads by concatenation). A sequence at or
+below `ack.through` is acknowledged as a duplicate; any other regression is
+rejected with `bad_sequence` and dropped.
+
+**`0x02` envelope frame** — the byte `0x02` followed by the exact v1 `chunk`
+encoding (below). For non-audio resources (location), and legal for a
+self-contained audio file too; enveloped chunks bypass the pooler and store
+1:1. Sequences share the one per-session space with audio frames.
+
+Any other discriminator → chunk-scoped `bad_frame` (no sequence), and the
+stream carries on.
+
+### v2 pooled storage, acks, and resume
+
+The server pools audio-frame PCM per connection and stores it as canonical
+WAV segments: a flush happens when the pool reaches
+`API_STREAM_POOL_TARGET_BYTES` or its oldest frame is
+`API_STREAM_POOL_MAX_LATENCY_SECONDS` old — whichever first — and on
+`finish`, disconnect, idle close, and session end. A stored row's `sequence`
+is the **last** frame sequence it covers; `metadata.frames`
+(`{"first", "last", "count"}`) records the range. Downstream (stitch,
+timeline, processing) sees ordinary uniform WAV segments.
+
+Ack semantics are unchanged on the wire, with two v2 readings: `through`
+advances for a frame only once the pooled segment containing it is durably
+stored — so **acks may lag live audio by up to the pool latency (default
+10 s)**, which is normal, not a stall — and `count`/`bytes` count frames and
+their PCM payload bytes. **v2 clients MUST buffer audio they have sent until
+it is acknowledged**: on any reconnect, retransmit every frame above the last
+`ack.through` (server shutdown does not flush the pool). Resume is unchanged:
+`welcome.next_sequence` is one past the highest stored frame sequence.
+
+A pooled flush that keeps failing is fatal: after server-side retries the
+stream gets a session-scoped `storage_failure` and a 4500 close — reconnect
+and retransmit from `through + 1`. (On v1, `storage_failure` remains
+chunk-scoped and recoverable.)
+
+### `chunk` (binary; v1 wire format, and the v2 `0x02` envelope body)
 
 ```
 +----------------------+------------------+------------------+
@@ -199,11 +270,15 @@ lists retransmitted sequences that were already stored (also durable). A
 
 | code | scope | meaning |
 |---|---|---|
-| `bad_header` | chunk | malformed binary envelope, header JSON, empty payload, or unknown `resource` |
+| `bad_header` | chunk | malformed chunk envelope, header JSON, empty payload, or unknown `resource` |
+| `bad_frame` | chunk | v2: malformed binary frame — unknown discriminator, truncated header, empty or misaligned PCM, unknown flags |
+| `bad_sequence` | chunk | v2: audio frame sequence out of order (and not a duplicate); frame dropped |
 | `chunk_too_large` | chunk | payload exceeds `limits.max_chunk_bytes` |
+| `frame_too_large` | chunk | v2: audio payload exceeds `limits.max_audio_frame_bytes` |
 | `checksum_mismatch` | chunk | payload does not match `checksum_sha256` |
 | `invalid_payload` | chunk | the payload violates its resource's contract (e.g. a malformed location batch) |
-| `storage_failure` | chunk | store write failed; retransmit |
+| `storage_failure` | chunk | store write failed; retransmit that chunk |
+| `storage_failure` | session | v2: a pooled flush failed past its retries; close 4500, reconnect and retransmit above `through` |
 | `session_ended` | session | session was ended (REST, sweeper, or a split) mid-stream |
 | `protocol_error` | session | unparseable text frame, or a second `hello` |
 | `internal` | session | unexpected server failure |
@@ -282,6 +357,12 @@ where the client needs them:
 | variable | default | |
 |---|---|---|
 | `API_STREAM_MAX_CHUNK_BYTES` | 8388608 | per-chunk payload cap; stay well under uvicorn's 16 MiB frame limit |
+| `API_STREAM_MAX_AUDIO_FRAME_BYTES` | 65536 | v2 per-frame PCM cap (`limits.max_audio_frame_bytes`) |
+| `API_STREAM_POOL_TARGET_BYTES` | 262144 | flush the frame pool into a segment at this size |
+| `API_STREAM_POOL_MAX_BUFFER_BYTES` | 1048576 | cap on buffered-but-not-durable PCM; past it the server stops reading (TCP backpressure) |
+| `API_STREAM_POOL_MAX_LATENCY_SECONDS` | 10.0 | …or when the oldest pooled frame is this old (also the worst-case ack lag) |
+| `API_STREAM_POOL_FLUSH_RETRIES` | 3 | server-side retries before a flush becomes session-fatal |
+| `API_STREAM_POOL_RETRY_BACKOFF_SECONDS` | 1.0 | first retry delay, doubling |
 | `API_STREAM_ACK_WINDOW_CHUNKS` | 10 | ack every N stored chunks |
 | `API_STREAM_ACK_WINDOW_SECONDS` | 2.0 | …or T seconds after the oldest unacked chunk |
 | `API_STREAM_HELLO_TIMEOUT_SECONDS` | 10 | AWAITING_HELLO deadline |
@@ -311,16 +392,16 @@ S  close 1000
 
 ## Extending with effects
 
-Effects are server-side consumers of the chunk stream that publish their own
-event types (`transcript`, `vad`, …) onto the same socket. The contract that
-keeps them compatible:
+Effects are server-side consumers of the v2 audio stream that publish their
+own event types onto the same socket (v2-only). The contract that keeps them
+compatible:
 
 - new event types appear without a `version` bump; old clients ignore them;
 - effect events may reference `sequence` values or ranges, and may arrive
-  *after* the `ack` covering those chunks;
+  before *or* after the `ack` covering those frames;
 - `hello.effects` requests effects by name, `welcome.effects` confirms the
-  enabled set (both empty today).
+  enabled set (empty until the live layer lands).
 
-Server-side, an effect is a task that consumes stored chunks and publishes to
-the connection's outbox (`api/routes/stream.py`), which already serializes all
-writers onto the socket.
+Server-side, an effect publishes to the connection's outbox
+(`api/routes/stream.py`), which already serializes all writers onto the
+socket.

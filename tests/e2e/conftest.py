@@ -112,6 +112,14 @@ def test_env(
         # Fast enough that stream tests observe an external end/split without
         # waiting out the production 5s check.
         "API_STREAM_SESSION_CHECK_SECONDS": "0.2",
+        # v2 pooling small enough that a handful of 50ms frames spans several
+        # stored segments, with a latency flush observable within a test.
+        "API_STREAM_MAX_AUDIO_FRAME_BYTES": "65536",
+        "API_STREAM_POOL_TARGET_BYTES": "4096",
+        "API_STREAM_POOL_MAX_BUFFER_BYTES": "1048576",
+        "API_STREAM_POOL_MAX_LATENCY_SECONDS": "0.3",
+        "API_STREAM_POOL_FLUSH_RETRIES": "2",
+        "API_STREAM_POOL_RETRY_BACKOFF_SECONDS": "0.05",
         "API_SESSION_STALE_SECONDS": "300",
         # Effectively parks the server's sweeper so test_stream can drive
         # end_stale deterministically.
