@@ -38,6 +38,18 @@ class ApiSettings(BaseSettings):
     # must reconnect long before its successor session could be swept.
     stream_session_check_seconds: float = 5.0
 
+    # Protocol v2: per-frame PCM cap and the pooling of frames into stored
+    # segments (api/stream_pool.py). The ack `through` for a frame waits on
+    # its pooled segment, so max_latency is also the worst-case ack lag.
+    stream_max_audio_frame_bytes: int = 64 * 1024
+    stream_pool_target_bytes: int = 256 * 1024
+    # Hard per-connection cap on buffered-but-not-durable PCM; past it the
+    # pump stops reading and backpressure lands in TCP.
+    stream_pool_max_buffer_bytes: int = 1024 * 1024
+    stream_pool_max_latency_seconds: float = 10.0
+    stream_pool_flush_retries: int = 3
+    stream_pool_retry_backoff_seconds: float = 1.0
+
     # An open session with no activity for this long is ended by the sweeper.
     # Keep it at or above the idle timeout, or a quiet-but-connected client's
     # session can be swept out from under it. Chunk heartbeats are throttled to

@@ -20,6 +20,7 @@ def test_schema_exposes_every_root() -> None:
         "StreamError",
         "Rotate",
         "Bye",
+        "EffectEvent",
         "ChunkHeader",
     ):
         assert frame in schema["$defs"], f"{frame} missing from $defs"

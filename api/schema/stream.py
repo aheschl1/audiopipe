@@ -1,21 +1,32 @@
 """Wire frames for the streaming upload websocket.
 
 The protocol these implement is specified in docs/streaming-protocol.md.
-Text frames carry one JSON message discriminated on ``type``; the one binary
-frame is a chunk: a 4-byte big-endian header length, the JSON-encoded
-:class:`ChunkHeader`, then the resource payload (audio bytes, a location
-batch, ...).
+Text frames carry one JSON message discriminated on ``type``. Binary frames
+differ by version: v1 sends bare enveloped chunks (a 4-byte big-endian header
+length, the JSON-encoded :class:`ChunkHeader`, then the resource payload);
+v2 prefixes every binary frame with a discriminator byte — a lean fixed-header
+audio frame carrying raw PCM, or the v1 envelope for everything else.
 """
 
-from datetime import datetime
+import struct
+from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
+SUPPORTED_VERSIONS = (1, 2)
 
 _HEADER_LEN_SIZE = 4
+
+# v2 binary frame discriminators.
+FRAME_AUDIO = 0x01
+FRAME_ENVELOPE = 0x02
+
+FLAG_CAPTURED_AT = 0x01
+_KNOWN_FLAGS = FLAG_CAPTURED_AT
+_AUDIO_FIXED_HEADER = 6  # discriminator + flags + u32 sequence
 
 
 class FrameError(ValueError):
@@ -121,6 +132,52 @@ def decode_chunk(message: bytes) -> tuple[ChunkHeader, bytes]:
     return header, message[body_start:]
 
 
+class AudioFrame(BaseModel):
+    """A decoded v2 audio frame: raw PCM addressed by a frame sequence."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sequence: Annotated[int, Field(ge=0)]
+    captured_at: datetime | None = None
+    pcm: bytes
+
+
+def encode_audio_frame(sequence: int, pcm: bytes, captured_at: datetime | None = None) -> bytes:
+    """Build a v2 audio frame. The client side of :func:`decode_v2_frame`."""
+    flags = 0
+    stamp = b""
+    if captured_at is not None:
+        flags |= FLAG_CAPTURED_AT
+        stamp = struct.pack(">Q", int(captured_at.timestamp() * 1000))
+    return bytes((FRAME_AUDIO, flags)) + struct.pack(">I", sequence) + stamp + pcm
+
+
+def decode_v2_frame(message: bytes) -> AudioFrame | tuple[ChunkHeader, bytes]:
+    """Split a v2 binary frame, raising :class:`FrameError` when malformed."""
+    if not message:
+        raise FrameError("empty binary frame")
+    discriminator = message[0]
+    if discriminator == FRAME_ENVELOPE:
+        return decode_chunk(message[1:])
+    if discriminator != FRAME_AUDIO:
+        raise FrameError(f"unknown frame discriminator 0x{discriminator:02x}")
+    if len(message) < _AUDIO_FIXED_HEADER:
+        raise FrameError("audio frame shorter than its fixed header")
+    flags = message[1]
+    if flags & ~_KNOWN_FLAGS:
+        raise FrameError(f"unknown audio frame flags 0x{flags:02x}")
+    (sequence,) = struct.unpack_from(">I", message, 2)
+    body_start = _AUDIO_FIXED_HEADER
+    captured_at = None
+    if flags & FLAG_CAPTURED_AT:
+        if len(message) < body_start + 8:
+            raise FrameError("audio frame shorter than its captured_at stamp")
+        (epoch_ms,) = struct.unpack_from(">Q", message, body_start)
+        captured_at = datetime.fromtimestamp(epoch_ms / 1000, tz=UTC)
+        body_start += 8
+    return AudioFrame(sequence=sequence, captured_at=captured_at, pcm=message[body_start:])
+
+
 # server -> client
 # Every event is a JSON text frame with a ``type``; clients must ignore types
 # they do not recognise, which is how future effect events stay compatible.
@@ -137,13 +194,16 @@ class StreamLimits(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     max_chunk_bytes: int
+    max_audio_frame_bytes: int | None = Field(
+        default=None, description="Per-frame PCM cap; v2 connections only."
+    )
 
 
 class Welcome(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     type: Literal["welcome"] = "welcome"
-    version: int = PROTOCOL_VERSION
+    version: int = Field(default=PROTOCOL_VERSION, description="The negotiated version.")
     session_id: UUID
     next_sequence: int = Field(description="One past the highest stored sequence.")
     ack_window: AckWindow
@@ -202,7 +262,23 @@ class Bye(BaseModel):
     through: int
 
 
-ServerEvent = Welcome | Ack | StreamError | Rotate | Bye
+class EffectEvent(BaseModel):
+    """Output of a live pipeline the client enabled via ``hello.effects``.
+
+    ``event`` and ``data`` mean whatever the effect says they mean; the stub
+    counter emits ``started`` and ``finished``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["effect"] = "effect"
+    effect: str
+    event: str
+    sequence: int | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
+ServerEvent = Welcome | Ack | StreamError | Rotate | Bye | EffectEvent
 
 _server_event: TypeAdapter[ServerEvent] = TypeAdapter(
     Annotated[ServerEvent, Field(discriminator="type")]
