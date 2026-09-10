@@ -210,6 +210,10 @@ services:
       # Free CUDA memory after this long idle; the next request blocks while
       # the models reload. 0 keeps them resident.
       IDLE_UNLOAD_SECONDS: ${SIDECAR_IDLE_UNLOAD_SECONDS:-1800}
+      # Exit on idle instead of unloading in-process: releases the CUDA
+      # context too, so an idle sidecar holds zero GPU memory. The fresh
+      # process starts lazy and loads on the first request.
+      IDLE_UNLOAD_EXIT: ${SIDECAR_IDLE_UNLOAD_EXIT:-1}
     healthcheck:
       <<: *sidecar-healthcheck
       start_period: 300s
@@ -228,6 +232,7 @@ services:
     environment:
       HF_HOME: /root/.cache/huggingface
       IDLE_UNLOAD_SECONDS: ${SIDECAR_IDLE_UNLOAD_SECONDS:-1800}
+      IDLE_UNLOAD_EXIT: ${SIDECAR_IDLE_UNLOAD_EXIT:-1}
       # The embedding weights are gated; without this the container starts and
       # then fails to load a model.
       HF_TOKEN: ${HF_TOKEN:?set HF_TOKEN in deploy/.env — see deploy/.env.example}
@@ -249,6 +254,7 @@ services:
     environment:
       HF_HOME: /root/.cache/huggingface
       IDLE_UNLOAD_SECONDS: ${SIDECAR_IDLE_UNLOAD_SECONDS:-1800}
+      IDLE_UNLOAD_EXIT: ${SIDECAR_IDLE_UNLOAD_EXIT:-1}
     healthcheck:
       <<: *sidecar-healthcheck
       start_period: 900s
