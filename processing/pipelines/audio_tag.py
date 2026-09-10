@@ -179,7 +179,8 @@ class AudioTagPipeline(Pipeline):
         overlap_ms = settings.audio_tag_window_ms - settings.audio_tag_hop_ms
         windows: list[TaggedWindow] = []
         tagger_model = embedding_model = None
-        # ClassifierError raises through: the worker retries with backoff.
+        # ClassifierError raises through: the worker retries with backoff
+        # (ClassifierUnavailable refunds the attempt — outages aren't faults).
         for start in span_starts(
             line.total_ms, span_ms=settings.audio_tag_span_ms, overlap_ms=overlap_ms
         ):
