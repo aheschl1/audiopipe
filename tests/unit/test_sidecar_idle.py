@@ -124,6 +124,56 @@ def test_cold_start_failure_never_exits(tagger, monkeypatch) -> None:
     assert deaths == []
 
 
+def test_exit_mode_watchdog_exits_instead_of_unloading(tagger, monkeypatch) -> None:
+    exits = []
+
+    def fake_exit(code):
+        exits.append(code)
+        raise SystemExit(code)  # os._exit never returns
+
+    monkeypatch.setattr(tagger, "IDLE_UNLOAD_EXIT", True)
+    monkeypatch.setattr(tagger, "IDLE_UNLOAD_SECONDS", 1)
+    monkeypatch.setattr(tagger.os, "_exit", fake_exit)
+    monkeypatch.setattr(tagger, "_state", "loaded")
+    monkeypatch.setattr(tagger, "_models", ("loaded",))
+    monkeypatch.setattr(tagger, "_last_used", 0.0)
+    with pytest.raises(SystemExit):
+        tagger._watchdog_tick()
+    assert exits == [0]
+    assert tagger._models is not None  # no in-process unload happened first
+
+
+def test_exit_mode_lazy_idle_never_exits(tagger, monkeypatch) -> None:
+    # The fresh post-exit process sits at "idle" holding no GPU; the watchdog
+    # must not exit-loop it.
+    exits = []
+    monkeypatch.setattr(tagger, "IDLE_UNLOAD_EXIT", True)
+    monkeypatch.setattr(tagger, "IDLE_UNLOAD_SECONDS", 1)
+    monkeypatch.setattr(tagger.os, "_exit", lambda code: exits.append(code))
+    monkeypatch.setattr(tagger, "_state", "idle")
+    monkeypatch.setattr(tagger, "_last_used", 0.0)
+    tagger._watchdog_tick()
+    assert exits == []
+
+
+def test_exit_mode_starts_lazy_and_healthy(tagger, monkeypatch) -> None:
+    spawned = []
+
+    class FakeThread:
+        def __init__(self, *, target, daemon):
+            spawned.append(target)
+
+        def start(self) -> None:
+            pass
+
+    monkeypatch.setattr(tagger, "IDLE_UNLOAD_EXIT", True)
+    monkeypatch.setattr(tagger.threading, "Thread", FakeThread)
+    tagger._startup()
+    assert tagger._state == "idle"
+    assert tagger._load_models_locked not in spawned
+    assert tagger.health().status_code == 200
+
+
 def test_health_is_200_when_idle_unloaded(tagger, monkeypatch) -> None:
     monkeypatch.setattr(tagger, "_state", "idle")
     monkeypatch.setattr(tagger, "_models", None)

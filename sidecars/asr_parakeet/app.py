@@ -19,7 +19,10 @@ With IDLE_UNLOAD_SECONDS set, a watchdog frees the CUDA memory after that
 long without inference; the next request blocks while the models reload
 (callers must budget their timeout for that, not just a contended GPU).
 Whisper is CTranslate2, not torch: its memory frees on object destruction,
-untouched by torch.cuda.empty_cache().
+untouched by torch.cuda.empty_cache(). With IDLE_UNLOAD_EXIT the watchdog
+exits instead — only process death releases the CUDA context itself — and
+the restarted process loads lazily, holding zero GPU memory until the first
+request.
 """
 
 import asyncio
@@ -43,6 +46,10 @@ WHISPER_COMPUTE = os.environ.get("ASR_WHISPER_COMPUTE", "int8_float16")
 # Release CUDA memory after this long without inference; 0 keeps the models
 # resident forever.
 IDLE_UNLOAD_SECONDS = int(os.environ.get("IDLE_UNLOAD_SECONDS", "0"))
+# Exit when the idle timer fires instead of unloading in-process: only
+# process death releases the CUDA context itself. The restart policy brings
+# back a fresh process, which loads lazily on the first request.
+IDLE_UNLOAD_EXIT = os.environ.get("IDLE_UNLOAD_EXIT", "0") == "1"
 _WATCHDOG_TICK_SECONDS = 30
 # A reload that fails leaves the process wedged: the checkpoint is fine, but
 # something in this long-lived worker cannot load it again. Retry with backoff,
@@ -203,6 +210,11 @@ def _watchdog_tick() -> None:
             return
         if not _gpu_lock.acquire(blocking=False):
             return  # inference in flight; not idle after all
+        if IDLE_UNLOAD_EXIT:
+            # A request racing this exit dies with the connection; the
+            # worker's ServiceUnavailable refund absorbs it.
+            logger.info("idle for %ss; exiting to release the GPU", IDLE_UNLOAD_SECONDS)
+            os._exit(0)
         try:
             import torch
 
@@ -225,7 +237,11 @@ def _load_models_locked() -> None:
 
 @app.on_event("startup")
 def _startup() -> None:
-    threading.Thread(target=_load_models_locked, daemon=True).start()
+    global _state
+    if IDLE_UNLOAD_EXIT:
+        _state = "idle"  # lazy: zero GPU until the first request loads
+    else:
+        threading.Thread(target=_load_models_locked, daemon=True).start()
     if IDLE_UNLOAD_SECONDS > 0:
         threading.Thread(target=_idle_watchdog, daemon=True).start()
 
