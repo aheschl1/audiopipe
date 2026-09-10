@@ -51,3 +51,17 @@ async def test_transcriber_unavailable_is_a_service_unavailable() -> None:
 
     assert issubclass(TranscriberUnavailable, ServiceUnavailable)
     assert issubclass(TranscriberUnavailable, TranscriberError)
+
+
+async def test_diarizer_unavailable_is_a_service_unavailable() -> None:
+    from processing.diarizer import DiarizerError, DiarizerUnavailable
+
+    assert issubclass(DiarizerUnavailable, ServiceUnavailable)
+    assert issubclass(DiarizerUnavailable, DiarizerError)
+
+
+async def test_classifier_unavailable_is_a_service_unavailable() -> None:
+    from processing.classifier import ClassifierError, ClassifierUnavailable
+
+    assert issubclass(ClassifierUnavailable, ServiceUnavailable)
+    assert issubclass(ClassifierUnavailable, ClassifierError)

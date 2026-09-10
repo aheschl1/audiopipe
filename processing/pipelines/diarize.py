@@ -419,7 +419,8 @@ class DiarizePipeline(Pipeline):
                     blocks=0,
                     skipped="session audio is gone",
                 )
-            # DiarizerError raises through: the worker retries with backoff.
+            # DiarizerError raises through: the worker retries with backoff
+            # (DiarizerUnavailable refunds the attempt — outages aren't faults).
             turn_rows, embedding_rows, raw_turns = [], [], []
             for block in blocks:
                 clip = await timeline.render_range(line, block.start_ms, block.end_ms)

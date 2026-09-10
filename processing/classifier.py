@@ -13,11 +13,16 @@ from typing import Any
 
 import httpx
 
+from processing.base import ServiceUnavailable
 from processing.config import ProcessingSettings
 
 
 class ClassifierError(Exception):
     """The service failed or answered something unusable. Retryable."""
+
+
+class ClassifierUnavailable(ClassifierError, ServiceUnavailable):
+    """The service itself is down (unreachable or 503)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,8 +56,14 @@ class Classifier:
                 f"{self._base_url}/audio/analyze",
                 files={"file": (filename, wav, "audio/wav")},
             )
+        except httpx.TransportError as exc:
+            raise ClassifierUnavailable(f"classifier unreachable: {exc}") from exc
         except httpx.HTTPError as exc:
-            raise ClassifierError(f"classifier unreachable: {exc}") from exc
+            raise ClassifierError(f"classifier request failed: {exc}") from exc
+        if response.status_code == 503:
+            raise ClassifierUnavailable(
+                f"classifier answered 503: {response.text[:500]}"
+            )
         if response.status_code >= 400:
             raise ClassifierError(
                 f"classifier answered {response.status_code}: {response.text[:500]}"
