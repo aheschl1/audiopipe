@@ -213,6 +213,26 @@ from wall clock (`t` minus the session start), which can drift from the
 audio-position time other events use when capture had gaps — the same caveat
 as `session-end`.
 
+#### `image` and `video` payloads
+
+One whole file per chunk. The server works out the format from the payload's
+leading bytes, and a declared `content_type` must agree with it.
+
+- **image**: JPEG, PNG, WebP or HEIC. `captured_at` is required and
+  `duration_ms` must be absent.
+- **video**: one independently playable clip, either an fMP4 with its own
+  init boxes or an MPEG-TS run that starts on a keyframe. Never a fragment
+  that depends on an earlier chunk. `captured_at` and a positive `duration_ms`
+  are required.
+
+Both are blob-stored and appear on the timeline as `image` and `video-clip`
+events, positioned by wall clock like location points. Audio pipelines never
+process them, and an audio track inside a clip is not the `audio` resource.
+Clients that produce whole files rather than a stream (camera apps, an RTMP
+recorder) can instead upload them with
+`POST /v1/sessions/{id}/segments` (multipart: `file`, `resource`,
+`captured_at`, `duration_ms`, and `attrs`/`metadata` as JSON strings).
+
 ### `finish` (text)
 
 ```json
@@ -236,7 +256,7 @@ session open for a resumed connection — see *Disconnects* below.
   "ack_window": {"chunks": 10, "seconds": 2.0},
   "limits": {"max_chunk_bytes": 8388608},
   "effects": [],
-  "resources": ["audio", "location"]
+  "resources": ["audio", "location", "image", "video"]
 }
 ```
 

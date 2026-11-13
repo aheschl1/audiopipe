@@ -24,6 +24,8 @@ class Resource(StrEnum):
 
     AUDIO = "audio"
     LOCATION = "location"
+    IMAGE = "image"
+    VIDEO = "video"
 
 
 class ResourceValidationError(Exception):
@@ -64,6 +66,7 @@ class ResourceType(ABC):
     stitchable: ClassVar[bool] = False  # whole-session download exists
     wall_clock_queryable: ClassVar[bool] = False  # cross-session captured_at queries
     timeline_events: ClassVar[bool] = False  # raw segments expand to timeline events
+    uploadable: ClassVar[bool] = False  # accepted by the REST upload route
 
     @abstractmethod
     def validate_chunk(

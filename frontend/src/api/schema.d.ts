@@ -274,7 +274,15 @@ export interface paths {
          */
         get: operations["list_session_segments_v1_sessions__session_id__segments_get"];
         put?: never;
-        post?: never;
+        /**
+         * Upload one image or video segment
+         * @description For resources a client produces as whole files rather than a stream.
+         *
+         *     The content type is sniffed from the bytes; a declared one must agree.
+         *     Sequence numbers are assigned server-side, sharing the session's one
+         *     sequence space with streamed chunks.
+         */
+        post: operations["upload_segment_v1_sessions__session_id__segments_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -378,7 +386,8 @@ export interface paths {
         /**
          * A session's ordered event timeline
          * @description What happened when: session frames, speech starts/ends, transcripts,
-         *     sound tags, the sound spans built from them, and location points.
+         *     sound tags, the sound spans built from them, location points, images
+         *     and video clips.
          *
          *     Events carry a ``type`` discriminator; clients must ignore types they do
          *     not recognise — future processing tiers add new ones. `limit`/`offset`
@@ -390,8 +399,9 @@ export interface paths {
          *
          *     An unprocessed (or speechless) session serves just its session frames;
          *     processing status stays introspectable via `.../artifacts?kind=speech-map`.
-         *     Location points come straight from the stored segments — no pipeline —
-         *     so they appear live while the session is still streaming.
+         *     Location points, images and video clips come straight from the stored
+         *     segments — no pipeline — so they appear live while the session is still
+         *     streaming.
          */
         get: operations["get_session_timeline_v1_sessions__session_id__timeline_get"];
         put?: never;
@@ -1441,6 +1451,39 @@ export interface components {
              */
             score: number;
         };
+        /** Body_upload_segment_v1_sessions__session_id__segments_post */
+        Body_upload_segment_v1_sessions__session_id__segments_post: {
+            /**
+             * File
+             * @description The image, or one self-contained clip.
+             */
+            file: string;
+            /**
+             * Resource
+             * @description `image` or `video`.
+             */
+            resource: string;
+            /**
+             * Captured At
+             * @description When it was captured; defaults to now.
+             */
+            captured_at?: string | null;
+            /**
+             * Duration Ms
+             * @description Clip length (video only).
+             */
+            duration_ms?: number | null;
+            /**
+             * Attrs
+             * @description JSON object of the resource's attrs.
+             */
+            attrs?: string | null;
+            /**
+             * Metadata
+             * @description JSON object stored on the segment.
+             */
+            metadata?: string | null;
+        };
         /**
          * ClusterParamsOverrides
          * @description Per-field overrides; null = inherit the server default for that field.
@@ -1755,6 +1798,94 @@ export interface components {
         HealthRead: {
             /** Status */
             status: string;
+        };
+        /** ImageAttrs */
+        ImageAttrs: {
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+        };
+        /**
+         * ImageEvent
+         * @description One still image, fetched from ``/v1/segments/{segment_id}/media``.
+         *
+         *     ``at_ms`` is wall-clock-derived, as for ``location-point``.
+         */
+        ImageEvent: {
+            /**
+             * At Ms
+             * @description Position of this event on the session timeline, ms.
+             */
+            at_ms: number;
+            /**
+             * Segment Id
+             * Format: uuid
+             * @description The resource segment this event derives from.
+             */
+            segment_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "image";
+            /**
+             * Captured At
+             * Format: date-time
+             * @description Wall-clock time the image was taken.
+             */
+            captured_at: string;
+            /** Content Type */
+            content_type: string;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+        };
+        /** ImageSegmentRead */
+        ImageSegmentRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Sequence */
+            sequence: number;
+            /**
+             * Ingested At
+             * Format: date-time
+             */
+            ingested_at: string;
+            /** Captured At */
+            captured_at: string | null;
+            /** Offset Ms */
+            offset_ms: number | null;
+            /** Duration Ms */
+            duration_ms: number | null;
+            /** Byte Size */
+            byte_size: number;
+            /** Content Type */
+            content_type: string;
+            /**
+             * Checksum Sha256
+             * @description Hex-encoded SHA-256 of the wire payload.
+             */
+            checksum_sha256: string | null;
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            resource: "image";
+            attrs: components["schemas"]["ImageAttrs"];
         };
         /**
          * LocationPointEvent
@@ -2218,7 +2349,7 @@ export interface components {
             /** Total Bytes */
             total_bytes: number;
         };
-        SegmentRead: components["schemas"]["AudioSegmentRead"] | components["schemas"]["LocationSegmentRead"];
+        SegmentRead: components["schemas"]["AudioSegmentRead"] | components["schemas"]["LocationSegmentRead"] | components["schemas"]["ImageSegmentRead"] | components["schemas"]["VideoSegmentRead"];
         /**
          * SessionCreateRequest
          * @description Body for starting a session; the owner comes from the bearer token.
@@ -2944,7 +3075,7 @@ export interface components {
             /** Items */
             items: components["schemas"]["TagSearchRead"][];
         };
-        TimelineEvent: components["schemas"]["SessionStartEvent"] | components["schemas"]["SessionEndEvent"] | components["schemas"]["SpeechEndEvent"] | components["schemas"]["SpeechStartEvent"] | components["schemas"]["TranscriptEvent"] | components["schemas"]["AudioTagEvent"] | components["schemas"]["SoundSpanEvent"] | components["schemas"]["ConversationEvent"] | components["schemas"]["LocationPointEvent"];
+        TimelineEvent: components["schemas"]["SessionStartEvent"] | components["schemas"]["SessionEndEvent"] | components["schemas"]["SpeechEndEvent"] | components["schemas"]["SpeechStartEvent"] | components["schemas"]["TranscriptEvent"] | components["schemas"]["AudioTagEvent"] | components["schemas"]["SoundSpanEvent"] | components["schemas"]["ConversationEvent"] | components["schemas"]["LocationPointEvent"] | components["schemas"]["ImageEvent"] | components["schemas"]["VideoClipEvent"];
         /**
          * TokenIssued
          * @description The plaintext exists exactly once, here; the server stores only a hash.
@@ -3155,6 +3286,103 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VideoAttrs */
+        VideoAttrs: {
+            /** Codec */
+            codec?: string | null;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Fps */
+            fps?: number | null;
+        };
+        /**
+         * VideoClipEvent
+         * @description One stored video clip over ``[at_ms, end_ms)``, positioned at its start.
+         *
+         *     Wall-clock-derived, as for ``location-point``.
+         */
+        VideoClipEvent: {
+            /**
+             * At Ms
+             * @description Position of this event on the session timeline, ms.
+             */
+            at_ms: number;
+            /**
+             * Segment Id
+             * Format: uuid
+             * @description The resource segment this event derives from.
+             */
+            segment_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "video-clip";
+            /**
+             * End Ms
+             * @description End (exclusive) of the clip, ms.
+             */
+            end_ms: number;
+            /**
+             * Captured At
+             * Format: date-time
+             * @description Wall-clock start of the clip.
+             */
+            captured_at: string;
+            /** Content Type */
+            content_type: string;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+        };
+        /** VideoSegmentRead */
+        VideoSegmentRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Sequence */
+            sequence: number;
+            /**
+             * Ingested At
+             * Format: date-time
+             */
+            ingested_at: string;
+            /** Captured At */
+            captured_at: string | null;
+            /** Offset Ms */
+            offset_ms: number | null;
+            /** Duration Ms */
+            duration_ms: number | null;
+            /** Byte Size */
+            byte_size: number;
+            /** Content Type */
+            content_type: string;
+            /**
+             * Checksum Sha256
+             * @description Hex-encoded SHA-256 of the wire payload.
+             */
+            checksum_sha256: string | null;
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            resource: "video";
+            attrs: components["schemas"]["VideoAttrs"];
         };
     };
     responses: never;
@@ -3802,6 +4030,78 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_segment_v1_sessions__session_id__segments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A recording session belonging to you. */
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_segment_v1_sessions__session_id__segments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The session has ended. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The file exceeds the upload cap. */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };

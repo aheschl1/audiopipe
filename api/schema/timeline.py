@@ -193,6 +193,33 @@ class LocationPointEvent(SegmentEventBase):
     captured_at: datetime = Field(description="Wall-clock time of the fix.")
 
 
+class ImageEvent(SegmentEventBase):
+    """One still image, fetched from ``/v1/segments/{segment_id}/media``.
+
+    ``at_ms`` is wall-clock-derived, as for ``location-point``.
+    """
+
+    type: Literal["image"] = "image"
+    captured_at: datetime = Field(description="Wall-clock time the image was taken.")
+    content_type: str
+    width: int | None = None
+    height: int | None = None
+
+
+class VideoClipEvent(SegmentEventBase):
+    """One stored video clip over ``[at_ms, end_ms)``, positioned at its start.
+
+    Wall-clock-derived, as for ``location-point``.
+    """
+
+    type: Literal["video-clip"] = "video-clip"
+    end_ms: int = Field(description="End (exclusive) of the clip, ms.")
+    captured_at: datetime = Field(description="Wall-clock start of the clip.")
+    content_type: str
+    width: int | None = None
+    height: int | None = None
+
+
 type TimelineEvent = Annotated[
     SessionStartEvent
     | SessionEndEvent
@@ -202,6 +229,8 @@ type TimelineEvent = Annotated[
     | AudioTagEvent
     | SoundSpanEvent
     | ConversationEvent
-    | LocationPointEvent,
+    | LocationPointEvent
+    | ImageEvent
+    | VideoClipEvent,
     Field(discriminator="type"),
 ]

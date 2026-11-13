@@ -14,6 +14,8 @@ from typing_extensions import TypeAliasType
 
 from database.schema.segments import ResourceSegment, SessionResourceSummary
 from resources.audio import AudioAttrs
+from resources.image import ImageAttrs
+from resources.video import VideoAttrs
 
 
 class SegmentReadBase(BaseModel):
@@ -54,15 +56,33 @@ class LocationSegmentRead(SegmentReadBase):
     attrs: LocationSegmentAttrs
 
 
+class ImageSegmentRead(SegmentReadBase):
+    resource: Literal["image"] = "image"
+    attrs: ImageAttrs
+
+
+class VideoSegmentRead(SegmentReadBase):
+    resource: Literal["video"] = "video"
+    attrs: VideoAttrs
+
+
+type AnySegmentRead = (
+    AudioSegmentRead | LocationSegmentRead | ImageSegmentRead | VideoSegmentRead
+)
+
+
 # TypeAliasType keeps the union's name in generated schemas: Page[SegmentRead]
 # stays Page_SegmentRead_ rather than a mangled Annotated[...] spelling.
 SegmentRead = TypeAliasType(
     "SegmentRead",
-    Annotated[AudioSegmentRead | LocationSegmentRead, Field(discriminator="resource")],
+    Annotated[
+        AudioSegmentRead | LocationSegmentRead | ImageSegmentRead | VideoSegmentRead,
+        Field(discriminator="resource"),
+    ],
 )
 
 
-def segment_read(segment: ResourceSegment) -> AudioSegmentRead | LocationSegmentRead:
+def segment_read(segment: ResourceSegment) -> AnySegmentRead:
     base = dict(
         id=segment.id,
         session_id=segment.session_id,
@@ -79,6 +99,10 @@ def segment_read(segment: ResourceSegment) -> AudioSegmentRead | LocationSegment
     if segment.resource == "location":
         points = len((segment.payload or {}).get("points", ()))
         return LocationSegmentRead(attrs=LocationSegmentAttrs(points=points), **base)
+    if segment.resource == "image":
+        return ImageSegmentRead(attrs=ImageAttrs.model_validate(segment.attrs), **base)
+    if segment.resource == "video":
+        return VideoSegmentRead(attrs=VideoAttrs.model_validate(segment.attrs), **base)
     return AudioSegmentRead(attrs=AudioAttrs.from_attrs(segment.attrs), **base)
 
 
