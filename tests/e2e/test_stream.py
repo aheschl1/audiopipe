@@ -503,7 +503,7 @@ async def test_stream_rejects_bad_location_batch_and_unknown_resource(
         assert (error["code"], error["scope"]) == ("invalid_payload", "chunk")
         assert error["sequence"] == 0
 
-        head = json.dumps({"sequence": 1, "resource": "video"}).encode()
+        head = json.dumps({"sequence": 1, "resource": "thermal"}).encode()
         await ws.send(len(head).to_bytes(4, "big") + head + b"frame")
         error = await _recv_until(ws, "error")
         assert (error["code"], error["scope"]) == ("bad_header", "chunk")

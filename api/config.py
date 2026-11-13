@@ -1,7 +1,7 @@
 """API settings, loaded from the environment / .env file.
 
-Everything here tunes the streaming websocket (docs/streaming-protocol.md);
-the HTTP routes need no configuration of their own.
+Mostly the streaming websocket (docs/streaming-protocol.md), plus the REST
+upload size cap.
 """
 
 from datetime import time
@@ -37,6 +37,8 @@ class ApiSettings(BaseSettings):
     # its next chunk. Keep well under session_stale_seconds: a rotated client
     # must reconnect long before its successor session could be swept.
     stream_session_check_seconds: float = 5.0
+    # Matches the nginx client_max_body_size in front of the API.
+    upload_max_bytes: int = 64 * 1024 * 1024
 
     # Protocol v2: per-frame PCM cap and the pooling of frames into stored
     # segments (api/stream_pool.py). The ack `through` for a frame waits on

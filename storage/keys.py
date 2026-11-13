@@ -21,6 +21,12 @@ SUFFIX_BY_CONTENT_TYPE = {
     "audio/aac": ".aac",
     "audio/webm": ".webm",
     "audio/l16": ".pcm",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/heic": ".heic",
+    "video/mp4": ".mp4",
+    "video/mp2t": ".ts",
 }
 
 

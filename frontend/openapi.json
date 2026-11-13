@@ -923,6 +923,105 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Upload one image or video segment",
+        "description": "For resources a client produces as whole files rather than a stream.\n\nThe content type is sniffed from the bytes; a declared one must agree.\nSequence numbers are assigned server-side from a range of their own\n(2**30 up), so an upload can go into a session that is streaming at the\nsame time without colliding with its frames.",
+        "operationId": "upload_segment_v1_sessions__session_id__segments_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "A recording session belonging to you.",
+              "title": "Session Id"
+            },
+            "description": "A recording session belonging to you."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_segment_v1_sessions__session_id__segments_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "The session has ended.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The file exceeds the upload cap.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/sessions/{session_id}/resources": {
@@ -1426,7 +1525,7 @@
           "sessions"
         ],
         "summary": "A session's ordered event timeline",
-        "description": "What happened when: session frames, speech starts/ends, transcripts,\nsound tags, the sound spans built from them, and location points.\n\nEvents carry a ``type`` discriminator; clients must ignore types they do\nnot recognise \u2014 future processing tiers add new ones. `limit`/`offset`\npage over events (one artifact can yield several, so offsets here do not\nline up with the artifacts route). A `from_ms`/`to_ms` window keeps only\nevents positioned inside it, so adjacent windows partition the stream \u2014\na span straddling a boundary contributes its `speech-end` alone, and a\n`sound-span` that began before the window is left out entirely.\n\nAn unprocessed (or speechless) session serves just its session frames;\nprocessing status stays introspectable via `.../artifacts?kind=speech-map`.\nLocation points come straight from the stored segments \u2014 no pipeline \u2014\nso they appear live while the session is still streaming.",
+        "description": "What happened when: session frames, speech starts/ends, transcripts,\nsound tags, the sound spans built from them, location points, images\nand video clips.\n\nEvents carry a ``type`` discriminator; clients must ignore types they do\nnot recognise \u2014 future processing tiers add new ones. `limit`/`offset`\npage over events (one artifact can yield several, so offsets here do not\nline up with the artifacts route). A `from_ms`/`to_ms` window keeps only\nevents positioned inside it, so adjacent windows partition the stream \u2014\na span straddling a boundary contributes its `speech-end` alone, and a\n`sound-span` that began before the window is left out entirely.\n\nAn unprocessed (or speechless) session serves just its session frames;\nprocessing status stays introspectable via `.../artifacts?kind=speech-map`.\nLocation points, images and video clips come straight from the stored\nsegments \u2014 no pipeline \u2014 so they appear live while the session is still\nstreaming.",
         "operationId": "get_session_timeline_v1_sessions__session_id__timeline_get",
         "security": [
           {
@@ -5048,6 +5147,76 @@
         "title": "AudioTagLabel",
         "description": "One scored sound-event class on a window."
       },
+      "Body_upload_segment_v1_sessions__session_id__segments_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "The image, or one self-contained clip."
+          },
+          "resource": {
+            "type": "string",
+            "title": "Resource",
+            "description": "`image` or `video`."
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At",
+            "description": "When it was captured; defaults to now."
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms",
+            "description": "Clip length (video only)."
+          },
+          "attrs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attrs",
+            "description": "JSON object of the resource's attrs."
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "JSON object stored on the segment."
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "resource"
+        ],
+        "title": "Body_upload_segment_v1_sessions__session_id__segments_post"
+      },
       "ClusterParamsOverrides": {
         "properties": {
           "cluster_distance": {
@@ -5653,6 +5822,206 @@
           "status"
         ],
         "title": "HealthRead"
+      },
+      "ImageAttrs": {
+        "properties": {
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ImageAttrs"
+      },
+      "ImageEvent": {
+        "properties": {
+          "at_ms": {
+            "type": "integer",
+            "title": "At Ms",
+            "description": "Position of this event on the session timeline, ms."
+          },
+          "segment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Segment Id",
+            "description": "The resource segment this event derives from."
+          },
+          "type": {
+            "type": "string",
+            "const": "image",
+            "title": "Type",
+            "default": "image"
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Captured At",
+            "description": "Wall-clock time the image was taken."
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at_ms",
+          "segment_id",
+          "captured_at",
+          "content_type"
+        ],
+        "title": "ImageEvent",
+        "description": "One still image, fetched from ``/v1/segments/{segment_id}/media``.\n\n``at_ms`` is wall-clock-derived, as for ``location-point``."
+      },
+      "ImageSegmentRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "ingested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ingested At"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "offset_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset Ms"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "byte_size": {
+            "type": "integer",
+            "title": "Byte Size"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "checksum_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum Sha256",
+            "description": "Hex-encoded SHA-256 of the wire payload."
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "resource": {
+            "type": "string",
+            "const": "image",
+            "title": "Resource",
+            "default": "image"
+          },
+          "attrs": {
+            "$ref": "#/components/schemas/ImageAttrs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "session_id",
+          "sequence",
+          "ingested_at",
+          "captured_at",
+          "offset_ms",
+          "duration_ms",
+          "byte_size",
+          "content_type",
+          "checksum_sha256",
+          "metadata",
+          "attrs"
+        ],
+        "title": "ImageSegmentRead"
       },
       "LocationPointEvent": {
         "properties": {
@@ -6602,13 +6971,21 @@
           },
           {
             "$ref": "#/components/schemas/LocationSegmentRead"
+          },
+          {
+            "$ref": "#/components/schemas/ImageSegmentRead"
+          },
+          {
+            "$ref": "#/components/schemas/VideoSegmentRead"
           }
         ],
         "discriminator": {
           "propertyName": "resource",
           "mapping": {
             "audio": "#/components/schemas/AudioSegmentRead",
-            "location": "#/components/schemas/LocationSegmentRead"
+            "image": "#/components/schemas/ImageSegmentRead",
+            "location": "#/components/schemas/LocationSegmentRead",
+            "video": "#/components/schemas/VideoSegmentRead"
           }
         }
       },
@@ -7883,6 +8260,12 @@
           },
           {
             "$ref": "#/components/schemas/LocationPointEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ImageEvent"
+          },
+          {
+            "$ref": "#/components/schemas/VideoClipEvent"
           }
         ],
         "discriminator": {
@@ -7890,13 +8273,15 @@
           "mapping": {
             "audio-tag": "#/components/schemas/AudioTagEvent",
             "conversation": "#/components/schemas/ConversationEvent",
+            "image": "#/components/schemas/ImageEvent",
             "location-point": "#/components/schemas/LocationPointEvent",
             "session-end": "#/components/schemas/SessionEndEvent",
             "session-start": "#/components/schemas/SessionStartEvent",
             "sound-span": "#/components/schemas/SoundSpanEvent",
             "speech-end": "#/components/schemas/SpeechEndEvent",
             "speech-start": "#/components/schemas/SpeechStartEvent",
-            "transcript": "#/components/schemas/TranscriptEvent"
+            "transcript": "#/components/schemas/TranscriptEvent",
+            "video-clip": "#/components/schemas/VideoClipEvent"
           }
         }
       },
@@ -8273,6 +8658,235 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VideoAttrs": {
+        "properties": {
+          "codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codec"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "fps": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "VideoAttrs"
+      },
+      "VideoClipEvent": {
+        "properties": {
+          "at_ms": {
+            "type": "integer",
+            "title": "At Ms",
+            "description": "Position of this event on the session timeline, ms."
+          },
+          "segment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Segment Id",
+            "description": "The resource segment this event derives from."
+          },
+          "type": {
+            "type": "string",
+            "const": "video-clip",
+            "title": "Type",
+            "default": "video-clip"
+          },
+          "end_ms": {
+            "type": "integer",
+            "title": "End Ms",
+            "description": "End (exclusive) of the clip, ms."
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Captured At",
+            "description": "Wall-clock start of the clip."
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at_ms",
+          "segment_id",
+          "end_ms",
+          "captured_at",
+          "content_type"
+        ],
+        "title": "VideoClipEvent",
+        "description": "One stored video clip over ``[at_ms, end_ms)``, positioned at its start.\n\nWall-clock-derived, as for ``location-point``."
+      },
+      "VideoSegmentRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "ingested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ingested At"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "offset_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset Ms"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "byte_size": {
+            "type": "integer",
+            "title": "Byte Size"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "checksum_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum Sha256",
+            "description": "Hex-encoded SHA-256 of the wire payload."
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "resource": {
+            "type": "string",
+            "const": "video",
+            "title": "Resource",
+            "default": "video"
+          },
+          "attrs": {
+            "$ref": "#/components/schemas/VideoAttrs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "session_id",
+          "sequence",
+          "ingested_at",
+          "captured_at",
+          "offset_ms",
+          "duration_ms",
+          "byte_size",
+          "content_type",
+          "checksum_sha256",
+          "metadata",
+          "attrs"
+        ],
+        "title": "VideoSegmentRead"
       }
     },
     "securitySchemes": {

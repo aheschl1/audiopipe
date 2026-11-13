@@ -14,6 +14,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from resources import Resource
 
+#: First sequence number of the REST upload range. Streamed chunks and frames
+#: are numbered by the client from 0 up; the server cannot know which of those
+#: numbers a live stream is about to store (frames wait in the pool for up to
+#: the pool latency), so a server-assigned number in the same range can collide
+#: with one and turn the stream's flush into a silent "duplicate". Uploads are
+#: therefore numbered from here, a range the stream rejects. INTEGER-safe
+#: (< 2**31), and a stream would need ~1.7 years of 50 ms frames to reach it.
+UPLOAD_SEQUENCE_BASE = 1 << 30
+
 
 class ResourceSegment(BaseModel):
     model_config = ConfigDict(frozen=True)

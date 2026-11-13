@@ -1,8 +1,9 @@
 """The resource type registry: what kinds of data a session can hold.
 
-A *resource* is one stream of data captured against a session — audio and
-location today. Each type declares how its chunks are validated and stored
-(``blob`` in the object store, or ``inline`` on the segment row) and which
+A *resource* is one stream of data captured against a session — audio,
+location, image and video today. Each type declares how its chunks are
+validated and stored (``blob`` in the object store, or ``inline`` on the
+segment row) and which
 capabilities the API may offer for it. Pipelines and endpoints interrogate
 the registry instead of assuming audio.
 """

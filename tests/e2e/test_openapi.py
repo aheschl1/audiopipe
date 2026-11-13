@@ -21,7 +21,7 @@ EXPECTED_METHODS = {
     "/v1/sessions/{session_id}/end": {"post"},
     "/v1/sessions/{session_id}/label": {"post"},
     "/v1/sessions/{session_id}/playback": {"post"},
-    "/v1/sessions/{session_id}/segments": {"get"},
+    "/v1/sessions/{session_id}/segments": {"get", "post"},
     "/v1/sessions/{session_id}/speakers": {"get"},
     "/v1/sessions/{session_id}/timeline": {"get"},
     "/v1/sessions/{session_id}/transcripts/{artifact_id}": {"post"},
@@ -101,6 +101,8 @@ async def test_timeline_event_union_is_discriminated(client: httpx.AsyncClient) 
         "sound-span",
         "conversation",
         "location-point",
+        "image",
+        "video-clip",
     }
     assert "label" in schemas["SoundSpanEvent"]["properties"]
     # Transcripts never leak the storage layout; the full text is inline and

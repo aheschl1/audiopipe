@@ -16,6 +16,7 @@ dependencies = [
     "pydantic-settings>=2.15.0",
     "pydantic[email]>=2.13.4",
     "pysilero-vad>=3.4.0",
+    "python-multipart>=0.0.20",
     "uvicorn[standard]>=0.52.1",
 ]
 
@@ -34,9 +35,6 @@ testpaths = ["tests"]
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
-    # Only for importing the sidecar apps (multipart routes) in unit tests;
-    # the sidecar containers pin their own copy.
-    "python-multipart>=0.0.20",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "testcontainers[minio,postgres]>=4.15.0",

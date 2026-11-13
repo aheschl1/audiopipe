@@ -118,7 +118,7 @@ async def test_session_media_gates_on_renderability(
     assert "no rendered media" in non_renderable.json()["detail"]
 
     unknown = await client.get(
-        f"/v1/sessions/{session.id}/resources/video/media", headers=account.headers
+        f"/v1/sessions/{session.id}/resources/thermal/media", headers=account.headers
     )
     assert unknown.status_code == 404
     assert "unknown resource" in unknown.json()["detail"]

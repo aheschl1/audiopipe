@@ -247,6 +247,7 @@ dependencies = [
     { name = "pydantic", extra = ["email"] },
     { name = "pydantic-settings" },
     { name = "pysilero-vad" },
+    { name = "python-multipart" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -255,7 +256,6 @@ dev = [
     { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
-    { name = "python-multipart" },
     { name = "testcontainers", extra = ["minio"] },
     { name = "websockets" },
 ]
@@ -273,6 +273,7 @@ requires-dist = [
     { name = "pydantic", extras = ["email"], specifier = ">=2.13.4" },
     { name = "pydantic-settings", specifier = ">=2.15.0" },
     { name = "pysilero-vad", specifier = ">=3.4.0" },
+    { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.1" },
 ]
 
@@ -281,7 +282,6 @@ dev = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
-    { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "testcontainers", extras = ["minio", "postgres"], specifier = ">=4.15.0" },
     { name = "websockets", specifier = ">=17.0.1" },
 ]

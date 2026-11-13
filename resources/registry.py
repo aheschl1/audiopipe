@@ -7,11 +7,15 @@ Mirrors ``processing/registry.py``.
 
 from resources.audio import AudioResource
 from resources.base import Resource, ResourceType
+from resources.image import ImageResource
 from resources.location import LocationResource
+from resources.video import VideoResource
 
 RESOURCES: tuple[ResourceType, ...] = (
     AudioResource(),
     LocationResource(),
+    ImageResource(),
+    VideoResource(),
 )
 
 _BY_NAME = {resource.name: resource for resource in RESOURCES}

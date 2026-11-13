@@ -18,6 +18,7 @@ from itertools import chain
 from api.schema.timeline import (
     AudioTagEvent,
     ConversationEvent,
+    ImageEvent,
     LocationPointEvent,
     SessionEndEvent,
     SessionStartEvent,
@@ -26,6 +27,7 @@ from api.schema.timeline import (
     SpeechStartEvent,
     TimelineEvent,
     TranscriptEvent,
+    VideoClipEvent,
 )
 from database.schema.artifacts import PipelineArtifact, parse_uuid
 from database.schema.segments import ResourceSegment
@@ -50,6 +52,8 @@ _TYPE_RANK = {
     "audio-tag": 5,
     "sound-span": 6,
     "location-point": 7,
+    "image": 8,
+    "video-clip": 9,
     "session-end": 100,
 }
 _DEFAULT_RANK = 50
@@ -171,6 +175,45 @@ def _location_events(
             accuracy_m=point.get("accuracy_m"),
             captured_at=datetime.fromtimestamp(point["t"] / 1000, tz=UTC),
         )
+
+
+def _wall_ms(segment: ResourceSegment, session: RecordingSession) -> int | None:
+    if segment.captured_at is None:
+        return None
+    return (segment.captured_at - session.started_at) // timedelta(milliseconds=1)
+
+
+@segment_expander("image")
+def _image_events(
+    segment: ResourceSegment, session: RecordingSession
+) -> Iterator[TimelineEvent]:
+    if (at_ms := _wall_ms(segment, session)) is None:
+        return
+    yield ImageEvent(
+        at_ms=at_ms,
+        segment_id=segment.id,
+        captured_at=segment.captured_at,
+        content_type=segment.content_type,
+        width=segment.attrs.get("width"),
+        height=segment.attrs.get("height"),
+    )
+
+
+@segment_expander("video")
+def _video_events(
+    segment: ResourceSegment, session: RecordingSession
+) -> Iterator[TimelineEvent]:
+    if (at_ms := _wall_ms(segment, session)) is None:
+        return
+    yield VideoClipEvent(
+        at_ms=at_ms,
+        end_ms=at_ms + (segment.duration_ms or 0),
+        segment_id=segment.id,
+        captured_at=segment.captured_at,
+        content_type=segment.content_type,
+        width=segment.attrs.get("width"),
+        height=segment.attrs.get("height"),
+    )
 
 
 def _nothing(artifact: PipelineArtifact) -> Iterator[TimelineEvent]:
