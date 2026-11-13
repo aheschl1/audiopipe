@@ -194,8 +194,9 @@ async def upload_segment(
     """For resources a client produces as whole files rather than a stream.
 
     The content type is sniffed from the bytes; a declared one must agree.
-    Sequence numbers are assigned server-side, sharing the session's one
-    sequence space with streamed chunks.
+    Sequence numbers are assigned server-side from a range of their own
+    (2**30 up), so an upload can go into a session that is streaming at the
+    same time without colliding with its frames.
     """
     try:
         resource_type = resource_registry.get(resource)
@@ -224,6 +225,7 @@ async def upload_segment(
             resource=resource,
             content_type=declared,
             filename=file.filename,
+            upload=True,
             captured_at=captured_at or datetime.now(UTC),
             duration_ms=duration_ms,
             attrs=_json_object(attrs, "attrs"),

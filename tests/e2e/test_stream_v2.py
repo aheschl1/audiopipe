@@ -296,3 +296,71 @@ async def test_v2_photo_lands_in_the_audio_session(
     timeline = await client.get(f"/v1/sessions/{session.id}/timeline", headers=account.headers)
     assert "image" in {event["type"] for event in timeline.json()["items"]}
 
+
+async def test_v2_rest_upload_cannot_steal_a_pooled_sequence(
+    server: str, client: httpx.AsyncClient, account: Account
+) -> None:
+    """A REST upload while frames sit in the pool must not take a sequence the
+    pool is about to store, or the flush reads as a duplicate and the audio is
+    silently dropped. REST uploads number from UPLOAD_SEQUENCE_BASE instead."""
+    from database.schema.segments import UPLOAD_SEQUENCE_BASE
+
+    session = await make_session(account)
+    frames = _pcm_frames(4)
+    jpeg = b"\xff\xd8\xff\xe0" + bytes(range(256)) * 4
+
+    async with _connect(server, session.id, account) as ws:
+        await ws.send(HELLO_V2)
+        await _recv_until(ws, "welcome")
+        await ws.send(encode_audio_frame(0, frames[0]))  # pooled, not yet stored
+        uploaded = await client.post(
+            f"/v1/sessions/{session.id}/segments",
+            files={"file": ("p.jpg", jpeg, "image/jpeg")},
+            data={"resource": "image"},
+            headers=account.headers,
+        )
+        assert uploaded.status_code == 201, uploaded.text
+        assert uploaded.json()["sequence"] == UPLOAD_SEQUENCE_BASE
+        await asyncio.sleep(0.6)  # the latency flush stores frame 0 on its own
+        for sequence in range(1, 4):
+            await ws.send(encode_audio_frame(sequence, frames[sequence]))
+        acks = []
+        while not acks or acks[-1]["through"] < 3:
+            acks.append(await _recv_until(ws, "ack"))
+    assert not [d for ack in acks for d in ack.get("duplicates", [])], acks
+
+    # Reconnect: the resume point ignores the upload range.
+    async with _connect(server, session.id, account) as ws:
+        await ws.send(HELLO_V2)
+        welcome = await _recv_until(ws, "welcome")
+        assert welcome["next_sequence"] == 4
+        await ws.send(FINISH)
+        events = await _drain_to_close(ws)
+    assert events[-1] == {"type": "bye", "reason": "finished", "through": 3}
+
+    stitched = await client.get(
+        f"/v1/sessions/{session.id}/resources/audio/media", headers=account.headers
+    )
+    assert stitched.content[WAV_HEADER_BYTES:] == b"".join(frames)
+
+
+async def test_v2_rejects_sequences_in_the_upload_range(
+    server: str, account: Account
+) -> None:
+    from database.schema.segments import UPLOAD_SEQUENCE_BASE
+
+    session = await make_session(account)
+    (frame,) = _pcm_frames(1)
+    async with _connect(server, session.id, account) as ws:
+        await ws.send(HELLO_V2)
+        await _recv_until(ws, "welcome")
+        await ws.send(encode_audio_frame(UPLOAD_SEQUENCE_BASE, frame))
+        error = await _recv_until(ws, "error")
+        assert (error["code"], error["sequence"]) == ("bad_sequence", UPLOAD_SEQUENCE_BASE)
+        location = encode_chunk(
+            ChunkHeader(sequence=UPLOAD_SEQUENCE_BASE + 1, resource="location"),
+            json.dumps({"points": [{"lat": 1.0, "lon": 2.0, "t": 1}]}).encode(),
+        )
+        await ws.send(bytes((FRAME_ENVELOPE,)) + location)
+        error = await _recv_until(ws, "error")
+        assert (error["code"], error["sequence"]) == ("bad_sequence", UPLOAD_SEQUENCE_BASE + 1)
