@@ -16,6 +16,7 @@ from resources import Resource
 from database.schema.segments import (
     ResourceSegment,
     ResourceUsage,
+    UPLOAD_SEQUENCE_BASE,
     SegmentCreate,
     SegmentSetFingerprint,
     SessionResourceSummary,
@@ -47,8 +48,28 @@ class SegmentsRepo(BaseRepo):
         if exists is None:
             raise NotFoundError("recording session", session_id)
         return await self._fetch_value(
-            "SELECT COALESCE(MAX(sequence) + 1, 0) FROM resource_segments WHERE session_id = %s",
-            (session_id,),
+            "SELECT COALESCE(MAX(sequence) + 1, 0) FROM resource_segments"
+            " WHERE session_id = %s AND sequence < %s",
+            (session_id, UPLOAD_SEQUENCE_BASE),
+        )
+
+    async def next_upload_sequence(self, session_id: UUID) -> int:
+        """The next number in the session's REST upload range.
+
+        Uploads never take a number from the stream's range: a live stream's
+        pooled frames are numbered but not yet stored, so any server pick
+        there can collide with one (:data:`UPLOAD_SEQUENCE_BASE`). Same
+        snapshot-read semantics as :meth:`next_sequence`.
+        """
+        exists = await self._fetch_value(
+            "SELECT 1 FROM recording_sessions WHERE id = %s", (session_id,)
+        )
+        if exists is None:
+            raise NotFoundError("recording session", session_id)
+        return await self._fetch_value(
+            "SELECT COALESCE(MAX(sequence) + 1, %s) FROM resource_segments"
+            " WHERE session_id = %s AND sequence >= %s",
+            (UPLOAD_SEQUENCE_BASE, session_id, UPLOAD_SEQUENCE_BASE),
         )
 
     async def create(self, data: SegmentCreate) -> ResourceSegment:

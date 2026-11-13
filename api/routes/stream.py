@@ -48,6 +48,7 @@ from live import registry as live_registry
 from live.tap import LiveSessionHandle
 from database.exceptions import DuplicateSequenceError, NotFoundError, SessionEndedError
 from database.pipe import DatabasePipe
+from database.schema.segments import UPLOAD_SEQUENCE_BASE
 from database.schema.sessions import RecordingSession
 from resources import Resource, ResourceValidationError
 from services.segments import ChecksumMismatchError, stream_segment
@@ -671,6 +672,9 @@ async def _ingest_v2_frame(
             f"payload of {len(decoded.pcm)} bytes exceeds {settings.stream_max_audio_frame_bytes}",
         )
         return
+    if decoded.sequence >= UPLOAD_SEQUENCE_BASE:
+        reject("bad_sequence", f"sequences from {UPLOAD_SEQUENCE_BASE} are reserved for uploads")
+        return
     if decoded.sequence <= pooler.highest_sequence:
         if decoded.sequence <= tracker.through:
             tracker.note_duplicate(decoded.sequence)
@@ -721,6 +725,13 @@ async def _ingest_decoded(
 
     if not payload:
         reject("bad_header", "empty payload", header.sequence)
+        return
+    if header.sequence >= UPLOAD_SEQUENCE_BASE:
+        reject(
+            "bad_sequence",
+            f"sequences from {UPLOAD_SEQUENCE_BASE} are reserved for uploads",
+            header.sequence,
+        )
         return
     if len(payload) > settings.stream_max_chunk_bytes:
         reject(

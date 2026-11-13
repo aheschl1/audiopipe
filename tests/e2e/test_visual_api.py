@@ -8,6 +8,7 @@ import httpx
 
 from database.pipe import DatabasePipe
 from database.repos.pipelines.common import PipelineDiscovery
+from database.schema.segments import UPLOAD_SEQUENCE_BASE
 from database.schema.sessions import SessionCreate
 from tests.e2e.conftest import Account, make_session
 
@@ -42,7 +43,7 @@ async def test_upload_image_and_video_then_list_and_fetch(
     assert body["resource"] == "image"
     assert body["content_type"] == "image/jpeg"
     assert body["attrs"] == {"width": 1280, "height": 720}
-    assert body["sequence"] == 0
+    assert body["sequence"] == UPLOAD_SEQUENCE_BASE
 
     video = await _upload(
         client, account, session.id, _MP4,
@@ -52,7 +53,7 @@ async def test_upload_image_and_video_then_list_and_fetch(
     assert video.status_code == 201, video.text
     assert video.json()["content_type"] == "video/mp4"
     assert video.json()["metadata"] == {"source": "rtmp"}
-    assert video.json()["sequence"] == 1
+    assert video.json()["sequence"] == UPLOAD_SEQUENCE_BASE + 1
 
     media = await client.get(
         f"/v1/segments/{body['id']}/media", headers=account.headers

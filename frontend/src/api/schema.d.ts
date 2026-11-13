@@ -279,8 +279,9 @@ export interface paths {
          * @description For resources a client produces as whole files rather than a stream.
          *
          *     The content type is sniffed from the bytes; a declared one must agree.
-         *     Sequence numbers are assigned server-side, sharing the session's one
-         *     sequence space with streamed chunks.
+         *     Sequence numbers are assigned server-side from a range of their own
+         *     (2**30 up), so an upload can go into a session that is streaming at the
+         *     same time without colliding with its frames.
          */
         post: operations["upload_segment_v1_sessions__session_id__segments_post"];
         delete?: never;

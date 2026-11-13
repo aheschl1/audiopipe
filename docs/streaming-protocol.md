@@ -184,7 +184,7 @@ not a slice of a longer bitstream; for location, one JSON batch of points
 
 | field | required | meaning |
 |---|---|---|
-| `sequence` | yes | client-assigned, ≥ 0; consecutive from `welcome.next_sequence` |
+| `sequence` | yes | client-assigned, 0 ≤ n < 2^30; consecutive from `welcome.next_sequence` |
 | `resource` | no | resource type of the payload; default `audio`. The server lists what it accepts in `welcome.resources` |
 | `captured_at` | no | ISO 8601 capture timestamp |
 | `duration_ms` | no | payload duration/span |
@@ -232,6 +232,14 @@ Clients that produce whole files rather than a stream (camera apps, an RTMP
 recorder) can instead upload them with
 `POST /v1/sessions/{id}/segments` (multipart: `file`, `resource`,
 `captured_at`, `duration_ms`, and `attrs`/`metadata` as JSON strings).
+
+Uploads are numbered by the server from **2^30** up, a range a stream may not
+use; stream sequences stay below it, and `welcome.next_sequence` ignores
+uploads. Sharing one range would let an upload take a number a stream has
+already sent but not yet stored (frames wait in the pool), and the stream's
+flush would then be dropped as a duplicate. So an upload can go into a
+session that is streaming at the same time, and it sorts after the
+streamed segments in sequence order; the timeline places it by wall clock.
 
 ### `finish` (text)
 
@@ -294,7 +302,7 @@ lists retransmitted sequences that were already stored (also durable). A
 |---|---|---|
 | `bad_header` | chunk | malformed chunk envelope, header JSON, empty payload, or unknown `resource` |
 | `bad_frame` | chunk | v2: malformed binary frame — unknown discriminator, truncated header, empty or misaligned PCM, unknown flags |
-| `bad_sequence` | chunk | v2: audio frame sequence out of order (and not a duplicate); frame dropped |
+| `bad_sequence` | chunk | v2: audio frame sequence out of order (and not a duplicate); frame dropped. Any version: a sequence ≥ 2^30, the REST upload range |
 | `chunk_too_large` | chunk | payload exceeds `limits.max_chunk_bytes` |
 | `frame_too_large` | chunk | v2: audio payload exceeds `limits.max_audio_frame_bytes` |
 | `checksum_mismatch` | chunk | payload does not match `checksum_sha256` |
