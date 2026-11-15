@@ -585,7 +585,7 @@ export default function SpeakersView({
   return (
     <div className="speakers-view">
       <PageHead
-        title="Speakers"
+        title="People"
         meta={
           speakers === null
             ? "loading…"

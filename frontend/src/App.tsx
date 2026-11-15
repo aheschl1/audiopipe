@@ -11,10 +11,13 @@ import {
 } from "react-router"
 import { dropLegacyToken, setExpiryHandler } from "./api/auth"
 import { api, type MeRead } from "./api/client"
+import { momentAt } from "./api/moments"
 import AbOverview from "./components/AbOverview"
 import AbVoteView from "./components/AbVoteView"
 import Gate from "./components/Gate"
 import GeoMap from "./components/GeoMap"
+import MomentsPage from "./components/MomentsPage"
+import MomentView from "./components/MomentView"
 import { preloadMapLibre } from "./map/trackMap"
 import SearchView from "./components/SearchView"
 import SessionList from "./components/SessionList"
@@ -23,32 +26,54 @@ import SpeakerMap from "./components/SpeakerMap"
 import SpeakersView from "./components/SpeakersView"
 import { useSearchParam } from "./useParam"
 
-const NAV = [
-  { to: "/sessions", label: "Sessions", match: (path: string) => path.startsWith("/sessions") },
-  { to: "/search", label: "Search", match: (path: string) => path === "/search" },
+type NavItem = { to: string; label: string; match: (path: string, view: string | null) => boolean }
+
+// Primary destinations are about your life; the second group is raw recordings and
+// model tooling, kept reachable while the app moves off sessions.
+const NAV: NavItem[] = [
+  { to: "/", label: "Moments", match: (path) => path === "/" || path.startsWith("/moments") },
+  { to: "/search", label: "Search", match: (path) => path === "/search" },
   {
     to: "/speakers",
-    label: "Speakers",
-    match: (path: string, view: string | null) => path === "/speakers" && view !== "map",
+    label: "People",
+    match: (path, view) => path === "/speakers" && view !== "map",
   },
+  { to: "/map", label: "Places", match: (path) => path === "/map" },
+]
+
+const NAV_TOOLS: NavItem[] = [
+  { to: "/sessions", label: "Recordings", match: (path) => path.startsWith("/sessions") },
   {
     to: "/speakers?view=map",
     label: "Voice map",
-    match: (path: string, view: string | null) => path === "/speakers" && view === "map",
+    match: (path, view) => path === "/speakers" && view === "map",
   },
-  { to: "/map", label: "Places", match: (path: string) => path === "/map" },
-  { to: "/ab", label: "A/B", match: (path: string) => path.startsWith("/ab") },
-] as const
+  { to: "/ab", label: "A/B", match: (path) => path.startsWith("/ab") },
+]
 
 function useNav() {
   const navigate = useNavigate()
   const openSession = (id: string, seekMs?: number) =>
     navigate(seekMs === undefined ? `/sessions/${id}` : `/sessions/${id}?t=${Math.round(seekMs)}`)
   const openAb = (id: string) => navigate(`/ab/${id}`)
+  const openMoment = (id: string, replace = false) => navigate(`/moments/${id}`, { replace })
+  // A search hit lands in its moment when one contains it; otherwise in the recording.
+  const openAt = async (sessionId: string, seekMs?: number, artifactId?: string) => {
+    if (seekMs !== undefined) {
+      const { data } = await momentAt(sessionId, seekMs)
+      if (data) {
+        const q = new URLSearchParams({ s: sessionId, t: String(Math.round(seekMs)) })
+        if (artifactId) q.set("item", artifactId)
+        navigate(`/moments/${data.id}?${q}`)
+        return
+      }
+    }
+    openSession(sessionId, seekMs)
+  }
   // A deep link has no app history to pop, so fall back to the list page.
   const back = (fallback: string) =>
     (window.history.state?.idx ?? 0) > 0 ? navigate(-1) : navigate(fallback)
-  return { openSession, openAb, back }
+  return { openSession, openAt, openAb, openMoment, back }
 }
 
 function SessionRoute() {
@@ -64,6 +89,29 @@ function SessionRoute() {
       onBack={() => back("/sessions")}
       onOpenSession={openSession}
       onAb={openAb}
+    />
+  )
+}
+
+function MomentRoute() {
+  const { id = "" } = useParams()
+  const [params] = useSearchParams()
+  const { openSession, openMoment, back } = useNav()
+  const t = Number(params.get("t"))
+  const target = {
+    item: params.get("item") ?? undefined,
+    sessionId: params.get("s") ?? undefined,
+    ms: params.has("t") && Number.isFinite(t) ? t : undefined,
+  }
+  return (
+    <MomentView
+      key={id}
+      momentId={id}
+      target={target.item || target.sessionId ? target : undefined}
+      onBack={() => back("/")}
+      // Stepping replaces history, so the breadcrumb still returns to the feed.
+      onNeighbour={(next) => openMoment(next, true)}
+      onOpenSession={openSession}
     />
   )
 }
@@ -88,7 +136,7 @@ export default function App() {
   const [unreachable, setUnreachable] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const location = useLocation()
-  const { openSession, openAb } = useNav()
+  const { openSession, openAt, openAb } = useNav()
 
   useEffect(() => {
     setExpiryHandler(() => setAuthed(false))
@@ -142,29 +190,36 @@ export default function App() {
   if (!authed) return <Gate onAuthed={() => setAuthed(true)} />
 
   const view = new URLSearchParams(location.search).get("view")
+  const navLink = (item: NavItem) => {
+    const active = item.match(location.pathname, view)
+    return (
+      <Link
+        key={item.to}
+        to={item.to}
+        className={`nav-item ${active ? "active" : ""}`}
+        aria-current={active ? "page" : undefined}
+      >
+        {item.label}
+      </Link>
+    )
+  }
   const wide =
     location.pathname === "/map" ||
     location.pathname.startsWith("/sessions/") ||
+    location.pathname.startsWith("/moments/") ||
     (location.pathname === "/speakers" && view === "map")
 
   return (
     <div className="app">
       <nav className="sidebar" aria-label="main">
-        <Link to="/sessions" className="brand">
+        <Link to="/" className="brand">
           <img className="brand-mark" src="/logo.svg" alt="" />
           context
         </Link>
         <div className="nav-items">
-          {NAV.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={`nav-item ${item.match(location.pathname, view) ? "active" : ""}`}
-              aria-current={item.match(location.pathname, view) ? "page" : undefined}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {NAV.map((item) => navLink(item))}
+          <span className="nav-group-label">Recordings &amp; tools</span>
+          {NAV_TOOLS.map((item) => navLink(item))}
         </div>
         <div className="nav-foot">
           {me && <span className="whoami">{me.user.display_name ?? me.user.email}</span>}
@@ -181,14 +236,17 @@ export default function App() {
 
       <main className={`main ${wide ? "wide" : ""}`}>
         <Routes>
+          <Route path="/" element={<MomentsPage />} />
+          <Route path="/moments" element={<Navigate to="/" replace />} />
+          <Route path="/moments/:id" element={<MomentRoute />} />
           <Route path="/sessions" element={<SessionList onOpen={openSession} />} />
           <Route path="/sessions/:id" element={<SessionRoute />} />
-          <Route path="/search" element={<SearchView onOpen={openSession} />} />
+          <Route path="/search" element={<SearchView onOpen={openAt} onOpenRecording={openSession} />} />
           <Route path="/speakers" element={<SpeakersPage />} />
           <Route path="/map" element={<GeoMap onOpen={openSession} />} />
           <Route path="/ab" element={<AbOverview onVote={openAb} />} />
           <Route path="/ab/:id" element={<AbVoteRoute />} />
-          <Route path="*" element={<Navigate to="/sessions" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
     </div>

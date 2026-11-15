@@ -31,6 +31,7 @@ from database.repos.embeddings import (
 from database.repos.jobs import JobsRepo
 from database.repos.label_carry import LabelCarryRepo
 from database.repos.locations import LocationsRepo
+from database.repos.moments import MomentsRepo
 from database.repos.segments import SegmentsRepo
 from database.repos.sessions import SessionsRepo
 from database.repos.speakers import SpeakersRepo
@@ -152,6 +153,10 @@ class DatabasePipe:
     @cached_property
     def visual_embeddings(self) -> VisualEmbeddingsRepo:
         return VisualEmbeddingsRepo(self.connection)
+
+    @cached_property
+    def moments(self) -> MomentsRepo:
+        return MomentsRepo(self.connection)
 
     @cached_property
     def speakers(self) -> SpeakersRepo:

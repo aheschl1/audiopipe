@@ -156,6 +156,13 @@ def test_env(
         "PROCESSING_VISION_TIMEOUT_SECONDS": "10",
         "API_VISION_BASE_URL": f"{stub_audio_services}/vision",
         "API_VISION_TIMEOUT_SECONDS": "10",
+        # Moments close 2s after the last capture, through the stub chat model.
+        "PROCESSING_LLM_BASE_URL": f"{stub_audio_services}/llm",
+        "PROCESSING_LLM_API_KEY": "stub",
+        "PROCESSING_LLM_MODEL": "stub-llm",
+        "PROCESSING_MOMENT_GAP_MS": "2000",
+        "PROCESSING_MOMENT_SETTLE_SECONDS": "0",
+        "PROCESSING_MOMENT_DISCOVER_INTERVAL_SECONDS": "0.2",
         "PROCESSING_DIARIZE_MIN_TURN_MS": "100",
         # The stub's turns are 150ms; the default 3s gate would silently
         # skip every embedding and no cluster test could pass.

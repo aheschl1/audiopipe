@@ -15,6 +15,7 @@ from processing.base import Callback, Pipeline
 from processing.pipelines.audio_tag import AudioTagPipeline
 from processing.pipelines.conversation import ConversationPipeline
 from processing.pipelines.diarize import DiarizePipeline
+from processing.pipelines.moment import MomentPipeline
 from processing.pipelines.session_stats import SessionStatsPipeline
 from processing.pipelines.speaker_cluster import SpeakerClusterPipeline
 from processing.pipelines.sound_span import SoundSpanPipeline
@@ -42,6 +43,7 @@ PIPELINES: tuple[type[Pipeline], ...] = (
     ThumbnailPipeline,
     VideoProxyPipeline,
     KeyframePipeline,
+    MomentPipeline,
 )
 
 

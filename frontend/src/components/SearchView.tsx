@@ -73,8 +73,10 @@ function fromTranscript(hit: TranscriptSearchRead): Hit {
 // - frames (contrastive, visual): free text through SigLIP against keyframes.
 export default function SearchView({
   onOpen,
+  onOpenRecording,
 }: {
-  onOpen: (id: string, seekMs?: number) => void
+  onOpen: (id: string, seekMs?: number, artifactId?: string) => void
+  onOpenRecording: (id: string, seekMs?: number) => void
 }) {
   const [modeParam, setMode] = useSearchParam("mode", "describe")
   const mode: Mode =
@@ -284,8 +286,8 @@ export default function SearchView({
               <div
                 key={hit.artifactId}
                 className="row clickable"
-                onClick={() => onOpen(hit.sessionId, hit.startMs)}
-                title="open in session"
+                onClick={() => onOpen(hit.sessionId, hit.startMs, hit.artifactId)}
+                title="open the moment"
               >
                 <ClipButton clip={clip} />
                 {hit.headline === null && hit.segments === null && (
@@ -319,7 +321,16 @@ export default function SearchView({
                     </span>
                   )}
                 </div>
-                <span className="row-open">open ↗</span>
+                <button
+                  className="btn ghost slim row-alt"
+                  title="open the full recording at this point"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenRecording(hit.sessionId, hit.startMs)
+                  }}
+                >
+                  recording
+                </button>
                 <ClipProgress clip={clip} />
               </div>
             )

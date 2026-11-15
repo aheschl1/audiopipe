@@ -8,6 +8,7 @@ tests.e2e.stub_audio_services PORT`` next to the real worker process.
 """
 
 import json
+import re
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -92,6 +93,34 @@ STUB_TEXT_EMBEDDING = [1.0, 0.0, 0.0, 0.0]
 # text query at distance 0.
 STUB_VISION_MODEL = "stub-siglip"
 STUB_VISION_EMBEDDING = [0.0, 0.0, 0.0, 1.0]
+# The chat endpoint, under {base}/llm: describes a moment by echoing what it
+# was sent, and links every candidate pair as "depicts".
+STUB_LLM_MODEL = "stub-llm"
+
+
+def _moment_reply(request: dict) -> dict:
+    parts = request["messages"][1]["content"]
+    text = parts[0]["text"]
+    images = sum(1 for p in parts if p.get("type") == "image_url")
+    labels = re.findall(r"^([UKPS]\d+)  ", text, re.MULTILINE)
+    pairs = re.findall(r"^([KP]\d+) ~ ([US]\d+)$", text, re.MULTILINE)
+    content = {
+        "title": f"stub moment with {images} images",
+        "summary": f"Items: {' '.join(labels)}.",
+        "people": ["voice 1"],
+        "places": [],
+        "visible_text": [],
+        "links": [
+            {"from": a, "to": b, "relation": "depicts", "confidence": 0.9, "why": "overlap"}
+            for a, b in pairs
+        ]
+        + [{"from": "X1", "to": "U1", "relation": "depicts"}],  # must be dropped
+    }
+    return {
+        "model": STUB_LLM_MODEL,
+        "choices": [{"message": {"role": "assistant", "content": json.dumps(content)}}],
+        "usage": {"prompt_tokens": len(text), "completion_tokens": 10, "total_tokens": len(text) + 10},
+    }
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -99,7 +128,9 @@ class _Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("content-length", 0))
         body = self.rfile.read(length)
         url = urlparse(self.path)
-        if "/vision/" in url.path:
+        if url.path.endswith("/llm/chat/completions"):
+            payload = _moment_reply(json.loads(body))
+        elif "/vision/" in url.path:
             if url.path.endswith("/images/embeddings"):
                 count = body.count(b'name="files"')
                 vectors = [STUB_VISION_EMBEDDING] * count

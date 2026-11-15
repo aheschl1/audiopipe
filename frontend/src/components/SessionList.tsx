@@ -1,36 +1,11 @@
 import { useCallback, useState } from "react"
 import { api, type SessionRead } from "../api/client"
-import { fmtDuration, shortId } from "../format"
+import { dayKey, dayLabel, fmtDuration, shortId, timeOfDay } from "../format"
 import { usePoll } from "../hooks/usePoll"
 import PageHead from "./PageHead"
 
 const PAGE = 50
 const POLL_MS = 15_000
-
-function dayKey(iso: string): string {
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-}
-
-/** "Today", "Yesterday", or a weekday date, for the day headings. */
-function dayLabel(iso: string): string {
-  const d = new Date(iso)
-  const today = new Date()
-  const yesterday = new Date()
-  yesterday.setDate(today.getDate() - 1)
-  if (dayKey(iso) === dayKey(today.toISOString())) return "Today"
-  if (dayKey(iso) === dayKey(yesterday.toISOString())) return "Yesterday"
-  return d.toLocaleDateString([], {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: d.getFullYear() === today.getFullYear() ? undefined : "numeric",
-  })
-}
-
-function timeOfDay(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-}
 
 function groupByDay(sessions: SessionRead[]): { key: string; label: string; items: SessionRead[] }[] {
   const groups: { key: string; label: string; items: SessionRead[] }[] = []
@@ -95,7 +70,7 @@ export default function SessionList({ onOpen }: { onOpen: (id: string) => void }
   return (
     <div className="sessions-page">
       <PageHead
-        title="Sessions"
+        title="Recordings"
         meta={
           sessions &&
           `${sessions.length}${hasMore ? "+" : ""} recorded${live ? ` · ${live} live` : ""}`
@@ -120,7 +95,7 @@ export default function SessionList({ onOpen }: { onOpen: (id: string) => void }
           ))}
         </div>
       ) : sessions.length === 0 ? (
-        <div className="empty">No sessions yet. Recordings from your phone or glasses land here.</div>
+        <div className="empty">No recordings yet. Audio, photos and video from your phone or glasses land here.</div>
       ) : (
         groupByDay(sessions).map((group) => (
           <section key={group.key} className="day-group">
@@ -151,7 +126,7 @@ export default function SessionList({ onOpen }: { onOpen: (id: string) => void }
       )}
       {hasMore && (
         <button className="btn ghost full" onClick={loadMore} disabled={loadingMore}>
-          {loadingMore ? "loading…" : "load older sessions"}
+          {loadingMore ? "loading…" : "load older recordings"}
         </button>
       )}
     </div>

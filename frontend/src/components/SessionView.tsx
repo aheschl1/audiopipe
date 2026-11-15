@@ -157,7 +157,7 @@ export default function SessionView({
     <div className="session-view">
       <header className="session-header">
         <button className="crumb" onClick={onBack}>
-          ← Sessions
+          ← Recordings
         </button>
         <div className="session-head-row">
           {draft === null ? (

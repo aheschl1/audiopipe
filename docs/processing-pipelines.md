@@ -505,6 +505,52 @@ and ranks keyframes by cosine distance. Text-to-image distances sit around
 Not yet: photo-burst dedup and speech-onset triggers (the transcript usually
 isn't ready when a clip lands).
 
+## The moment tier
+
+`moment` describes the day in **moments**: wall-clock stretches of recording
+bounded by `PROCESSING_MOMENT_GAP_MS` (10 min) of nothing, **across sessions**.
+One dinner can be an audio session plus a dozen single-photo sessions. Moments
+live in their own `moments` table, per user. They are not artifacts, because a
+moment has no single session.
+
+- **Activity.** Each audio session is one span, placed from its start. Each
+  photo or clip is a span at its capture time. Location pings don't count;
+  they would chain a whole day together.
+- **When a window becomes a job.** The gap must have passed since its last
+  capture. No audio session in it may still be streaming. Its last upload and
+  its newest transcript, keyframe or sound span must be
+  `MOMENT_SETTLE_SECONDS` (2 min) old. No other pipeline may have queued or
+  running work for its sessions. The dedup key hashes per-session segment
+  and artifact counts, so a late transcript or a re-diarize rebuilds the
+  window. Discovery runs at most every
+  `MOMENT_DISCOVER_INTERVAL_SECONDS` (60 s).
+- **Splitting.** A window longer than `MOMENT_MAX_MS` (90 min) is cut at its
+  largest quiet gap of at least `MOMENT_SPLIT_GAP_MS` (2 min), or into equal
+  slices if it has none. Sound spans don't count as activity here; each one
+  joins every piece it overlaps.
+- **The call.** Each moment goes to an OpenAI-compatible chat endpoint
+  (`PROCESSING_LLM_*`; the key falls back to `OPENAI_API_KEY`) as a labelled
+  manifest. It lists transcripts as U1, U2…, with unnamed speakers shown as
+  "voice N". Confident sound
+  spans other than speech are S1…. Up to 12 images are attached, every photo
+  first and then keyframes spread through time, as P1… and K1…. Each
+  image–utterance pair within 2 s of each other is listed as a candidate for
+  the model to judge. The model returns a title, summary, people, places,
+  visible text and links.
+- **Links** land in `artifact_links`: from, to, `relation`
+  (`depicts`/`mentions`/`reads`/`same_scene`/`unrelated`), confidence, why.
+  Each link belongs to the moment that asserted it, and a link is deleted
+  when either of its artifacts is. Links between labels the model wasn't
+  shown, or between items more than `MOMENT_LINK_MAX_MS` (10 min) apart, are
+  dropped. `unrelated` is kept, so the UI can hide coincidences.
+- **Publishing.** A job replaces every moment of the user that overlaps its
+  window, in one transaction. A moment stores a snapshot of the items it was
+  shown, so `GET /v1/moments/{id}` needs no joins. Moments whose sessions are
+  all gone are pruned at discovery.
+
+With the default OpenAI base URL and no key the tier stays idle. To use a
+local server, set `PROCESSING_LLM_BASE_URL`; no key is needed.
+
 ## Callbacks and chaining
 
 `Pipeline.__init__` takes an optional callback; `maybe_callback(job, result)`

@@ -4787,6 +4787,326 @@
           }
         }
       }
+    },
+    "/v1/moments": {
+      "get": {
+        "tags": [
+          "moments"
+        ],
+        "summary": "Your moments, newest first",
+        "operationId": "list_moments_v1_moments_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only moments starting before this instant.",
+              "title": "Before"
+            },
+            "description": "Only moments starting before this instant."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MomentListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/moments/links/{artifact_id}": {
+      "get": {
+        "tags": [
+          "moments"
+        ],
+        "summary": "Links touching one artifact",
+        "description": "Every relation any of your moments drew to or from this artifact.",
+        "operationId": "artifact_links_v1_moments_links__artifact_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Artifact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactLinksResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/moments/at": {
+      "get": {
+        "tags": [
+          "moments"
+        ],
+        "summary": "The moment containing a point in a recording",
+        "description": "For opening a search hit as a moment. Falls back to the nearest of the\nsession's moments within an hour; 404 when it has none.",
+        "operationId": "moment_at_v1_moments_at_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The recording the point is in.",
+              "title": "Session Id"
+            },
+            "description": "The recording the point is in."
+          },
+          {
+            "name": "at_ms",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Session-relative ms, as search hits and timeline events give it.",
+              "title": "At Ms"
+            },
+            "description": "Session-relative ms, as search hits and timeline events give it."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MomentRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/moments/{moment_id}": {
+      "get": {
+        "tags": [
+          "moments"
+        ],
+        "summary": "One moment with its items and links",
+        "operationId": "get_moment_v1_moments__moment_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "moment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Moment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MomentDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5085,6 +5405,38 @@
           "text"
         ],
         "title": "AbVoteResponse"
+      },
+      "ArtifactLinksResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Artifact Id"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/MomentLink"
+            },
+            "type": "array",
+            "title": "Links"
+          },
+          "moment_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Moment Ids",
+            "description": "The moments that asserted these links."
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "links",
+          "moment_ids"
+        ],
+        "title": "ArtifactLinksResponse"
       },
       "ArtifactRead": {
         "properties": {
@@ -6776,6 +7128,568 @@
         ],
         "title": "MeRead",
         "description": "`GET /v1/me`: who the token belongs to, and what they have stored.\n\n``usage`` holds one entry per resource the caller has captured, ordered by\nresource name; a resource never captured has no entry."
+      },
+      "MomentCounts": {
+        "properties": {
+          "utterances": {
+            "type": "integer",
+            "title": "Utterances"
+          },
+          "frames": {
+            "type": "integer",
+            "title": "Frames"
+          },
+          "photos": {
+            "type": "integer",
+            "title": "Photos"
+          },
+          "links": {
+            "type": "integer",
+            "title": "Links"
+          }
+        },
+        "type": "object",
+        "required": [
+          "utterances",
+          "frames",
+          "photos",
+          "links"
+        ],
+        "title": "MomentCounts"
+      },
+      "MomentCover": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Artifact Id",
+            "description": "A keyframe; its JPEG is at /v1/artifacts/{id}/media."
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "session_id",
+          "width",
+          "height"
+        ],
+        "title": "MomentCover"
+      },
+      "MomentDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "people": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "People",
+            "description": "Participants as the model named them; prefer ``speakers``."
+          },
+          "speakers": {
+            "items": {
+              "$ref": "#/components/schemas/MomentSpeaker"
+            },
+            "type": "array",
+            "title": "Speakers"
+          },
+          "places": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Places"
+          },
+          "visible_text": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Visible Text"
+          },
+          "session_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Session Ids"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/MomentCounts"
+          },
+          "cover": {
+            "items": {
+              "$ref": "#/components/schemas/MomentCover"
+            },
+            "type": "array",
+            "title": "Cover"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MomentItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/MomentLink"
+            },
+            "type": "array",
+            "title": "Links"
+          },
+          "previous_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Id",
+            "description": "Your moment just before this one."
+          },
+          "next_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Id",
+            "description": "Your moment just after this one."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "start_at",
+          "end_at",
+          "title",
+          "summary",
+          "people",
+          "speakers",
+          "places",
+          "visible_text",
+          "session_ids",
+          "counts",
+          "cover",
+          "model",
+          "created_at",
+          "items",
+          "links",
+          "previous_id",
+          "next_id"
+        ],
+        "title": "MomentDetail"
+      },
+      "MomentItem": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Artifact Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "The label the model saw, e.g. U3, K2, P1, S1."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "utterance",
+              "keyframe",
+              "photo",
+              "sound"
+            ],
+            "title": "Kind"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "at_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At Ms",
+            "description": "Session-relative ms, for opening the session view there."
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text",
+            "description": "The utterance's words, or the sound span's class."
+          },
+          "speaker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speaker",
+            "description": "Speaker name if curated, else 'voice N'."
+          },
+          "speaker_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speaker Id",
+            "description": "The speaker cluster, when the voice is clustered."
+          },
+          "segment_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segment Id"
+          },
+          "offset_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset Ms"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "label",
+          "kind",
+          "session_id",
+          "at_ms",
+          "start_at",
+          "end_at",
+          "text",
+          "speaker",
+          "segment_id",
+          "offset_ms",
+          "width",
+          "height"
+        ],
+        "title": "MomentItem",
+        "description": "One labelled artifact the model was shown."
+      },
+      "MomentLink": {
+        "properties": {
+          "from_artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "From Artifact Id"
+          },
+          "to_artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "To Artifact Id"
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "depicts",
+              "mentions",
+              "reads",
+              "same_scene",
+              "unrelated"
+            ],
+            "title": "Relation"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "why": {
+            "type": "string",
+            "title": "Why"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_artifact_id",
+          "to_artifact_id",
+          "relation",
+          "confidence",
+          "why"
+        ],
+        "title": "MomentLink"
+      },
+      "MomentListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MomentRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before",
+            "description": "Pass as ``before`` for the next (older) page; null at the end."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_before"
+        ],
+        "title": "MomentListResponse"
+      },
+      "MomentRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "people": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "People",
+            "description": "Participants as the model named them; prefer ``speakers``."
+          },
+          "speakers": {
+            "items": {
+              "$ref": "#/components/schemas/MomentSpeaker"
+            },
+            "type": "array",
+            "title": "Speakers"
+          },
+          "places": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Places"
+          },
+          "visible_text": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Visible Text"
+          },
+          "session_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Session Ids"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/MomentCounts"
+          },
+          "cover": {
+            "items": {
+              "$ref": "#/components/schemas/MomentCover"
+            },
+            "type": "array",
+            "title": "Cover"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "start_at",
+          "end_at",
+          "title",
+          "summary",
+          "people",
+          "speakers",
+          "places",
+          "visible_text",
+          "session_ids",
+          "counts",
+          "cover",
+          "model",
+          "created_at"
+        ],
+        "title": "MomentRead"
+      },
+      "MomentSpeaker": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "speaker_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speaker Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "speaker_id"
+        ],
+        "title": "MomentSpeaker",
+        "description": "Someone heard in the moment, from its transcripts (not the model's guess)."
       },
       "Page_ArtifactRead_": {
         "properties": {

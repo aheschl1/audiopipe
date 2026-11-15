@@ -26,6 +26,7 @@ from api.routes import (
     auth,
     conversations,
     health,
+    moments,
     resources,
     search,
     segments,
@@ -186,6 +187,7 @@ def create_app() -> FastAPI:
     app.include_router(ab.router, prefix=API_PREFIX)
     app.include_router(conversations.router, prefix=API_PREFIX)
     app.include_router(artifacts.router, prefix=API_PREFIX)
+    app.include_router(moments.router, prefix=API_PREFIX)
     return app
 
 

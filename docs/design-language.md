@@ -120,17 +120,30 @@ Scale (px): `--fs-2xs 11`, `xs 12`, `sm 13`, `md 14` (app body), `lg 16`, `xl 20
 - **Timeline lanes:** a white canvas inside a hairline frame, with lanes divided by `--line-faint`. Blocks use a palette tint with a solid border. Unresolved voices use a dashed border. Conversations are `--sunken` bands. The playhead is a 2px red line with a red time tag. Tooltips are white with a hairline border.
 - **Event list:** a 1px rail with 7px nodes: grey for speech, ink for a conversation, the media colour for photos and video, and red for the utterance under the playhead. The playing row also gets the red wash.
 - **Lightboxes:** a white scrim at 97%. The image sits on the paper with a hairline-topped caption bar of ghost buttons below it.
+- **Feed entries** (moments): a hairline row in three columns: mono start time and duration, then title, context line, a summary clamped to 3 lines and a muted tally, then an optional 208×140 cover mosaic (1 to 4 images, 2px gutters). There is no placeholder when there are no images. On phones the time goes above the title and the cover goes full width below the text.
+- **Sticky day heading:** a day name at `--fs-xl` with the long date muted beside it, a one-line digest below, and an optional lead paragraph (the day's story, 16px, 64ch). It sits on paper with a hairline under it and sticks below the top bar.
+- **Building note:** a hairline row at the head of Today, holding either the live badge or a spinner plus one muted sentence about when the next moment will appear.
+- **Label refs:** tiny mono tags (`K2`, `U3`) with a hairline border that name a linked item. They are clickable, and hovering darkens the border and text. A dashed border means low confidence, the same convention as unresolved voices.
+- **Relation tag:** an 11px medium word on `--sunken-2` (*depicts*, *mentioned*, *same scene*), shown on an item only while a linked item is in focus. A weak link uses a dashed white tag.
+- **Focus dimming:** hovering or selecting an item in a linked set drops everything outside its neighbourhood to 30% opacity, faded with an `opacity` transition. Selection uses the active treatment: a red wash with a 2px red left edge for a line, and a 2px red outline for an image. This is the only way relations are drawn. There are no connector lines.
+- **Connection sentences:** an aside list that writes each link as *[thumb] K1 depicts Sam U1*, followed by the quote, the reason in muted 12px, and the confidence in mono.
+- **Docked selection:** below 1100px, a selected item docks to the bottom edge (white, `--line-strong` top rule), the same pattern as the player.
 - **Empty and loading states:** centred 13px muted text with one sentence that says what will appear. Skeletons are flat `--sunken` blocks shaped like the rows they replace. Errors use a danger wash banner.
 
 ## UX decisions
 
 ### App shell: left rail, not a top bar
-The app has six destinations (Sessions, Search, Speakers, Voice map, Places, A/B). Six labels crowd a top bar and leave no room to grow. A 200px left rail lists them vertically and frees the full height for content. Account and logout sit at the bottom of the rail, out of the way. The voice map used to be a sub-tab under Speakers. It now has its own entry, because it is a different task (exploring a corpus, not naming people). Its URL (`/speakers?view=map`) is unchanged. Below 900px the rail becomes a sticky top bar with a sideways-scrolling nav, which works for one-handed thumb scrolling. A command palette was considered and deferred: with six destinations, plain links are faster to learn.
+The rail now has two groups. The primary group (*Moments*, *Search*, *People*, *Places*) is about your life. A faint small-caps label, *Recordings & tools*, introduces the second group (*Recordings*, *Voice map*, *A/B*): raw ingest and model tooling. On the narrow top bar the label becomes a 1px divider. Moments is home (`/`). See `docs/moments-ux.md` for the move away from sessions.
+
+The app first had six destinations (Sessions, Search, Speakers, Voice map, Places, A/B). Six labels crowd a top bar and leave no room to grow. A 200px left rail lists them vertically and frees the full height for content. Account and logout sit at the bottom of the rail, out of the way. The voice map used to be a sub-tab under Speakers. It now has its own entry, because it is a different task (exploring a corpus, not naming people). Its URL (`/speakers?view=map`) is unchanged. Below 900px the rail becomes a sticky top bar with a sideways-scrolling nav, which works for one-handed thumb scrolling. A command palette was considered and deferred: with six destinations, plain links are faster to learn.
 
 ### Page head
 Every page opens with the same head: a title, a one-line summary or count, and page-level actions on the right. This gives every screen the same entry point and a predictable home for actions like *split all live* and *clustering settings*, which used to float in ad-hoc toolbars.
 
-### Sessions
+### Moments (home)
+Home is a feed of days, each a list of moments: a stretch of time across however many recordings, titled and summarised by the moments tier. Covers make the page worth opening, and the day digest and summaries make it scannable. A moment page sets *Heard* beside *Seen* with a *Connections* aside. The agent's links are shown by acting on the content (label refs, focus dimming and relation tags), not by drawing a graph. Rationale and the migration plan are in `docs/moments-ux.md`.
+
+### Sessions (now "Recordings")
 A life log is browsed by day, so sessions are grouped under day headings (*Today*, *Yesterday*, *Fri, Nov 13*). Each row leads with its start time in mono, followed by the name and then duration and device. The date no longer repeats on every row. *Split all live* moved from the top of the list into the page actions, where it is visible but cannot be mistaken for a list row. A live session shows a red dot, the one red element on the page.
 
 ### Session view
