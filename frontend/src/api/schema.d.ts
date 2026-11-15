@@ -1110,6 +1110,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/artifacts/{artifact_id}/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download an artifact's stored blob
+         * @description For artifacts that record their blob's ``content_type`` and ``byte_size``
+         *     in metadata — the visual pipelines' thumbnails and proxies. Accepts
+         *     ``?token=`` like the segment media route, for `<img>`/`<video>`.
+         */
+        get: operations["get_artifact_media_v1_artifacts__artifact_id__media_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1842,6 +1864,11 @@ export interface components {
             width?: number | null;
             /** Height */
             height?: number | null;
+            /**
+             * Thumbnail Id
+             * @description Small upright JPEG artifact (``/v1/artifacts/{id}/media``); null until the thumbnail pipeline has run.
+             */
+            thumbnail_id?: string | null;
         };
         /** ImageSegmentRead */
         ImageSegmentRead: {
@@ -3339,6 +3366,37 @@ export interface components {
             width?: number | null;
             /** Height */
             height?: number | null;
+            /**
+             * Proxy Id
+             * @description Browser-playable H.264 MP4 artifact of the clip; null until the video-proxy pipeline has run. Prefer it over the original, whose codec (often HEVC) browsers may not decode.
+             */
+            proxy_id?: string | null;
+            /**
+             * Frames
+             * @description Evenly spaced stills, in clip order; empty until thumbnailed.
+             * @default []
+             */
+            frames: components["schemas"]["VideoFrameRef"][];
+        };
+        /**
+         * VideoFrameRef
+         * @description One still of a clip, served by ``/v1/artifacts/{artifact_id}/media``.
+         */
+        VideoFrameRef: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+            /**
+             * Offset Ms
+             * @description Position of the still within the clip, ms.
+             */
+            offset_ms: number;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
         };
         /** VideoSegmentRead */
         VideoSegmentRead: {
@@ -4688,7 +4746,10 @@ export interface operations {
     };
     get_segment_media_v1_segments__segment_id__media_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Bearer token as a query parameter, for `<img>`/`<video>` elements; mint one via POST /v1/sessions/{session_id}/playback. Ignored when the header is present. */
+                token?: string | null;
+            };
             header?: never;
             path: {
                 /** @description A segment belonging to you. */
@@ -6154,6 +6215,81 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_artifact_media_v1_artifacts__artifact_id__media_get: {
+        parameters: {
+            query?: {
+                /** @description Bearer token as a query parameter, for `<img>`/`<video>` elements; mint one via POST /v1/sessions/{session_id}/playback. Ignored when the header is present. */
+                token?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description An artifact of one of your sessions. */
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The blob. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": unknown;
+                    "video/mp4": unknown;
+                };
+            };
+            /** @description The requested byte range. */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "video/mp4": unknown;
+                };
+            };
+            /** @description The client's cached copy is still current. */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not yours, or the artifact stores no servable blob. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The requested range lies outside the object. */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

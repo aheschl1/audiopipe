@@ -2117,6 +2117,24 @@
               "title": "Segment Id"
             },
             "description": "A segment belonging to you."
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Bearer token as a query parameter, for `<img>`/`<video>` elements; mint one via POST /v1/sessions/{session_id}/playback. Ignored when the header is present.",
+              "title": "Token"
+            },
+            "description": "Bearer token as a query parameter, for `<img>`/`<video>` elements; mint one via POST /v1/sessions/{session_id}/playback. Ignored when the header is present."
           }
         ],
         "responses": {
@@ -4452,6 +4470,97 @@
           }
         }
       }
+    },
+    "/v1/artifacts/{artifact_id}/media": {
+      "get": {
+        "tags": [
+          "artifacts"
+        ],
+        "summary": "Download an artifact's stored blob",
+        "description": "For artifacts that record their blob's ``content_type`` and ``byte_size``\nin metadata \u2014 the visual pipelines' thumbnails and proxies. Accepts\n``?token=`` like the segment media route, for `<img>`/`<video>`.",
+        "operationId": "get_artifact_media_v1_artifacts__artifact_id__media_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "An artifact of one of your sessions.",
+              "title": "Artifact Id"
+            },
+            "description": "An artifact of one of your sessions."
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Bearer token as a query parameter, for `<img>`/`<video>` elements; mint one via POST /v1/sessions/{session_id}/playback. Ignored when the header is present.",
+              "title": "Token"
+            },
+            "description": "Bearer token as a query parameter, for `<img>`/`<video>` elements; mint one via POST /v1/sessions/{session_id}/playback. Ignored when the header is present."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The blob.",
+            "content": {
+              "image/jpeg": {},
+              "video/mp4": {}
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not yours, or the artifact stores no servable blob."
+          },
+          "206": {
+            "content": {
+              "video/mp4": {}
+            },
+            "description": "The requested byte range."
+          },
+          "304": {
+            "description": "The client's cached copy is still current."
+          },
+          "416": {
+            "description": "The requested range lies outside the object."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5904,6 +6013,19 @@
               }
             ],
             "title": "Height"
+          },
+          "thumbnail_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Id",
+            "description": "Small upright JPEG artifact (``/v1/artifacts/{id}/media``); null until the thumbnail pipeline has run."
           }
         },
         "type": "object",
@@ -8768,6 +8890,28 @@
               }
             ],
             "title": "Height"
+          },
+          "proxy_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy Id",
+            "description": "Browser-playable H.264 MP4 artifact of the clip; null until the video-proxy pipeline has run. Prefer it over the original, whose codec (often HEVC) browsers may not decode."
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/VideoFrameRef"
+            },
+            "type": "array",
+            "title": "Frames",
+            "description": "Evenly spaced stills, in clip order; empty until thumbnailed.",
+            "default": []
           }
         },
         "type": "object",
@@ -8780,6 +8924,49 @@
         ],
         "title": "VideoClipEvent",
         "description": "One stored video clip over ``[at_ms, end_ms)``, positioned at its start.\n\nWall-clock-derived, as for ``location-point``."
+      },
+      "VideoFrameRef": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Artifact Id"
+          },
+          "offset_ms": {
+            "type": "integer",
+            "title": "Offset Ms",
+            "description": "Position of the still within the clip, ms."
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "offset_ms"
+        ],
+        "title": "VideoFrameRef",
+        "description": "One still of a clip, served by ``/v1/artifacts/{artifact_id}/media``."
       },
       "VideoSegmentRead": {
         "properties": {

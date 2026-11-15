@@ -193,6 +193,17 @@ class LocationPointEvent(SegmentEventBase):
     captured_at: datetime = Field(description="Wall-clock time of the fix.")
 
 
+class VideoFrameRef(BaseModel):
+    """One still of a clip, served by ``/v1/artifacts/{artifact_id}/media``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    artifact_id: UUID
+    offset_ms: int = Field(description="Position of the still within the clip, ms.")
+    width: int | None = None
+    height: int | None = None
+
+
 class ImageEvent(SegmentEventBase):
     """One still image, fetched from ``/v1/segments/{segment_id}/media``.
 
@@ -204,6 +215,11 @@ class ImageEvent(SegmentEventBase):
     content_type: str
     width: int | None = None
     height: int | None = None
+    thumbnail_id: UUID | None = Field(
+        None,
+        description="Small upright JPEG artifact (``/v1/artifacts/{id}/media``); "
+        "null until the thumbnail pipeline has run.",
+    )
 
 
 class VideoClipEvent(SegmentEventBase):
@@ -218,6 +234,15 @@ class VideoClipEvent(SegmentEventBase):
     content_type: str
     width: int | None = None
     height: int | None = None
+    proxy_id: UUID | None = Field(
+        None,
+        description="Browser-playable H.264 MP4 artifact of the clip; null until "
+        "the video-proxy pipeline has run. Prefer it over the original, whose "
+        "codec (often HEVC) browsers may not decode.",
+    )
+    frames: tuple[VideoFrameRef, ...] = Field(
+        (), description="Evenly spaced stills, in clip order; empty until thumbnailed."
+    )
 
 
 type TimelineEvent = Annotated[

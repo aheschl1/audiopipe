@@ -137,3 +137,23 @@ async def test_audio_pipelines_skip_visual_only_sessions(
             "speech-detect", "audio", 1_000
         )
     assert session.id not in {s.id for s in found}
+
+
+async def test_segment_media_accepts_query_token(
+    client: httpx.AsyncClient, account: Account, other_account: Account
+) -> None:
+    session = await make_session(account)
+    image = await _upload(client, account, session.id, _JPEG, resource="image")
+    url = f"/v1/segments/{image.json()['id']}/media"
+    minted = await client.post(f"/v1/sessions/{session.id}/playback", headers=account.headers)
+    token = minted.json()["token"]
+
+    assert (await client.get(url, params={"token": token})).content == _JPEG
+    assert (await client.get(url)).status_code == 401
+    assert (await client.get(url, params={"token": "bogus"})).status_code == 401
+
+    other = await make_session(other_account)
+    theirs = await client.post(
+        f"/v1/sessions/{other.id}/playback", headers=other_account.headers
+    )
+    assert (await client.get(url, params={"token": theirs.json()["token"]})).status_code == 404

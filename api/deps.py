@@ -13,6 +13,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from api.schema.common import PageParams, RangeParams
 from database.pipe import DatabasePipe
+from database.schema.artifacts import PipelineArtifact
 from database.schema.segments import ResourceSegment
 from database.schema.sessions import RecordingSession
 from database.schema.speakers import Speaker
@@ -155,6 +156,59 @@ async def get_owned_segment(
 
 
 OwnedSegment = Annotated[ResourceSegment, Depends(get_owned_segment)]
+
+
+_MediaToken = Annotated[
+    str | None,
+    Query(
+        description="Bearer token as a query parameter, for `<img>`/`<video>` "
+        "elements; mint one via POST /v1/sessions/{session_id}/playback. "
+        "Ignored when the header is present."
+    ),
+]
+
+
+async def _media_user(
+    credentials: HTTPAuthorizationCredentials | None, token: str | None
+) -> User:
+    user = await authenticate_bearer(credentials.credentials if credentials else token)
+    if user is None:
+        raise _UNAUTHENTICATED
+    return user
+
+
+async def get_playable_segment(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    segment_id: Annotated[UUID, Path(description="A segment belonging to you.")],
+    token: _MediaToken = None,
+) -> ResourceSegment:
+    """``OwnedSegment`` that also accepts ``?token=``, as for session media."""
+    return await get_owned_segment(await _media_user(credentials, token), segment_id)
+
+
+PlayableSegment = Annotated[ResourceSegment, Depends(get_playable_segment)]
+
+
+async def get_playable_artifact(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    artifact_id: Annotated[UUID, Path(description="An artifact of one of your sessions.")],
+    token: _MediaToken = None,
+) -> PipelineArtifact:
+    """An artifact of a session the caller owns (header or ``?token=``); else 404."""
+    user = await _media_user(credentials, token)
+    async with DatabasePipe() as pipe:
+        artifact = await pipe.artifacts.get(artifact_id)
+        session = (
+            await pipe.sessions.get(artifact.session_id)
+            if artifact is not None and artifact.session_id is not None
+            else None
+        )
+    if artifact is None or session is None or session.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="artifact not found")
+    return artifact
+
+
+PlayableArtifact = Annotated[PipelineArtifact, Depends(get_playable_artifact)]
 
 
 async def get_owned_speaker(

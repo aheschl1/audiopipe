@@ -369,6 +369,14 @@ async def get_session_timeline(
             session.id, resource=resource, limit=_MAX_TIMELINE_ARTIFACTS
         )
     ]
+    # Unwindowed: these carry no span, and the window query keeps spans only.
+    visuals = [
+        artifact
+        for pipeline in timeline_events.VISUAL_PIPELINES
+        for artifact in await pipe.artifacts.list_for_session(
+            session.id, pipeline=pipeline, limit=_MAX_TIMELINE_ARTIFACTS
+        )
+    ]
     labels = await pipe.speakers.labels_for_session(session.id)
     speaker_map = {
         label.speaker: label for label in labels if label.speaker_id is not None
@@ -377,6 +385,7 @@ async def get_session_timeline(
         session,
         rows,
         segments=segments,
+        visuals=visuals,
         from_ms=window.from_ms,
         to_ms=window.to_ms,
         speakers=speaker_map,

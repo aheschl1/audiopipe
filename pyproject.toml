@@ -8,6 +8,7 @@ dependencies = [
     "aioboto3>=15.5.0",
     "alembic>=1.19.1",
     "argon2-cffi>=25.1.0",
+    "av>=19.0.2",
     "click>=8.4.2",
     "fastapi>=0.141.1",
     "httpx>=0.28.1",

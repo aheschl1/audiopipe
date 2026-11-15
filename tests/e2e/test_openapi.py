@@ -35,6 +35,7 @@ EXPECTED_METHODS = {
     "/v1/segments": {"get"},
     "/v1/segments/{segment_id}": {"get"},
     "/v1/segments/{segment_id}/media": {"get"},
+    "/v1/artifacts/{artifact_id}/media": {"get"},
     "/v1/search/audio": {"get"},
     "/v1/search/tags": {"get"},
     "/v1/search/tags/labels": {"get"},

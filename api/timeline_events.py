@@ -28,6 +28,7 @@ from api.schema.timeline import (
     TimelineEvent,
     TranscriptEvent,
     VideoClipEvent,
+    VideoFrameRef,
 )
 from database.schema.artifacts import PipelineArtifact, parse_uuid
 from database.schema.segments import ResourceSegment
@@ -243,11 +244,55 @@ def _sort_key(event: TimelineEvent) -> tuple[int, int, str, str]:
     )
 
 
+# The per-segment visual pipelines; their artifacts attach to segment events
+# instead of becoming events of their own.
+VISUAL_PIPELINES = ("thumbnail", "video-proxy")
+
+
+def _attach_visuals(
+    events: list[TimelineEvent], visuals: Sequence[PipelineArtifact]
+) -> list[TimelineEvent]:
+    proxies: dict[str, PipelineArtifact] = {}
+    thumbs: dict[str, list[PipelineArtifact]] = {}
+    for artifact in visuals:
+        segment = str(artifact.links.get("segment"))
+        if artifact.kind == "video-proxy":
+            proxies[segment] = artifact
+        elif artifact.kind == "thumbnail":
+            thumbs.setdefault(segment, []).append(artifact)
+    for frames in thumbs.values():
+        frames.sort(key=lambda a: a.metadata.get("offset_ms", 0))
+
+    def attach(event: TimelineEvent) -> TimelineEvent:
+        if event.type == "image" and (frames := thumbs.get(str(event.segment_id))):
+            return event.model_copy(update={"thumbnail_id": frames[0].id})
+        if event.type == "video-clip":
+            segment = str(event.segment_id)
+            update: dict = {}
+            if (proxy := proxies.get(segment)) is not None:
+                update["proxy_id"] = proxy.id
+            if frames := thumbs.get(segment):
+                update["frames"] = tuple(
+                    VideoFrameRef(
+                        artifact_id=a.id,
+                        offset_ms=a.metadata.get("offset_ms", 0),
+                        width=a.metadata.get("width"),
+                        height=a.metadata.get("height"),
+                    )
+                    for a in frames
+                )
+            return event.model_copy(update=update) if update else event
+        return event
+
+    return [attach(event) for event in events]
+
+
 def assemble(
     session: RecordingSession,
     artifacts: Sequence[PipelineArtifact],
     *,
     segments: Sequence[ResourceSegment] = (),
+    visuals: Sequence[PipelineArtifact] = (),
     from_ms: int | None = None,
     to_ms: int | None = None,
     speakers: Mapping[str, SessionSpeakerLabel] | None = None,
@@ -261,6 +306,9 @@ def assemble(
     ``from_ms``/``to_ms`` keep only events positioned in ``[from_ms, to_ms)``:
     an artifact overlapping the window contributes just the events inside it,
     so adjacent windows partition the stream — no duplicates, no gaps.
+
+    ``visuals`` are the thumbnail/video-proxy artifacts; they decorate the
+    image and video-clip events of the segments they link to.
 
     ``speakers`` maps block-local labels to their clustering-tier resolution;
     matching transcript events get stamped with the global identity and the
@@ -286,6 +334,8 @@ def assemble(
     if to_ms is not None:
         events = (event for event in events if event.at_ms < to_ms)
     ordered = sorted(events, key=_sort_key)
+    if visuals:
+        ordered = _attach_visuals(ordered, visuals)
     if not speakers:
         return ordered
     return [

@@ -450,6 +450,25 @@ session's conversations; `GET /v1/conversations/{id}` adds the ordered
 transcript with speakers resolved at read through the same label → cluster
 → name chain the timeline uses.
 
+## The visual tiers
+
+`thumbnail` and `video-proxy` (`processing/pipelines/visual.py`) work per
+segment, not per session: an image or clip is a whole file, so it is work as
+soon as it lands, open session or not. Jobs carry `payload.segment_id` and dedup
+on `{pipeline}:segment:{id}`.
+
+- `thumbnail`: one upright JPEG (≤320 px) per image; for a clip, one still
+  per second (capped at 24), each with `metadata.offset_ms` into the clip.
+- `video-proxy`: an upright 720p H.264/AAC MP4 with `moov` first, so any
+  source codec (phone HEVC, RTMP MPEG-TS) plays and seeks in a browser.
+
+Both decode with PyAV (bundled FFmpeg, no system ffmpeg), apply the display
+rotation to the pixels, and write artifacts linked by `links.segment` with
+`metadata.content_type`/`byte_size`. Originals are untouched. The timeline
+attaches them to `image` (`thumbnail_id`) and `video-clip` (`proxy_id`,
+`frames`) events; `/v1/artifacts/{id}/media` serves them, accepting
+`?token=` for `<img>`/`<video>`.
+
 ## Callbacks and chaining
 
 `Pipeline.__init__` takes an optional callback; `maybe_callback(job, result)`

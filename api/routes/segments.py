@@ -1,18 +1,17 @@
 """Resource segments: metadata, and the stored bytes themselves. Read-only."""
 
 import json
-from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 
-from api.deps import CurrentUser, OwnedSegment, Paging, Pipe
-from api.ranges import RangeNotSatisfiable, etag_matches, parse_range
+from api.deps import CurrentUser, OwnedSegment, Paging, Pipe, PlayableSegment
+from api.blob_media import blob_response
+from api.ranges import etag_matches
 from api.schema.common import Page
 from api.schema.segments import SegmentRead, segment_read
 from database.schema.segments import ResourceSegment
 from storage.keys import suffix_for
-from storage.pipe import BlobPipe
 
 router = APIRouter(prefix="/segments", tags=["segments"])
 
@@ -36,39 +35,6 @@ async def get_segment(segment: OwnedSegment) -> SegmentRead:
     return segment_read(segment)
 
 
-async def _stream_blob(
-    segment: ResourceSegment, start: int | None = None, end: int | None = None
-) -> AsyncIterator[bytes]:
-    """Yield the segment's bytes, optionally only the inclusive range.
-
-    The blob store is opened inside the generator: FastAPI closes
-    yield-dependencies when the handler returns, which would tear the client
-    down before the body is sent.
-
-    The first chunk is pulled here, before the response starts, so a missing
-    object raises `BlobNotFoundError` while a 404 is still possible. Left lazy,
-    that failure would land mid-body and truncate an already-sent 200.
-    """
-
-    async def chunks() -> AsyncIterator[bytes]:
-        async with BlobPipe() as blobs:
-            async for chunk in blobs.stream(segment.object_key, start=start, end=end):
-                yield chunk
-
-    stream = chunks()
-    try:
-        first = await anext(stream)
-    except StopAsyncIteration:
-        first = b""
-
-    async def body() -> AsyncIterator[bytes]:
-        yield first
-        async for chunk in stream:
-            yield chunk
-
-    return body()
-
-
 def _etag(segment: ResourceSegment) -> str:
     """Strong validator: the stored SHA-256, or id + size when it is unset."""
     return f'"{segment.checksum_hex or f"{segment.id}-{segment.byte_size}"}"'
@@ -88,7 +54,7 @@ def _etag(segment: ResourceSegment) -> str:
         416: {"description": "The requested range lies outside the object."},
     },
 )
-async def get_segment_media(segment: OwnedSegment, request: Request) -> Response:
+async def get_segment_media(segment: PlayableSegment, request: Request) -> Response:
     """Serve what the segment stores: the blob for blob-backed resources
     (honouring `Range` and conditional requests), the inline payload as JSON
     otherwise.
@@ -117,36 +83,11 @@ async def get_segment_media(segment: OwnedSegment, request: Request) -> Response
             headers=headers,
         )
 
-    headers["Accept-Ranges"] = "bytes"
-    # A stale If-Range means the client must take the whole object, not a slice
-    # it would splice onto an older copy.
-    range_header = request.headers.get("range")
-    if_range = request.headers.get("if-range")
-    if if_range and not etag_matches(if_range, etag):
-        range_header = None
-
-    try:
-        byte_range = parse_range(range_header, segment.byte_size)
-    except RangeNotSatisfiable:
-        return Response(
-            status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
-            headers={**headers, "Content-Range": f"bytes */{segment.byte_size}"},
-        )
-
-    if byte_range is None:
-        return StreamingResponse(
-            await _stream_blob(segment),
-            media_type=segment.content_type,
-            headers={**headers, "Content-Length": str(segment.byte_size)},
-        )
-
-    return StreamingResponse(
-        await _stream_blob(segment, byte_range.start, byte_range.end),
-        status_code=status.HTTP_206_PARTIAL_CONTENT,
-        media_type=segment.content_type,
-        headers={
-            **headers,
-            "Content-Length": str(byte_range.length),
-            "Content-Range": byte_range.content_range(segment.byte_size),
-        },
+    return await blob_response(
+        request,
+        key=segment.object_key,
+        byte_size=segment.byte_size,
+        content_type=segment.content_type,
+        etag=etag,
+        headers=headers,
     )
