@@ -1,5 +1,5 @@
 [project]
-name = "audio-pipeline"
+name = "context"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -22,9 +22,9 @@ dependencies = [
 ]
 
 [project.scripts]
-audio-pipeline = "cli.main:cli"
-audio-pipeline-api = "api.main:serve"
-audio-pipeline-worker = "processing.main:serve"
+context = "cli.main:cli"
+context-api = "api.main:serve"
+context-worker = "processing.main:serve"
 
 [tool.pytest.ini_options]
 # The project has no build backend, so it is not installed into the venv.

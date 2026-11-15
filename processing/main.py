@@ -42,7 +42,7 @@ async def _ping() -> None:
     type=click.Choice(["critical", "error", "warning", "info", "debug"]),
 )
 def serve(only: tuple[str, ...], log_level: str) -> None:
-    """Run the audio-pipeline processing workers."""
+    """Run the context processing workers."""
     known = registry.names()
     for name in only:
         if name not in known:

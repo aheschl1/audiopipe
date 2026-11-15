@@ -1,1 +1,1 @@
-"""Command-line interface for the audio-pipeline database."""
+"""Command-line interface for the context database."""

@@ -157,6 +157,14 @@ The travel map gets the wide layout, with a session legend in a right column tha
 ### A/B
 A page head explains the purpose. The wins table uses uppercase column labels and ink share bars. The voting view keeps its sticky toolbar. The focused card gets a red ring and the winning candidate a green wash, so the keyboard flow reads at a glance.
 
+## Logo
+
+The mark is a red glass orb on a white rounded tile (`frontend/public/logo.svg`). The lower half sags and leans slightly left, as if the glass has started to melt, and a soft red light gathers on the tile beneath it. It is the one deliberate exception to flatness: the mark carries depth so that the UI around it doesn't have to.
+
+- The orb's base colour is the accent `--red` (`#E4002B`), deepening to `#7D0016` at the rim. Its highlights are restrained: a blurred top sheen at 32% white and a faint inner glow at the bottom.
+- The wordmark is lower-case **context** in Plex Sans semibold, set beside the mark. The sidebar uses a 24 px mark and the login page a 32 px one. The favicon is the SVG itself.
+- Never recolour the orb, flatten it into a plain dot, or place it on red.
+
 ## Brand layer (future site)
 
 The public site imports the same `tokens.css` and adds a brand sheet on top of it. It does not fork the tokens.

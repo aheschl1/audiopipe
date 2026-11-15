@@ -29,8 +29,11 @@ export default function Gate({ onAuthed }: { onAuthed: () => void }) {
   return (
     <div className="gate">
       <form className="gate-card" onSubmit={submit}>
-        <h1 className="gate-title">spyware</h1>
-        <div className="gate-subtitle">your audio, indexed</div>
+        <h1 className="gate-title">
+          <img className="brand-mark" src="/logo.svg" alt="" />
+          context
+        </h1>
+        <div className="gate-subtitle">what you saw and heard, indexed</div>
         <input
           className="input"
           type="email"

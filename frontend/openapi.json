@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "audio-pipeline",
+    "title": "context",
     "summary": "Recording sessions and their audio segments. Audio is uploaded over the streaming websocket described in docs/streaming-protocol.md.",
     "version": "0.1.0"
   },

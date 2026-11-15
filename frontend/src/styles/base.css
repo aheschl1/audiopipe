@@ -92,12 +92,10 @@ input[type="range"] {
   text-decoration: none;
 }
 
-.brand::before {
-  content: "";
-  width: 10px;
-  height: 10px;
-  border-radius: var(--r-round);
-  background: var(--red);
+.brand-mark {
+  width: 24px;
+  height: 24px;
+  flex: none;
 }
 
 .nav-items {
@@ -811,12 +809,9 @@ button.row:hover,
   letter-spacing: -0.01em;
 }
 
-.gate-title::before {
-  content: "";
-  width: 12px;
-  height: 12px;
-  border-radius: var(--r-round);
-  background: var(--red);
+.gate-title .brand-mark {
+  width: 32px;
+  height: 32px;
 }
 
 .gate-subtitle {

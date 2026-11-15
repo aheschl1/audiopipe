@@ -34,7 +34,7 @@ unreliably.
 DiariZen returns a bare `Annotation`, so embedding is owned here rather than
 borrowed from pipeline internals.
 
-Consumed by the audio-pipeline's `diarize` tier
+Consumed by the context's `diarize` tier
 (`PROCESSING_DIARIZER_BASE_URL=http://127.0.0.1:8034/v1`).
 
 ## Setup

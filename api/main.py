@@ -122,7 +122,7 @@ def _error(status_code: int, detail: str) -> JSONResponse:
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="audio-pipeline",
+        title="context",
         version="0.1.0",
         summary=(
             "Recording sessions and their audio segments. Audio is uploaded over "
@@ -207,7 +207,7 @@ APP_PATH = "api.main:app"
     type=click.Choice(["critical", "error", "warning", "info", "debug", "trace"]),
 )
 def serve(host: str, port: int, reload: bool, workers: int, log_level: str) -> None:
-    """Run the audio-pipeline HTTP API."""
+    """Run the context HTTP API."""
     if reload and workers > 1:
         raise click.UsageError("--reload cannot be combined with --workers")
     uvicorn.run(

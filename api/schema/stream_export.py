@@ -32,7 +32,7 @@ def build_schema() -> dict[str, Any]:
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "StreamProtocol",
         "description": (
-            "Wire frames for the audio-pipeline streaming websocket "
+            "Wire frames for the context streaming websocket "
             f"(docs/streaming-protocol.md), protocol version {PROTOCOL_VERSION}."
         ),
         "type": "object",

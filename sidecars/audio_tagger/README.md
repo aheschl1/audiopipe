@@ -1,6 +1,6 @@
 # audio-tagger
 
-Serving container for the audio-pipeline's **audio-tag** tier: sound-event
+Serving container for the context's **audio-tag** tier: sound-event
 tagging + audio embeddings in one service, because both consume the same
 windows of audio.
 

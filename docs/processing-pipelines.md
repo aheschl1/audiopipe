@@ -24,7 +24,7 @@ enqueue wiring in the API**: workers find their own work by querying the same
 database the API writes.
 
 Run them with `make worker` (`uv run python -m processing`), or a subset with
-`--only <name>` (repeatable). `audio-pipeline-worker` is the script entry.
+`--only <name>` (repeatable). `context-worker` is the script entry.
 
 ## Topology
 

@@ -1,4 +1,8 @@
-# audio-pipeline
+# context
+
+A self-hosted context layer: phones and glasses stream audio, location, photos and
+video into sessions; background pipelines transcribe, diarize, tag and derive media;
+agents and the web app read it back as one timeline.
 
 ## Database layer
 
@@ -113,7 +117,7 @@ so it is not implemented yet.
 uv run python -m cli.main check
 ```
 
-`pyproject.toml` declares the `audio-pipeline` entry point, but with no build backend
+`pyproject.toml` declares the `context` entry point, but with no build backend
 the project is not installed onto `PATH` — use `python -m cli.main`.
 
 ## Web frontend (`frontend/`)

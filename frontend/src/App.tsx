@@ -121,7 +121,8 @@ export default function App() {
     <div className="app">
       <nav className="sidebar" aria-label="main">
         <Link to="/sessions" className="brand">
-          spyware
+          <img className="brand-mark" src="/logo.svg" alt="" />
+          context
         </Link>
         <div className="nav-items">
           {NAV.map((item) => (
