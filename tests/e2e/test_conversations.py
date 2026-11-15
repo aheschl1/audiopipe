@@ -90,7 +90,7 @@ async def test_utterances_group_by_gap_and_lone_remarks_drop(
     assert (first["opening"], first["closure"]) == ("session_start", "gap")
     async with DatabasePipe() as pipe:
         artifacts = await pipe.artifacts.list_for_session(session.id, kind="conversation")
-    assert {a.metadata["user_source"] for a in artifacts} == {"dominant"}  # nothing clustered here
+    assert all(len(a.metadata["user_labels"]) == 1 for a in artifacts)
     assert first["gap_after_ms"] == GAP_MS + 1
     assert (second["turns"], second["alternations"]) == (2, 0)
     assert second["closure"] == "session_end"

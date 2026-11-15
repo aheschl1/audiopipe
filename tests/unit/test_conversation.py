@@ -12,7 +12,6 @@ from processing.pipelines.conversation import (
     split_on_churn,
     summarize,
     user_labels,
-    dominant_labels,
 )
 
 GAP = 60_000
@@ -25,7 +24,7 @@ def _t(start: int, end: int, speaker: str = "b0:SPEAKER_00", block: int = 0) -> 
 def _group(turns, **overrides):
     """The chain with the speaker-shift pass off (window 0)."""
     params = {"gap_ms": GAP, "min_turns": 2, "churn_window": 0, "churn_min_turns": 1}
-    return [c for c, _, _ in build_conversations(turns, **{**params, **overrides})]
+    return [c for c, _ in build_conversations(turns, **{**params, **overrides})]
 
 
 class TestReadTurn:
@@ -166,20 +165,7 @@ def _dialogue(*labels: str, user: str = "me") -> list:
 class TestUserLabel:
     def test_dominant_talk_per_block(self) -> None:
         turns = [_t(0, 5000, "me"), _t(5000, 6000, "A"), _t(9000, 9500, "B", block=9000), _t(9500, 12_000, "A", block=9000)]
-        assert dominant_labels(turns) == {0: "me", 9000: "A"}
-        assert user_labels(turns) == {
-            0: (frozenset({"me"}), "dominant"),
-            9000: (frozenset({"A"}), "dominant"),
-        }
-
-    def test_identity_beats_talk_time_and_takes_every_sub_label(self) -> None:
-        # The user is quiet in block 9000 but resolved there: identity wins,
-        # and both of the user's sub-labels count.
-        turns = [_t(0, 5000, "me"), _t(5000, 6000, "A"), _t(9000, 9500, "me.0", block=9000), _t(9500, 12_000, "A", block=9000), _t(12_000, 12_500, "me.1", block=9000)]
-        assert user_labels(turns, identified=["me.0", "me.1"]) == {
-            0: (frozenset({"me"}), "dominant"),
-            9000: (frozenset({"me.0", "me.1"}), "identity"),
-        }
+        assert user_labels(turns) == {0: "me", 9000: "A"}
 
 
 class TestSplitOnChurn:
@@ -218,5 +204,5 @@ class TestBuildConversations:
         # A→B shift whose B side is one non-user turn short of min_turns=3.
         turns = _dialogue("me", "A", "me", "A", "me", "A", "B", "me")
         out = build_conversations(turns, gap_ms=GAP, min_turns=3, churn_window=2, churn_min_turns=1)
-        assert [c.stats.turns for c, _, _ in out] == [6]
-        assert out[0][1:] == (frozenset({"me"}), "dominant")
+        assert [c.stats.turns for c, _ in out] == [6]
+        assert out[0][1] == frozenset({"me"})

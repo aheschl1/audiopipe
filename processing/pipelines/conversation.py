@@ -178,9 +178,9 @@ def _assemble(runs: Sequence[Sequence[Turn]], closures: Sequence[Boundary]) -> l
     return out
 
 
-def dominant_labels(turns: Iterable[Turn]) -> dict[int | None, str]:
-    """Per block, the label with the most talk — the fallback guess at the
-    user, who is in every conversation and so must not count as a participant."""
+def user_labels(turns: Iterable[Turn]) -> dict[int | None, str]:
+    """Per block, the label with the most talk — the user, who is in every
+    conversation and so must not count as a participant."""
     talk: dict[int | None, dict[str, int]] = {}
     for turn in turns:
         if turn.speaker is not None:
@@ -190,26 +190,6 @@ def dominant_labels(turns: Iterable[Turn]) -> dict[int | None, str]:
         block: max(sorted(per_block), key=lambda label: per_block[label])
         for block, per_block in talk.items()
     }
-
-
-def user_labels(
-    turns: Iterable[Turn], identified: Iterable[str] = ()
-) -> dict[int | None, tuple[frozenset[str], str]]:
-    """Per block, the labels to treat as the user and how they were chosen:
-    ``identity`` when any label resolves to the user's cluster, else
-    ``dominant`` (the block's loudest voice)."""
-    turns = list(turns)
-    known = set(identified)
-    by_block: dict[int | None, set[str]] = {}
-    for turn in turns:
-        if turn.speaker in known:
-            by_block.setdefault(turn.block_start_ms, set()).add(turn.speaker)
-    out: dict[int | None, tuple[frozenset[str], str]] = {
-        block: (frozenset(labels), "identity") for block, labels in by_block.items()
-    }
-    for block, label in dominant_labels(turns).items():
-        out.setdefault(block, (frozenset({label}), "dominant"))
-    return out
 
 
 def split_on_churn(
@@ -279,19 +259,19 @@ def build_conversations(
     min_turns: int,
     churn_window: int,
     churn_min_turns: int,
-    user_identified: Iterable[str] = (),
-) -> list[tuple[Conversation, frozenset[str], str]]:
+) -> list[tuple[Conversation, frozenset[str]]]:
     """The whole pure chain: gap/block grouping, speaker-shift splits, then
     the ``min_turns`` floor (applied last so a split's short remainder is
     dropped, not silently kept). Each result carries the user labels it was
-    built with and how they were chosen."""
-    users = user_labels(turns, user_identified)
-    out: list[tuple[Conversation, frozenset[str], str]] = []
+    built with."""
+    users = user_labels(turns)
+    out: list[tuple[Conversation, frozenset[str]]] = []
     for conversation in group_conversations(turns, gap_ms=gap_ms, min_turns=min_turns):
         block = conversation.members[0].block_start_ms
-        user, source = users.get(block, (frozenset(), "none"))
+        label = users.get(block)
+        user = frozenset() if label is None else frozenset({label})
         out += [
-            (piece, user, source)
+            (piece, user)
             for piece in split_on_churn(
                 conversation, user=user, window=churn_window, min_turns=churn_min_turns
             )
@@ -341,12 +321,6 @@ class ConversationPipeline(Pipeline):
             rows = await ConversationQueries(pipe.connection).utterances(
                 job.session_id, _SOURCE_PIPELINE, _MAX_UTTERANCES
             )
-            identified = [
-                label.speaker
-                for label in await pipe.speakers.labels_for_session(job.session_id)
-                if settings.conversation_user_name
-                and label.name == settings.conversation_user_name
-            ]
         if diarize_map is None:
             return {"skipped": "diarize-map vanished"}
         if len(rows) == _MAX_UTTERANCES:
@@ -369,7 +343,6 @@ class ConversationPipeline(Pipeline):
             min_turns=settings.conversation_min_turns,
             churn_window=settings.conversation_churn_window,
             churn_min_turns=settings.conversation_churn_min_turns,
-            user_identified=identified,
         )
         return await self._publish(
             job, conversations=conversations, utterances=len(turns), excluded=excluded
@@ -379,7 +352,7 @@ class ConversationPipeline(Pipeline):
         self,
         job: Job,
         *,
-        conversations: list[tuple[Conversation, frozenset[str], str]],
+        conversations: list[tuple[Conversation, frozenset[str]]],
         utterances: int,
         excluded: list[Exclusion],
     ) -> dict[str, Any]:
@@ -403,16 +376,14 @@ class ConversationPipeline(Pipeline):
                     "gap_before_ms": conversation.gap_before_ms,
                     "gap_after_ms": conversation.gap_after_ms,
                     "user_labels": sorted(user),
-                    "user_source": source,
                 },
             )
-            for conversation, user, source in conversations
+            for conversation, user in conversations
         ]
         map_metadata: dict[str, Any] = {
             "conversations": len(conversations),
             "utterances": utterances,
-            "grouped": sum(c.stats.turns for c, _, _ in conversations),
-            "user_identified": sum(1 for _, _, source in conversations if source == "identity"),
+            "grouped": sum(c.stats.turns for c, _ in conversations),
             "excluded": len(excluded_ids),
             "source_map": str(job.artifact_id),
             "params": {
@@ -420,7 +391,6 @@ class ConversationPipeline(Pipeline):
                 "min_turns": settings.conversation_min_turns,
                 "churn_window": settings.conversation_churn_window,
                 "churn_min_turns": settings.conversation_churn_min_turns,
-                "user_name": settings.conversation_user_name,
             },
         }
         async with DatabasePipe() as pipe:

@@ -501,8 +501,7 @@ async def conversations_rebuild(session_id: UUID | None, every: bool, yes: bool)
     """Regroup conversations from the existing diarization — no GPU work.
 
     Deletes the tier's artifacts and job history so discovery re-runs it on
-    each session's current diarize-map. Manual exclusions are lost. Run
-    after clustering settles so the user's labels resolve by identity.
+    each session's current diarize-map. Manual exclusions are lost.
     """
     if (session_id is None) == (not every):
         raise click.UsageError("give a SESSION_ID or --all, not both")

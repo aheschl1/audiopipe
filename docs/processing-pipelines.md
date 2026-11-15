@@ -408,21 +408,17 @@ conversations in three pure stages:
    are 60 s) is stamped `block`. The effective pause tolerance is therefore
    `min(conversation gap, diarize block gap)` — raise both together.
 2. **Speaker-shift split.** Within each run, the user — present in every
-   conversation, so never a participant signal — is set aside: every label
-   in the block that resolves to the cluster named
-   `PROCESSING_CONVERSATION_USER_NAME`, or, when none does (unset, or not
-   yet clustered), the block's dominant label. The artifact records
-   `user_labels` and `user_source` (`identity`/`dominant`). Then and the remaining speaker sets of the trailing and leading
+   conversation, so never a participant signal — is set aside as the
+   block's dominant label (most talk time), recorded as `user_labels`. Then
+   the remaining speaker sets of the trailing and leading
    `PROCESSING_CONVERSATION_CHURN_WINDOW` (4) turns are compared. Where they
    are disjoint and each side holds `PROCESSING_CONVERSATION_CHURN_MIN_TURNS`
    (2) non-user turns, the run splits with `closure: speaker_change`. A
    single interjection never reaches the floor; a user talking alone (a
    phone call) never splits. This is what catches a hop from one person to
    another with little or no silence — the one shape silence cannot see.
-   The tier runs on `diarize-map`, before that session's new labels are
-   clustered, so a fresh session usually gets the dominant-label fallback;
-   `conversations rebuild --all` regroups from identity once clustering has
-   settled (no GPU work).
+   `conversations rebuild --all` regroups every session from its existing
+   diarization (no GPU work).
 3. **Floor.** Runs shorter than `PROCESSING_CONVERSATION_MIN_TURNS` (2) are
    dropped, after the splits, so a short remainder is discarded rather than
    kept. Transcripts are never consulted, so the tier needs no transcribe

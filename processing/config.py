@@ -218,12 +218,9 @@ class ProcessingSettings(BaseSettings):
     # Speaker-shift split: compare the non-user speaker sets of the trailing
     # and leading `churn_window` turns; split where they are disjoint and each
     # side holds at least `churn_min_turns` non-user turns (one interjection
-    # is not a new conversation). The user is every label in the block that
-    # resolves to the speaker cluster named `conversation_user_name`; with no
-    # such label (unset, or not yet clustered) the block's dominant label.
+    # is not a new conversation). The user is the block's dominant label.
     conversation_churn_window: int = 4
     conversation_churn_min_turns: int = 2
-    conversation_user_name: str | None = None
 
     # Speaker clustering tier: batch agglomerative clustering (average
     # linkage, cosine) over per-(block, speaker) embeddings; merging stops at
