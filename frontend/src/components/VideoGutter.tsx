@@ -51,16 +51,12 @@ function place(wrap: HTMLElement, clips: VideoClipEvent[]): Placed[] {
 export default function VideoGutter({
   clips,
   wrapRef,
-  token,
   onOpen,
-  onMediaError,
   onWidth,
 }: {
   clips: VideoClipEvent[]
   wrapRef: RefObject<HTMLDivElement | null>
-  token: string | null
   onOpen: (clip: VideoClipEvent, offsetMs: number) => void
-  onMediaError: () => void
   onWidth: (px: number) => void
 }) {
   const [placed, setPlaced] = useState<Placed[]>([])
@@ -95,9 +91,7 @@ export default function VideoGutter({
         <Filmstrip
           key={p.clip.segment_id}
           placed={p}
-          token={token}
           onOpen={onOpen}
-          onMediaError={onMediaError}
         />
       ))}
     </div>
@@ -106,14 +100,10 @@ export default function VideoGutter({
 
 function Filmstrip({
   placed: { clip, top, height, lane, frameH },
-  token,
   onOpen,
-  onMediaError,
 }: {
   placed: Placed
-  token: string | null
   onOpen: (clip: VideoClipEvent, offsetMs: number) => void
-  onMediaError: () => void
 }) {
   const durationMs = Math.max(0, clip.end_ms - clip.at_ms)
   const frames = clip.frames
@@ -151,8 +141,8 @@ function Filmstrip({
             title={`${fmtClock(Math.max(0, clip.at_ms) + offsetMs)} · play from here`}
             onClick={() => onOpen(clip, offsetMs)}
           >
-            {frame && token && (
-              <img src={artifactUrl(frame.artifact_id, token)} alt="" onError={onMediaError} />
+            {frame && (
+              <img src={artifactUrl(frame.artifact_id)} alt="" />
             )}
           </button>
         )

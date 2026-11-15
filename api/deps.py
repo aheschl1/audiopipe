@@ -8,8 +8,8 @@ already loaded and confirmed to belong to the caller.
 from typing import Annotated, AsyncIterator
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, Path, Query, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends, HTTPException, Path, Request, status
+from fastapi.security import APIKeyCookie, HTTPAuthorizationCredentials, HTTPBearer
 
 from api.schema.common import PageParams, RangeParams
 from database.pipe import DatabasePipe
@@ -19,14 +19,32 @@ from database.schema.sessions import RecordingSession
 from database.schema.speakers import Speaker
 from database.schema.users import User
 
-# auto_error=False: a missing header reaches get_current_user, which raises 401.
+# The web app's sign-in cookie, set by POST /v1/auth/session.
+SESSION_COOKIE = "context_session"
+# Cookie-authenticated writes must carry this header. A cross-site page can
+# make the browser send the cookie, but not a custom header without a CORS
+# preflight, which this API never grants.
+CSRF_HEADER = "X-Requested-With"
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+# auto_error=False: missing credentials reach _authenticate, which raises 401.
 _bearer = HTTPBearer(auto_error=False, description="An API token from `tokens issue`.")
+_cookie = APIKeyCookie(
+    name=SESSION_COOKIE, auto_error=False, description="Web sign-in, set by POST /v1/auth/session."
+)
 
 _UNAUTHENTICATED = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="a valid bearer token is required",
     headers={"WWW-Authenticate": "Bearer"},
 )
+_CSRF = HTTPException(
+    status_code=status.HTTP_403_FORBIDDEN,
+    detail=f"cookie-authenticated writes need the {CSRF_HEADER} header",
+)
+
+_Bearer = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]
+_Cookie = Annotated[str | None, Depends(_cookie)]
 
 
 async def get_pipe() -> AsyncIterator[DatabasePipe]:
@@ -70,14 +88,29 @@ async def authenticate_bearer(token: str | None) -> User | None:
         return await authenticate_token(pipe, token)
 
 
-async def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+async def _authenticate(
+    request: Request, credentials: HTTPAuthorizationCredentials | None, cookie: str | None
 ) -> User:
-    """Resolve the bearer token to its owner, or raise 401."""
-    user = await authenticate_bearer(credentials.credentials if credentials else None)
+    """The caller, from the Authorization header, else the sign-in cookie.
+
+    Never from the URL: tokens in query strings land in logs and history.
+    """
+    secret: str | None = None
+    if credentials is not None:
+        secret = credentials.credentials
+    elif cookie:
+        if request.method not in _SAFE_METHODS and not request.headers.get(CSRF_HEADER):
+            raise _CSRF
+        secret = cookie
+    user = await authenticate_bearer(secret)
     if user is None:
         raise _UNAUTHENTICATED
     return user
+
+
+async def get_current_user(request: Request, credentials: _Bearer, cookie: _Cookie) -> User:
+    """Resolve the bearer token or sign-in cookie to its owner, or raise 401."""
+    return await _authenticate(request, credentials, cookie)
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
@@ -109,34 +142,6 @@ async def get_owned_session(
 OwnedSession = Annotated[RecordingSession, Depends(get_owned_session)]
 
 
-async def get_playable_session(
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
-    session_id: Annotated[UUID, Path(description="A recording session belonging to you.")],
-    token: Annotated[
-        str | None,
-        Query(
-            description="Bearer token as a query parameter, for media elements "
-            "that cannot send an Authorization header. Mint a short-lived one "
-            "via POST /v1/sessions/{session_id}/playback. Ignored when the "
-            "header is present."
-        ),
-    ] = None,
-) -> RecordingSession:
-    """``OwnedSession`` for media routes: `<audio src>` cannot set headers, so
-    the token may arrive as ``?token=``. Any live token works — the query
-    channel widens *transport*, not privilege — but URLs land in logs and
-    history, which is why the playback route mints minutes-lived ones."""
-    user = await authenticate_bearer(
-        credentials.credentials if credentials else token
-    )
-    if user is None:
-        raise _UNAUTHENTICATED
-    return await _load_owned_session(user, session_id)
-
-
-PlayableSession = Annotated[RecordingSession, Depends(get_playable_session)]
-
-
 async def get_owned_segment(
     user: CurrentUser,
     segment_id: Annotated[UUID, Path(description="A segment belonging to you.")],
@@ -158,44 +163,11 @@ async def get_owned_segment(
 OwnedSegment = Annotated[ResourceSegment, Depends(get_owned_segment)]
 
 
-_MediaToken = Annotated[
-    str | None,
-    Query(
-        description="Bearer token as a query parameter, for `<img>`/`<video>` "
-        "elements; mint one via POST /v1/sessions/{session_id}/playback. "
-        "Ignored when the header is present."
-    ),
-]
-
-
-async def _media_user(
-    credentials: HTTPAuthorizationCredentials | None, token: str | None
-) -> User:
-    user = await authenticate_bearer(credentials.credentials if credentials else token)
-    if user is None:
-        raise _UNAUTHENTICATED
-    return user
-
-
-async def get_playable_segment(
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
-    segment_id: Annotated[UUID, Path(description="A segment belonging to you.")],
-    token: _MediaToken = None,
-) -> ResourceSegment:
-    """``OwnedSegment`` that also accepts ``?token=``, as for session media."""
-    return await get_owned_segment(await _media_user(credentials, token), segment_id)
-
-
-PlayableSegment = Annotated[ResourceSegment, Depends(get_playable_segment)]
-
-
-async def get_playable_artifact(
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+async def get_owned_artifact(
+    user: CurrentUser,
     artifact_id: Annotated[UUID, Path(description="An artifact of one of your sessions.")],
-    token: _MediaToken = None,
 ) -> PipelineArtifact:
-    """An artifact of a session the caller owns (header or ``?token=``); else 404."""
-    user = await _media_user(credentials, token)
+    """An artifact of a session the caller owns; else 404."""
     async with DatabasePipe() as pipe:
         artifact = await pipe.artifacts.get(artifact_id)
         session = (
@@ -208,7 +180,7 @@ async def get_playable_artifact(
     return artifact
 
 
-PlayableArtifact = Annotated[PipelineArtifact, Depends(get_playable_artifact)]
+OwnedArtifact = Annotated[PipelineArtifact, Depends(get_owned_artifact)]
 
 
 async def get_owned_speaker(

@@ -90,6 +90,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign the web app in with a cookie
+         * @description Verify the credentials and set an HttpOnly ``context_session`` cookie.
+         *
+         *     The cookie holds a token that expires after ``API_WEB_SESSION_DAYS``. It is
+         *     sent on every same-site request, media elements included; writes made
+         *     with it must also send the ``X-Requested-With`` header.
+         */
+        post: operations["create_web_session_v1_auth_session_post"];
+        /**
+         * Sign the web app out
+         * @description Revoke the cookie's token and clear the cookie. Idempotent.
+         */
+        delete: operations["delete_web_session_v1_auth_session_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me": {
         parameters: {
             query?: never;
@@ -229,32 +257,6 @@ export interface paths {
          * @description Idempotent in effect; re-ending only moves the end timestamp.
          */
         post: operations["end_session_v1_sessions__session_id__end_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/sessions/{session_id}/playback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Mint a short-lived media playback token
-         * @description A token for the media route's ``?token=`` parameter.
-         *
-         *     Media elements (``<audio src>``) cannot send an Authorization header, so
-         *     the session-media route also accepts a token in the URL. This mints one
-         *     whose lifetime is minutes; the player re-mints when it expires. It is a
-         *     real API token, just time-boxed — expired ``playback`` rows are purged
-         *     opportunistically on each mint.
-         */
-        post: operations["create_playback_token_v1_sessions__session_id__playback_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1142,8 +1144,8 @@ export interface paths {
         /**
          * Download an artifact's stored blob
          * @description For artifacts that record their blob's ``content_type`` and ``byte_size``
-         *     in metadata — the visual pipelines' thumbnails and proxies. Accepts
-         *     ``?token=`` like the segment media route, for `<img>`/`<video>`.
+         *     in metadata — the visual pipelines' thumbnails and proxies. Browsers
+         *     authenticate `<img>`/`<video>` with the sign-in cookie.
          */
         get: operations["get_artifact_media_v1_artifacts__artifact_id__media_get"];
         put?: never;
@@ -2279,23 +2281,6 @@ export interface components {
              * @description True when more rows exist past this slice.
              */
             has_more: boolean;
-        };
-        /**
-         * PlaybackTokenRead
-         * @description A minutes-lived token for media-element audio URLs (``?token=``).
-         */
-        PlaybackTokenRead: {
-            /**
-             * Token
-             * @description Short-lived token for the audio route's ?token= parameter.
-             */
-            token: string;
-            /**
-             * Expires At
-             * Format: date-time
-             * @description When the token stops working; mint a new one after.
-             */
-            expires_at: string;
         };
         /**
          * ProjectionClusterRead
@@ -3524,6 +3509,19 @@ export interface components {
             resource: "video";
             attrs: components["schemas"]["VideoAttrs"];
         };
+        /** WebSessionRequest */
+        WebSessionRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /**
+             * Password
+             * Format: password
+             */
+            password: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -3696,6 +3694,93 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_web_session_v1_auth_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_web_session_v1_auth_session_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4052,56 +4137,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionRead"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_playback_token_v1_sessions__session_id__playback_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description A recording session belonging to you. */
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PlaybackTokenRead"];
                 };
             };
             /** @description Unauthorized */
@@ -4641,10 +4676,7 @@ export interface operations {
     };
     get_session_media_v1_sessions__session_id__resources__resource__media_get: {
         parameters: {
-            query?: {
-                /** @description Bearer token as a query parameter, for media elements that cannot send an Authorization header. Mint a short-lived one via POST /v1/sessions/{session_id}/playback. Ignored when the header is present. */
-                token?: string | null;
-            };
+            query?: never;
             header?: never;
             path: {
                 resource: string;
@@ -4827,10 +4859,7 @@ export interface operations {
     };
     get_segment_media_v1_segments__segment_id__media_get: {
         parameters: {
-            query?: {
-                /** @description Bearer token as a query parameter, for `<img>`/`<video>` elements; mint one via POST /v1/sessions/{session_id}/playback. Ignored when the header is present. */
-                token?: string | null;
-            };
+            query?: never;
             header?: never;
             path: {
                 /** @description A segment belonging to you. */
@@ -6363,10 +6392,7 @@ export interface operations {
     };
     get_artifact_media_v1_artifacts__artifact_id__media_get: {
         parameters: {
-            query?: {
-                /** @description Bearer token as a query parameter, for `<img>`/`<video>` elements; mint one via POST /v1/sessions/{session_id}/playback. Ignored when the header is present. */
-                token?: string | null;
-            };
+            query?: never;
             header?: never;
             path: {
                 /** @description An artifact of one of your sessions. */

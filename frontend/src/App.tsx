@@ -9,7 +9,7 @@ import {
   useParams,
   useSearchParams,
 } from "react-router"
-import { clearToken, getToken, setExpiryHandler } from "./api/auth"
+import { dropLegacyToken, setExpiryHandler } from "./api/auth"
 import { api, type MeRead } from "./api/client"
 import AbOverview from "./components/AbOverview"
 import AbVoteView from "./components/AbVoteView"
@@ -81,22 +81,29 @@ function SpeakersPage() {
 }
 
 export default function App() {
-  const [authed, setAuthed] = useState(() => getToken() !== null)
+  // Unknown until /v1/me answers: the cookie is invisible to script.
+  const [authed, setAuthed] = useState<boolean | null>(null)
   const [me, setMe] = useState<MeRead | null>(null)
   const location = useLocation()
   const { openSession, openAb } = useNav()
 
   useEffect(() => {
     setExpiryHandler(() => setAuthed(false))
+    dropLegacyToken()
   }, [])
 
   useEffect(() => {
-    if (!authed) {
+    if (authed === false) {
       setMe(null)
       return
     }
-    void api.GET("/v1/me").then(({ data }) => {
-      if (data) setMe(data)
+    void api.GET("/v1/me").then(({ data, response }) => {
+      if (data) {
+        setMe(data)
+        setAuthed(true)
+      } else if (response.status === 401) {
+        setAuthed(false)
+      }
     })
   }, [authed])
 
@@ -109,6 +116,7 @@ export default function App() {
     return () => window.clearTimeout(timer)
   }, [authed])
 
+  if (authed === null) return null
   if (!authed) return <Gate onAuthed={() => setAuthed(true)} />
 
   const view = new URLSearchParams(location.search).get("view")
@@ -141,8 +149,7 @@ export default function App() {
           <button
             className="btn ghost slim"
             onClick={() => {
-              clearToken()
-              setAuthed(false)
+              void api.DELETE("/v1/auth/session").finally(() => setAuthed(false))
             }}
           >
             log out

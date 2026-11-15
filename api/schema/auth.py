@@ -1,7 +1,5 @@
 """Request and response models for credential login."""
 
-from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr
 
 
@@ -15,18 +13,16 @@ class LoginRequest(BaseModel):
     )
 
 
+class WebSessionRequest(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    email: EmailStr
+    password: SecretStr
+
+
 class TokenIssued(BaseModel):
     """The plaintext exists exactly once, here; the server stores only a hash."""
 
     model_config = ConfigDict(frozen=True)
 
     token: str = Field(description="Bearer token for the Authorization header.")
-
-
-class PlaybackTokenRead(BaseModel):
-    """A minutes-lived token for media-element audio URLs (``?token=``)."""
-
-    model_config = ConfigDict(frozen=True)
-
-    token: str = Field(description="Short-lived token for the audio route's ?token= parameter.")
-    expires_at: datetime = Field(description="When the token stops working; mint a new one after.")

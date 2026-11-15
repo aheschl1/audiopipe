@@ -42,8 +42,6 @@ export default function Timeline({
   follow,
   refreshKey,
   onSpeakersChanged,
-  mediaToken,
-  onMediaError,
   onOpenImage,
 }: {
   sessionId: string
@@ -55,8 +53,6 @@ export default function Timeline({
   follow?: boolean
   refreshKey?: number
   onSpeakersChanged?: () => void
-  mediaToken?: string | null
-  onMediaError?: () => void
   onOpenImage?: (segmentId: string) => void
 }) {
   const [events, setEvents] = useState<TimelineEvent[] | null>(null)
@@ -88,7 +84,6 @@ export default function Timeline({
     (clip: VideoClipEvent, offsetMs: number) => setPlaying({ clip, offsetMs }),
     [],
   )
-  const noop = useCallback(() => {}, [])
   useEffect(() => {
     if (clips.length === 0) setGutterW(0)
   }, [clips.length])
@@ -472,12 +467,11 @@ export default function Timeline({
                   title={`${fmtWallTime(image.captured_at)} · open`}
                   onClick={() => onOpenImage?.(image.segment_id)}
                 >
-                  {mediaToken && imageThumbUrl(image, mediaToken) ? (
+                  {imageThumbUrl(image) ? (
                     <img
-                      src={imageThumbUrl(image, mediaToken)}
+                      src={imageThumbUrl(image)}
                       alt={`image at ${fmtClock(Math.max(0, image.at_ms))}`}
                       loading="lazy"
-                      onError={onMediaError}
                     />
                   ) : (
                     <span className="thumb-placeholder" />
@@ -534,9 +528,7 @@ export default function Timeline({
           <VideoGutter
             clips={clips}
             wrapRef={wrapRef}
-            token={mediaToken ?? null}
             onOpen={openClip}
-            onMediaError={onMediaError ?? noop}
             onWidth={setGutterW}
           />
         )}
@@ -574,14 +566,13 @@ export default function Timeline({
         )}
       </div>
       </div>
-      {playing && mediaToken && (
+      {playing && (
         <VideoLightbox
           clip={playing.clip}
-          src={clipUrl(playing.clip, mediaToken)}
+          src={clipUrl(playing.clip)}
           offsetMs={playing.offsetMs}
           onClose={() => setPlaying(null)}
           onSeek={onSeek}
-          onMediaError={onMediaError ?? noop}
         />
       )}
     </>

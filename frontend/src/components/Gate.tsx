@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from "react"
-import { setToken } from "../api/auth"
 import { api } from "../api/client"
 
 // Full-screen login card; the app renders nothing else until authed.
@@ -14,12 +13,9 @@ export default function Gate({ onAuthed }: { onAuthed: () => void }) {
     event.preventDefault()
     setBusy(true)
     setError(null)
-    const { data, error: err } = await api.POST("/v1/auth/login", {
-      body: { email, password, name: "web" },
-    })
+    const { data, error: err } = await api.POST("/v1/auth/session", { body: { email, password } })
     setBusy(false)
     if (data) {
-      setToken(data.token)
       onAuthed()
     } else {
       setError(typeof err?.detail === "string" ? err.detail : "login failed")

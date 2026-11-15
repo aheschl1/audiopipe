@@ -1,13 +1,10 @@
 // One app-wide clip player: search results and speaker transcripts play a
 // [startMs, endMs) slice of a session's audio in place, without navigating.
-// A single hidden <audio> element is reused; the playback token (a real
-// user token, minutes-lived) is cached across clips and re-minted near
-// expiry. Seeking into the stitched WAV rides the browser's native Range
+// A single hidden <audio> element is reused, authenticated by the sign-in
+// cookie. Seeking into the stitched WAV rides the browser's native Range
 // requests, so only the played slice crosses the wire.
 
 import { useSyncExternalStore } from "react"
-import { api } from "./api/client"
-
 export type Clip = {
   key: string
   sessionId: string
@@ -27,22 +24,11 @@ let state: ClipPlayerState = IDLE
 let audio: HTMLAudioElement | null = null
 let current: Clip | null = null
 let loadedSrc = ""
-let token: { value: string; expiresAt: number } | null = null
 const listeners = new Set<() => void>()
 
 function emit(next: ClipPlayerState): void {
   state = next
   listeners.forEach((listener) => listener())
-}
-
-async function mintToken(sessionId: string): Promise<string | null> {
-  if (token && token.expiresAt - Date.now() > 60_000) return token.value
-  const { data } = await api.POST("/v1/sessions/{session_id}/playback", {
-    params: { path: { session_id: sessionId } },
-  })
-  if (!data) return null
-  token = { value: data.token, expiresAt: new Date(data.expires_at).getTime() }
-  return data.token
 }
 
 function ensureAudio(): HTMLAudioElement {
@@ -60,8 +46,6 @@ function ensureAudio(): HTMLAudioElement {
   })
   audio.addEventListener("ended", stopClip)
   audio.addEventListener("error", () => {
-    // Most likely an expired token mid-clip; drop it so the next play re-mints.
-    token = null
     loadedSrc = ""
     stopClip()
   })
@@ -84,14 +68,7 @@ export async function toggleClip(clip: Clip): Promise<void> {
   current = clip
   emit({ key: clip.key, status: "loading", progressMs: 0 })
 
-  const value = await mintToken(clip.sessionId)
-  if (current?.key !== clip.key) return
-  if (!value) {
-    stopClip()
-    return
-  }
-
-  const src = `/v1/sessions/${clip.sessionId}/resources/audio/media?token=${encodeURIComponent(value)}`
+  const src = `/v1/sessions/${clip.sessionId}/resources/audio/media`
   if (loadedSrc !== src) {
     element.src = src
     loadedSrc = src

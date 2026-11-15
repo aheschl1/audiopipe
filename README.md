@@ -146,9 +146,13 @@ hand-written**: `make gen-client` regenerates `frontend/openapi.json` (a pure
 function of the route/model declarations — no server needed) and
 `frontend/src/api/schema.d.ts` via openapi-typescript; requests go through a
 typed openapi-fetch client. Regenerate after any API change — `npm run build`
-(tsc) fails on drift. Audio playback uses a minutes-lived token minted by
-`POST /v1/sessions/{id}/playback` in the audio URL's `?token=`, because media
-elements cannot send an Authorization header.
+(tsc) fails on drift. The web app signs in with `POST /v1/auth/session`, which
+sets an HttpOnly `context_session` cookie (30 days, `API_WEB_SESSION_DAYS`).
+Media elements send it, so `<img>`, `<audio>` and `<video>` use plain URLs;
+cookie-authenticated writes must also send `X-Requested-With` (CSRF). The
+cookie is `Secure`: browsers accept that on `http://localhost`, but plain-HTTP
+access by LAN address needs `API_COOKIE_SECURE=false`. Devices and scripts keep
+using bearer tokens.
 
 Pages are URLs (react-router; nginx and Vite fall back to `index.html`), so a
 reload or a shared link lands on the same screen: `/sessions`, `/sessions/<id>?t=<ms>`,

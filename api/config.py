@@ -57,6 +57,12 @@ class ApiSettings(BaseSettings):
     # session can be swept out from under it. Chunk heartbeats are throttled to
     # roughly one write a minute (sessions.touch_if_stale), so keep this well
     # above that interval too.
+    # Web sign-in: an HttpOnly cookie holding a token that lives this long.
+    # Keep cookie_secure on behind TLS; turn it off only for plain-HTTP LAN dev
+    # (browsers already treat http://localhost as secure).
+    web_session_days: int = 30
+    cookie_secure: bool = True
+
     session_stale_seconds: float = 300.0
     session_sweep_interval_seconds: float = 60.0
 

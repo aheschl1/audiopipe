@@ -10,14 +10,12 @@ export default function VideoLightbox({
   offsetMs,
   onClose,
   onSeek,
-  onMediaError,
 }: {
   clip: VideoClipEvent
   src: string
   offsetMs: number
   onClose: () => void
   onSeek: (ms: number) => void
-  onMediaError: () => void
 }) {
   const ref = useRef<HTMLVideoElement | null>(null)
 
@@ -42,7 +40,6 @@ export default function VideoLightbox({
           onLoadedMetadata={(e) => {
             e.currentTarget.currentTime = offsetMs / 1000
           }}
-          onError={onMediaError}
         />
         <div className="lightbox-bar">
           <span className="row-dim">

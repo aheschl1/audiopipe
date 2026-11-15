@@ -10,6 +10,23 @@ from tests.e2e.conftest import Account, make_session, wait_for_job
 from tests.visual_media import jpeg_bytes, mp4_bytes
 
 
+async def _wait_for_jobs(session_id, pipeline: str, count: int, timeout: float = 60.0) -> None:
+    """Until ``count`` jobs of ``pipeline`` succeeded (wait_for_job returns on the first)."""
+    import asyncio
+    import time
+
+    from database.pipe import DatabasePipe
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        async with DatabasePipe() as pipe:
+            jobs = await pipe.jobs.list_for_session(session_id)
+        if sum(j.pipeline == pipeline and j.status == JobStatus.SUCCEEDED for j in jobs) >= count:
+            return
+        await asyncio.sleep(0.1)
+    await wait_for_job(session_id, pipeline, JobStatus.SUCCEEDED, timeout=0)  # raises with the job list
+
+
 async def _upload(client, account, session_id, payload, **form):
     response = await client.post(
         f"/v1/sessions/{session_id}/segments",
@@ -36,8 +53,7 @@ async def test_derivatives_land_on_the_timeline_and_serve(
         duration_ms="3000",
     )
     await wait_for_job(session.id, "video-proxy", JobStatus.SUCCEEDED, timeout=60)
-    for _ in range(2):  # one thumbnail job per segment
-        await wait_for_job(session.id, "thumbnail", JobStatus.SUCCEEDED, timeout=60)
+    await _wait_for_jobs(session.id, "thumbnail", 2)  # one per segment
 
     timeline = await client.get(f"/v1/sessions/{session.id}/timeline", headers=account.headers)
     events = {e["type"]: e for e in timeline.json()["items"]}
@@ -49,20 +65,17 @@ async def test_derivatives_land_on_the_timeline_and_serve(
     assert len(clip["frames"]) == 3
     assert [f["offset_ms"] for f in clip["frames"]] == sorted(f["offset_ms"] for f in clip["frames"])
 
-    token = (
-        await client.post(f"/v1/sessions/{session.id}/playback", headers=account.headers)
-    ).json()["token"]
     thumb = await client.get(
-        f"/v1/artifacts/{events['image']['thumbnail_id']}/media", params={"token": token}
+        f"/v1/artifacts/{events['image']['thumbnail_id']}/media", headers=account.headers
     )
     assert thumb.status_code == 200
     assert thumb.headers["content-type"] == "image/jpeg"
 
     proxy_url = f"/v1/artifacts/{clip['proxy_id']}/media"
-    whole = await client.get(proxy_url, params={"token": token})
+    whole = await client.get(proxy_url, headers=account.headers)
     assert whole.headers["content-type"] == "video/mp4"
     assert whole.content.index(b"moov") < whole.content.index(b"mdat")
-    ranged = await client.get(proxy_url, params={"token": token}, headers={"Range": "bytes=0-99"})
+    ranged = await client.get(proxy_url, headers={**account.headers, "Range": "bytes=0-99"})
     assert ranged.status_code == 206 and len(ranged.content) == 100
 
     assert (await client.get(proxy_url)).status_code == 401
@@ -98,8 +111,7 @@ async def test_keyframes_are_placed_embedded_and_searchable(
         resource="video", captured_at=(start + timedelta(seconds=5)).isoformat(),
         duration_ms="3000",
     )
-    for _ in range(2):
-        await wait_for_job(session.id, "keyframe", JobStatus.SUCCEEDED, timeout=60)
+    await _wait_for_jobs(session.id, "keyframe", 2)
 
     from database.pipe import DatabasePipe
 
@@ -122,11 +134,8 @@ async def test_keyframes_are_placed_embedded_and_searchable(
     assert {hit["segment_id"] for hit in body["items"]} == {image["id"], video["id"]}
     assert all(abs(hit["distance"]) < 1e-6 for hit in body["items"])
 
-    token = (
-        await client.post(f"/v1/sessions/{session.id}/playback", headers=account.headers)
-    ).json()["token"]
     jpeg = await client.get(
-        f"/v1/artifacts/{body['items'][0]['artifact_id']}/media", params={"token": token}
+        f"/v1/artifacts/{body['items'][0]['artifact_id']}/media", headers=account.headers
     )
     assert jpeg.headers["content-type"] == "image/jpeg"
 

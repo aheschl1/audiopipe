@@ -4,7 +4,7 @@
 
 import createClient, { type Middleware } from "openapi-fetch"
 import type { components, paths } from "./schema"
-import { expire, getToken } from "./auth"
+import { CSRF_HEADER, CSRF_VALUE, expire } from "./auth"
 
 export type Schemas = components["schemas"]
 export type SessionRead = Schemas["SessionRead"]
@@ -41,13 +41,12 @@ export type AbResultsRead = Schemas["AbResultsRead"]
 
 const auth: Middleware = {
   onRequest({ request }) {
-    const token = getToken()
-    if (token) request.headers.set("Authorization", `Bearer ${token}`)
+    request.headers.set(CSRF_HEADER, CSRF_VALUE)
     return request
   },
   onResponse({ request, response }) {
     // A failed login is not an expired session; only established auth expires.
-    if (response.status === 401 && !request.url.includes("/v1/auth/login")) expire()
+    if (response.status === 401 && !request.url.includes("/v1/auth/")) expire()
     return response
   },
 }

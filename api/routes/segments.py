@@ -5,7 +5,7 @@ import json
 from fastapi import APIRouter, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 
-from api.deps import CurrentUser, OwnedSegment, Paging, Pipe, PlayableSegment
+from api.deps import CurrentUser, OwnedSegment, Paging, Pipe
 from api.blob_media import blob_response
 from api.ranges import etag_matches
 from api.schema.common import Page
@@ -54,7 +54,7 @@ def _etag(segment: ResourceSegment) -> str:
         416: {"description": "The requested range lies outside the object."},
     },
 )
-async def get_segment_media(segment: PlayableSegment, request: Request) -> Response:
+async def get_segment_media(segment: OwnedSegment, request: Request) -> Response:
     """Serve what the segment stores: the blob for blob-backed resources
     (honouring `Range` and conditional requests), the inline payload as JSON
     otherwise.

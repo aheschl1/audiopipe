@@ -466,8 +466,8 @@ Both decode with PyAV (bundled FFmpeg, no system ffmpeg), apply the display
 rotation to the pixels, and write artifacts linked by `links.segment` with
 `metadata.content_type`/`byte_size`. Originals are untouched. The timeline
 attaches them to `image` (`thumbnail_id`) and `video-clip` (`proxy_id`,
-`frames`) events; `/v1/artifacts/{id}/media` serves them, accepting
-`?token=` for `<img>`/`<video>`.
+`frames`) events; `/v1/artifacts/{id}/media` serves them, authenticated
+by the web app's sign-in cookie (or a bearer header).
 
 ### Keyframes
 

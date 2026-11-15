@@ -119,7 +119,6 @@ export default function TimelineStrip({
   onSpeakersChanged,
   mapOpen,
   onMapToggle,
-  mediaToken,
   onOpenImage,
 }: {
   events: TimelineEvent[]
@@ -131,7 +130,6 @@ export default function TimelineStrip({
   onSpeakersChanged: () => void
   mapOpen?: boolean
   onMapToggle?: () => void
-  mediaToken?: string | null
   onOpenImage?: (segmentId: string) => void
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -433,7 +431,7 @@ export default function TimelineStrip({
                         ? fmtClock(at)
                         : `${fmtClock(at)}–${fmtClock(Math.max(0, v.end_ms))}`,
                       text: null,
-                      image: isImage && mediaToken ? imageThumbUrl(v, mediaToken) : undefined,
+                      image: isImage ? imageThumbUrl(v) : undefined,
                     })
                   }
                   onPointerLeave={hideTip}
@@ -451,7 +449,6 @@ export default function TimelineStrip({
     tagBlocks,
     points,
     visuals,
-    mediaToken,
     onOpenImage,
     durationMs,
     viewportW,

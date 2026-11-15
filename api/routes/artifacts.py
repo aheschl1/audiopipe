@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 
 from api.blob_media import blob_response
-from api.deps import PlayableArtifact
+from api.deps import OwnedArtifact
 from api.ranges import etag_matches
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
@@ -22,10 +22,10 @@ router = APIRouter(prefix="/artifacts", tags=["artifacts"])
         416: {"description": "The requested range lies outside the object."},
     },
 )
-async def get_artifact_media(artifact: PlayableArtifact, request: Request) -> Response:
+async def get_artifact_media(artifact: OwnedArtifact, request: Request) -> Response:
     """For artifacts that record their blob's ``content_type`` and ``byte_size``
-    in metadata — the visual pipelines' thumbnails and proxies. Accepts
-    ``?token=`` like the segment media route, for `<img>`/`<video>`."""
+    in metadata — the visual pipelines' thumbnails and proxies. Browsers
+    authenticate `<img>`/`<video>` with the sign-in cookie."""
     content_type = artifact.metadata.get("content_type")
     byte_size = artifact.metadata.get("byte_size")
     if artifact.object_key is None or not content_type or not isinstance(byte_size, int):

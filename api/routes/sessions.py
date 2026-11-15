@@ -7,7 +7,7 @@ uploaded over REST.
 
 import json
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -30,10 +30,9 @@ from api.config import get_settings
 from resources import ResourceValidationError
 from services import segments as segment_service
 from services import stitch
-from api.deps import CurrentUser, OwnedSession, Paging, Pipe, PlayableSession, Range
+from api.deps import CurrentUser, OwnedSession, Paging, Pipe, Range
 from api.ranges import RangeNotSatisfiable, etag_matches, parse_range
 from api.schema.artifacts import ArtifactRead
-from api.schema.auth import PlaybackTokenRead
 from api.schema.common import ErrorResponse, Page
 from api.schema.conversations import ConversationRead
 from api.schema.locations import LocationPointRead
@@ -126,32 +125,6 @@ async def label_session(
 async def end_session(session: OwnedSession, pipe: Pipe) -> SessionRead:
     """Idempotent in effect; re-ending only moves the end timestamp."""
     return SessionRead.from_model(await pipe.sessions.end(session.id))
-
-
-# Minutes, not hours: the token rides in the audio URL's query string, where
-# it lands in server logs and browser history. Short life bounds that leak.
-_PLAYBACK_TTL = timedelta(minutes=15)
-_PLAYBACK_TOKEN_NAME = "playback"
-
-
-@router.post("/{session_id}/playback", summary="Mint a short-lived media playback token")
-async def create_playback_token(session: OwnedSession, pipe: Pipe) -> PlaybackTokenRead:
-    """A token for the media route's ``?token=`` parameter.
-
-    Media elements (``<audio src>``) cannot send an Authorization header, so
-    the session-media route also accepts a token in the URL. This mints one
-    whose lifetime is minutes; the player re-mints when it expires. It is a
-    real API token, just time-boxed — expired ``playback`` rows are purged
-    opportunistically on each mint.
-    """
-    await pipe.tokens.purge_expired_named(session.user_id, _PLAYBACK_TOKEN_NAME)
-    issued = await pipe.tokens.issue(
-        session.user_id, name=_PLAYBACK_TOKEN_NAME, ttl=_PLAYBACK_TTL
-    )
-    assert issued.record.expires_at is not None  # ttl was given
-    return PlaybackTokenRead(
-        token=issued.token.get_secret_value(), expires_at=issued.record.expires_at
-    )
 
 
 @router.get("/{session_id}/segments", summary="List a session's segments")
@@ -498,7 +471,7 @@ async def _stream_stitched(
     },
 )
 async def get_session_media(
-    session: PlayableSession, resource: str, request: Request
+    session: OwnedSession, resource: str, request: Request
 ) -> Response:
     """The session's whole stream of one resource as a single media object.
 

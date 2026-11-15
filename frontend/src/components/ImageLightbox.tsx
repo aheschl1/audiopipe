@@ -7,19 +7,15 @@ import { fmtWallTime, imageFullUrl } from "../visual"
 export default function ImageLightbox({
   images,
   index,
-  token,
   onIndex,
   onClose,
   onSeek,
-  onMediaError,
 }: {
   images: ImageEvent[]
   index: number
-  token: string
   onIndex: (index: number) => void
   onClose: () => void
   onSeek: (ms: number) => void
-  onMediaError: () => void
 }) {
   const image = images[index]
 
@@ -41,9 +37,8 @@ export default function ImageLightbox({
       <div className="lightbox-frame" onClick={(e) => e.stopPropagation()}>
         <img
           className="lightbox-img"
-          src={imageFullUrl(image, token)}
+          src={imageFullUrl(image)}
           alt={`image at ${fmtClock(at)}`}
-          onError={onMediaError}
         />
         <div className="lightbox-bar">
           <button

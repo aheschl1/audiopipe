@@ -152,3 +152,58 @@ async def test_use_stamps_last_used_at(client: httpx.AsyncClient, account: Accou
             break
         assert time.monotonic() < deadline, "last_used_at was never stamped"
         await asyncio.sleep(0.05)
+
+
+async def _web_session(client: httpx.AsyncClient, account: Account) -> str:
+    response = await client.post(
+        "/v1/auth/session", json={"email": account.user.email, "password": "s3cret"}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["email"] == account.user.email
+    set_cookie = response.headers["set-cookie"]
+    for flag in ("HttpOnly", "Secure", "SameSite=lax", "Path=/"):
+        assert flag.lower() in set_cookie.lower()
+    client.cookies.clear()  # the jar won't replay a Secure cookie over http; send it by hand
+    return set_cookie.split(";", 1)[0]
+
+
+async def test_cookie_signs_the_web_app_in_and_out(
+    client: httpx.AsyncClient, account: Account
+) -> None:
+    cookie = await _web_session(client, account)
+    headers = {"Cookie": cookie}
+    assert (await client.get("/v1/me", headers=headers)).status_code == 200
+
+    # Writes need the CSRF header on top of the cookie.
+    refused = await client.post("/v1/sessions", json={}, headers=headers)
+    assert refused.status_code == 403
+    created = await client.post(
+        "/v1/sessions", json={}, headers={**headers, "X-Requested-With": "context"}
+    )
+    assert created.status_code == 201, created.text
+
+    assert (await client.delete("/v1/auth/session", headers=headers)).status_code == 403
+    out = await client.delete(
+        "/v1/auth/session", headers={**headers, "X-Requested-With": "context"}
+    )
+    assert out.status_code == 204
+    assert "max-age=0" in out.headers["set-cookie"].lower()
+    assert (await client.get("/v1/me", headers=headers)).status_code == 401
+
+
+async def test_cookie_sign_in_rejects_a_wrong_password(
+    client: httpx.AsyncClient, account: Account
+) -> None:
+    response = await client.post(
+        "/v1/auth/session", json={"email": account.user.email, "password": "nope"}
+    )
+    assert response.status_code == 401
+    assert "set-cookie" not in response.headers
+
+
+async def test_the_header_wins_over_a_foreign_cookie(
+    client: httpx.AsyncClient, account: Account, other_account: Account
+) -> None:
+    theirs = await _web_session(client, other_account)
+    response = await client.get("/v1/me", headers={**account.headers, "Cookie": theirs})
+    assert response.json()["user"]["id"] == str(account.user.id)

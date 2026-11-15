@@ -3,7 +3,6 @@ import { api, type SessionRead } from "../api/client"
 import { stopClip } from "../clipPlayer"
 import { fmtDate, fmtDuration, shortId } from "../format"
 import { usePlayhead } from "../hooks/usePlayhead"
-import { useMediaToken } from "../hooks/useMediaToken"
 import { useSessionEvents } from "../hooks/useSessionEvents"
 import { imageEvents } from "../visual"
 import AudioPlayer from "./AudioPlayer"
@@ -46,7 +45,6 @@ export default function SessionView({
   const [refreshKey, setRefreshKey] = useState(0)
 
   const { events, truncated } = useSessionEvents(sessionId, refreshKey)
-  const media = useMediaToken(sessionId)
   const images = useMemo(() => imageEvents(events ?? []), [events])
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const openImage = useCallback(
@@ -250,7 +248,6 @@ export default function SessionView({
           onSpeakersChanged={onSpeakersChanged}
           mapOpen={showMap}
           onMapToggle={() => setShowMap((v) => !v)}
-          mediaToken={media.token}
           onOpenImage={openImage}
         />
       )}
@@ -266,8 +263,8 @@ export default function SessionView({
             />
           )}
           <TagSummary sessionId={sessionId} />
-          {media.token && images.length > 0 && (
-            <SessionPhotos images={images} token={media.token} onOpen={setLightboxIndex} />
+          {images.length > 0 && (
+            <SessionPhotos images={images} onOpen={setLightboxIndex} />
           )}
         </aside>
         <div className="session-main">
@@ -279,21 +276,17 @@ export default function SessionView({
             follow={follow && head.playing}
             refreshKey={refreshKey}
             onSpeakersChanged={onSpeakersChanged}
-            mediaToken={media.token}
-            onMediaError={media.refresh}
             onOpenImage={openImage}
           />
         </div>
       </div>
-      {lightboxIndex !== null && media.token && (
+      {lightboxIndex !== null && (
         <ImageLightbox
           images={images}
           index={lightboxIndex}
-          token={media.token}
           onIndex={setLightboxIndex}
           onClose={() => setLightboxIndex(null)}
           onSeek={seekTo}
-          onMediaError={media.refresh}
         />
       )}
     </div>

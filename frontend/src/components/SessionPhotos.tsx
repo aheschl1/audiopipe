@@ -5,11 +5,9 @@ import { imageThumbUrl } from "../visual"
 /** Every photo in the session as a contact sheet; opens the lightbox at that photo. */
 export default function SessionPhotos({
   images,
-  token,
   onOpen,
 }: {
   images: ImageEvent[]
-  token: string
   onOpen: (index: number) => void
 }) {
   return (
@@ -25,8 +23,8 @@ export default function SessionPhotos({
             title={`photo at ${fmtClock(Math.max(0, image.at_ms))}`}
             onClick={() => onOpen(index)}
           >
-            {imageThumbUrl(image, token) ? (
-              <img src={imageThumbUrl(image, token)} alt="" loading="lazy" />
+            {imageThumbUrl(image) ? (
+              <img src={imageThumbUrl(image)} alt="" loading="lazy" />
             ) : (
               <span className="thumb-placeholder" />
             )}

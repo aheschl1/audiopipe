@@ -14,31 +14,32 @@ export function imageEvents(events: TimelineEvent[]): ImageEvent[] {
   return events.filter((e): e is ImageEvent => e.type === "image")
 }
 
-export function mediaUrl(segmentId: string, token: string): string {
-  return `/v1/segments/${segmentId}/media?token=${encodeURIComponent(token)}`
+// Plain URLs: the sign-in cookie authenticates media elements.
+export function mediaUrl(segmentId: string): string {
+  return `/v1/segments/${segmentId}/media`
 }
 
-export function artifactUrl(artifactId: string, token: string): string {
-  return `/v1/artifacts/${artifactId}/media?token=${encodeURIComponent(token)}`
+export function artifactUrl(artifactId: string): string {
+  return `/v1/artifacts/${artifactId}/media`
 }
 
 /** The small upright JPEG when the thumbnail pipeline has run, else the original;
  * nothing for a HEIC original, which browsers can't show. */
-export function imageThumbUrl(image: ImageEvent, token: string): string | undefined {
-  if (image.thumbnail_id) return artifactUrl(image.thumbnail_id, token)
-  return image.content_type === "image/heic" ? undefined : mediaUrl(image.segment_id, token)
+export function imageThumbUrl(image: ImageEvent): string | undefined {
+  if (image.thumbnail_id) return artifactUrl(image.thumbnail_id)
+  return image.content_type === "image/heic" ? undefined : mediaUrl(image.segment_id)
 }
 
 /** Browsers can't show HEIC; fall back to the thumbnail for those. */
-export function imageFullUrl(image: ImageEvent, token: string): string {
+export function imageFullUrl(image: ImageEvent): string {
   return image.content_type === "image/heic" && image.thumbnail_id
-    ? artifactUrl(image.thumbnail_id, token)
-    : mediaUrl(image.segment_id, token)
+    ? artifactUrl(image.thumbnail_id)
+    : mediaUrl(image.segment_id)
 }
 
 /** The H.264 proxy when ready; the original (maybe undecodable) until then. */
-export function clipUrl(clip: VideoClipEvent, token: string): string {
-  return clip.proxy_id ? artifactUrl(clip.proxy_id, token) : mediaUrl(clip.segment_id, token)
+export function clipUrl(clip: VideoClipEvent): string {
+  return clip.proxy_id ? artifactUrl(clip.proxy_id) : mediaUrl(clip.segment_id)
 }
 
 export function fmtWallTime(iso: string): string {
