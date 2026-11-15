@@ -9,8 +9,9 @@ import {
   type SpeakerTranscriptRead,
 } from "../api/client"
 import { fmtClock, fmtDate, shortId } from "../format"
-import { hue, initials, speakerLabel } from "../speakers"
+import { categoryColor, categoryTint, initials, speakerLabel } from "../speakers"
 import ClipButton, { ClipProgress } from "./ClipButton"
+import PageHead from "./PageHead"
 
 // Centroids of one voice spread up to ~0.6; different voices sit near ~0.9.
 // At or past this, the confirm step warns that the merge looks cross-voice.
@@ -27,7 +28,7 @@ function Avatar({ id, name, small }: { id: string; name?: string | null; small?:
   return (
     <span
       className={`avatar ${small ? "small" : ""}`}
-      style={{ background: `hsl(${hue(id)} 45% 28%)` }}
+      style={{ background: categoryTint(id, 14), color: categoryColor(id) }}
     >
       {initials(name, id)}
     </span>
@@ -583,19 +584,21 @@ export default function SpeakersView({
 
   return (
     <div className="speakers-view">
-      <div className="speakers-toolbar">
-        <span className="row-dim">
-          {speakers === null
+      <PageHead
+        title="Speakers"
+        meta={
+          speakers === null
             ? "loading…"
-            : `${speakers.length} cluster${speakers.length === 1 ? "" : "s"}`}
-        </span>
+            : `${speakers.length} voice${speakers.length === 1 ? "" : "s"}, named first`
+        }
+      >
         <button
           className={`btn ghost slim ${panelOpen ? "filtered" : ""}`}
           onClick={() => setPanelOpen((o) => !o)}
         >
           clustering settings ▾
         </button>
-      </div>
+      </PageHead>
       {panelOpen && params && (
         <ClusterPanel
           params={params}

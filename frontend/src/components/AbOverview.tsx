@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import { api, type AbResultsRead, type SessionRead } from "../api/client"
 import { fmtDate, fmtDuration, shortId } from "../format"
 import { usePoll } from "../hooks/usePoll"
+import PageHead from "./PageHead"
 
 const POLL_MS = 10_000
 const ACTIVE_POLL_MS = 2_500
@@ -96,6 +97,7 @@ export default function AbOverview({ onVote }: { onVote: (sessionId: string) => 
 
   return (
     <div className="ab-overview">
+      <PageHead title="A/B transcripts" meta="Vote on competing transcriptions to pick the best model." />
       <div className="ab-tally">
         <div className="row-title">model × strategy wins</div>
         {results === null ? (

@@ -3,6 +3,7 @@ import { api, type AudioSearchRead, type Schemas } from "../api/client"
 import { fmtClock, shortId } from "../format"
 import ClipButton, { ClipProgress } from "./ClipButton"
 import { useSearchParam } from "../useParam"
+import PageHead from "./PageHead"
 
 type TagSearchRead = Schemas["TagSearchRead"]
 type TagLabelRead = Schemas["TagLabelRead"]
@@ -152,6 +153,7 @@ export default function SearchView({
 
   return (
     <div className="search-view">
+      <PageHead title="Search" meta="Find a moment by what was said or what it sounded like." />
       <div className="mode-toggle">
         {(
           [

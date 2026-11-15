@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { api, type SpeakerRead } from "../api/client"
 import { shortId } from "../format"
-import { hue, localLabelTail } from "../speakers"
+import { categoryColor, localLabelTail } from "../speakers"
 
 // A voice, wearable anywhere: colour dot + best-known name. Clicking opens
 // the labeling popover — rename the cluster in place, or declare "this is …"
@@ -61,7 +61,7 @@ export default function SpeakerChip({
       >
         <span
           className="speaker-dot"
-          style={{ background: `hsl(${hue(colorKey)} 62% 58%)` }}
+          style={{ background: categoryColor(colorKey) }}
         />
         {text}
       </button>
@@ -299,7 +299,7 @@ function LabelPop({
             >
               <span
                 className="speaker-dot"
-                style={{ background: `hsl(${hue(candidate.id)} 62% 58%)` }}
+                style={{ background: categoryColor(candidate.id) }}
               />
               <span className="merge-candidate-main">
                 <span>{candidate.name}</span>

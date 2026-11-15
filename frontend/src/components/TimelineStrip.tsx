@@ -15,7 +15,7 @@ import type {
 import { fmtClock } from "../format"
 import { usePlayhead } from "../hooks/usePlayhead"
 import { describePoint, locationPoints } from "../location"
-import { hue, localLabelTail } from "../speakers"
+import { categoryColor, categoryTint, localLabelTail } from "../speakers"
 import {
   SOUND_LANES_SHOWN,
   buildSoundLanes,
@@ -23,6 +23,7 @@ import {
   soundAlpha,
   soundBorderAlpha,
 } from "../sounds"
+import { imageThumbUrl, visualEvents } from "../visual"
 import SpeakerChip from "./SpeakerChip"
 
 // The visual session timeline: one lane per voice, utterance blocks placed at
@@ -59,6 +60,7 @@ type Tooltip = {
   title: string
   time: string
   text: string | null
+  image?: string
 }
 
 function buildLanes(events: TimelineEvent[]): Lane[] {
@@ -117,6 +119,8 @@ export default function TimelineStrip({
   onSpeakersChanged,
   mapOpen,
   onMapToggle,
+  mediaToken,
+  onOpenImage,
 }: {
   events: TimelineEvent[]
   truncated: boolean
@@ -127,6 +131,8 @@ export default function TimelineStrip({
   onSpeakersChanged: () => void
   mapOpen?: boolean
   onMapToggle?: () => void
+  mediaToken?: string | null
+  onOpenImage?: (segmentId: string) => void
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const [zoom, setZoom] = useState(1)
@@ -153,6 +159,7 @@ export default function TimelineStrip({
   )
   const soundLanes = useMemo(() => buildSoundLanes(events), [events])
   const points = useMemo(() => locationPoints(events), [events])
+  const visuals = useMemo(() => visualEvents(events), [events])
   const visibleSoundLanes = useMemo(
     () => (showAllSounds ? soundLanes : soundLanes.slice(0, SOUND_LANES_SHOWN)),
     [soundLanes, showAllSounds],
@@ -269,7 +276,7 @@ export default function TimelineStrip({
           ))}
         </div>
         {lanes.map((lane) => {
-          const color = hue(lane.clusterId ?? lane.localLabel ?? "?")
+          const colorKey = lane.clusterId ?? lane.localLabel ?? "?"
           const laneName =
             lane.name ??
             (lane.localLabel ? localLabelTail(lane.localLabel) : "unknown voice")
@@ -282,8 +289,8 @@ export default function TimelineStrip({
                   style={{
                     left: `${(block.start_ms / durationMs) * 100}%`,
                     width: `${(Math.max(200, block.end_ms - block.start_ms) / durationMs) * 100}%`,
-                    background: `hsl(${color} 55% 55% / 0.55)`,
-                    borderColor: `hsl(${color} 60% 62% / 0.9)`,
+                    background: categoryTint(colorKey, 28),
+                    borderColor: categoryColor(colorKey),
                   }}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -291,7 +298,7 @@ export default function TimelineStrip({
                   }}
                   onPointerMove={(e) =>
                     showBlockTip(e, {
-                      color: `hsl(${color} 62% 58%)`,
+                      color: categoryColor(colorKey),
                       title: laneName,
                       time: `${fmtClock(block.start_ms)}–${fmtClock(block.end_ms)}`,
                       text: block.text,
@@ -304,7 +311,7 @@ export default function TimelineStrip({
           )
         })}
         {visibleSoundLanes.map((lane, i) => {
-          const color = hue(lane.label)
+          const colorKey = lane.label
           const last = i === visibleSoundLanes.length - 1
           return (
             <div
@@ -323,8 +330,8 @@ export default function TimelineStrip({
                     width: `${
                       (Math.max(200, span.end_ms - span.start_ms) / durationMs) * 100
                     }%`,
-                    background: `hsl(${color} 55% 55% / ${soundAlpha(span)})`,
-                    borderColor: `hsl(${color} 60% 62% / ${soundBorderAlpha(span)})`,
+                    background: categoryTint(colorKey, soundAlpha(span) * 60),
+                    borderColor: categoryTint(colorKey, soundBorderAlpha(span) * 100),
                   }}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -332,7 +339,7 @@ export default function TimelineStrip({
                   }}
                   onPointerMove={(e) =>
                     showBlockTip(e, {
-                      color: `hsl(${color} 62% 58%)`,
+                      color: categoryColor(colorKey),
                       title: lane.label,
                       time: `${fmtClock(span.start_ms)}–${fmtClock(span.end_ms)}`,
                       text: describeSpan(span),
@@ -398,6 +405,43 @@ export default function TimelineStrip({
             ))}
           </div>
         )}
+        {visuals.length > 0 && (
+          <div className="strip-lane visual" style={{ height: LANE_H }}>
+            {visuals.map((v) => {
+              const at = Math.max(0, v.at_ms)
+              const isImage = v.type === "image"
+              return (
+                <div
+                  key={v.segment_id}
+                  className={`strip-block ${isImage ? "image" : "video"}`}
+                  style={{
+                    left: `${(at / durationMs) * 100}%`,
+                    width: isImage
+                      ? 3
+                      : `${(Math.max(200, v.end_ms - v.at_ms) / durationMs) * 100}%`,
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (isImage && onOpenImage) onOpenImage(v.segment_id)
+                    else onSeek(at, true)
+                  }}
+                  onPointerMove={(e) =>
+                    showBlockTip(e, {
+                      color: null,
+                      title: isImage ? "image" : "video",
+                      time: isImage
+                        ? fmtClock(at)
+                        : `${fmtClock(at)}–${fmtClock(Math.max(0, v.end_ms))}`,
+                      text: null,
+                      image: isImage && mediaToken ? imageThumbUrl(v, mediaToken) : undefined,
+                    })
+                  }
+                  onPointerLeave={hideTip}
+                />
+              )
+            })}
+          </div>
+        )}
       </>
     )
   }, [
@@ -406,6 +450,9 @@ export default function TimelineStrip({
     showTagLane,
     tagBlocks,
     points,
+    visuals,
+    mediaToken,
+    onOpenImage,
     durationMs,
     viewportW,
     zoom,
@@ -419,7 +466,8 @@ export default function TimelineStrip({
     (lanes.length === 0 &&
       soundLanes.length === 0 &&
       tagBlocks.length === 0 &&
-      points.length === 0)
+      points.length === 0 &&
+      visuals.length === 0)
   )
     return null
 
@@ -429,7 +477,8 @@ export default function TimelineStrip({
       (lanes.length +
         visibleSoundLanes.length +
         (showTagLane ? 1 : 0) +
-        (points.length > 0 ? 1 : 0))
+        (points.length > 0 ? 1 : 0) +
+        (visuals.length > 0 ? 1 : 0))
 
   return (
     <div className="strip">
@@ -523,7 +572,7 @@ export default function TimelineStrip({
               >
                 <span
                   className="speaker-dot"
-                  style={{ background: `hsl(${hue(lane.label)} 62% 58%)` }}
+                  style={{ background: categoryColor(lane.label) }}
                 />
                 {lane.label}
               </span>
@@ -538,10 +587,19 @@ export default function TimelineStrip({
           {points.length > 0 && (
             <div className="strip-head" style={{ height: LANE_H }}>
               <span className="strip-head-sound" title={`${points.length} location points`}>
-                <span className="speaker-dot" style={{ background: "hsl(200 62% 58%)" }} />
+                <span className="speaker-dot" style={{ background: "var(--data-location)" }} />
                 location
               </span>
               <span className="strip-talk">{points.length}</span>
+            </div>
+          )}
+          {visuals.length > 0 && (
+            <div className="strip-head" style={{ height: LANE_H }}>
+              <span className="strip-head-sound" title={`${visuals.length} images and clips`}>
+                <span className="speaker-dot" style={{ background: "var(--data-media)" }} />
+                visual
+              </span>
+              <span className="strip-talk">{visuals.length}</span>
             </div>
           )}
         </div>
@@ -601,6 +659,7 @@ export default function TimelineStrip({
               <span className="row-dim">{tooltip.time}</span>
             </div>
             {tooltip.text && <div className="strip-tip-text">{tooltip.text}</div>}
+            {tooltip.image && <img className="strip-tip-img" src={tooltip.image} alt="" />}
           </div>
         )}
       </div>

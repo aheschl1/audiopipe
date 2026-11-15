@@ -25,12 +25,15 @@ export default function TagSummary({ sessionId }: { sessionId: string }) {
 
   if (tags.length === 0) return null
   return (
-    <div className="chips tag-summary">
-      {tags.map((tag) => (
-        <span key={tag.label} className="chip strong" title={`score ${tag.score.toFixed(2)}`}>
-          {tag.label}
-        </span>
-      ))}
-    </div>
+    <section className="aside-section">
+      <h2 className="section-label">Sounds</h2>
+      <div className="chips tag-summary">
+        {tags.map((tag) => (
+          <span key={tag.label} className="chip strong" title={`score ${tag.score.toFixed(2)}`}>
+            {tag.label}
+          </span>
+        ))}
+      </div>
+    </section>
   )
 }

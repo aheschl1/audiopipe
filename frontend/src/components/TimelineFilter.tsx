@@ -7,6 +7,8 @@ export type EventKind =
   | "sound-span"
   | "audio-tag"
   | "location-point"
+  | "image"
+  | "video-clip"
   | "marker"
 
 export const ALL_KINDS: { key: EventKind; label: string }[] = [
@@ -15,6 +17,8 @@ export const ALL_KINDS: { key: EventKind; label: string }[] = [
   { key: "sound-span", label: "Sound spans" },
   { key: "audio-tag", label: "Sound tags" },
   { key: "location-point", label: "Location" },
+  { key: "image", label: "Images" },
+  { key: "video-clip", label: "Video" },
   { key: "marker", label: "Session markers" },
 ]
 

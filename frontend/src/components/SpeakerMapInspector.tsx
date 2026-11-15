@@ -1,6 +1,6 @@
 import type { ProjectionPointRead } from "../api/client"
 import { fmtClock, fmtDate, shortId } from "../format"
-import { hue, localLabelTail } from "../speakers"
+import { categoryColor, localLabelTail } from "../speakers"
 import ClipButton, { ClipProgress } from "./ClipButton"
 
 // Distances past this read as "probably a different voice" — the same
@@ -16,7 +16,7 @@ export default function SpeakerMapInspector({
   onOpen: (sessionId: string, seekMs?: number) => void
   onClose: () => void
 }) {
-  const tint = hue(point.speaker_id ?? point.speaker)
+  const tint = categoryColor(point.speaker_id ?? point.speaker)
   const clip =
     point.clip_start_ms !== null &&
     point.clip_start_ms !== undefined &&
@@ -33,7 +33,7 @@ export default function SpeakerMapInspector({
   return (
     <aside className="map-inspector">
       <div className="map-inspector-head">
-        <span className="map-swatch" style={{ background: `hsl(${tint} 55% 55%)` }} />
+        <span className="map-swatch" style={{ background: tint }} />
         <strong>{point.name ?? (point.speaker_id ? shortId(point.speaker_id) : "unassigned")}</strong>
         <button className="btn ghost slim" onClick={onClose}>
           ✕

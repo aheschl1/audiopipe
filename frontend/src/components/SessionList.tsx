@@ -1,10 +1,47 @@
 import { useCallback, useState } from "react"
 import { api, type SessionRead } from "../api/client"
-import { fmtDate, fmtDuration, shortId } from "../format"
+import { fmtDuration, shortId } from "../format"
 import { usePoll } from "../hooks/usePoll"
+import PageHead from "./PageHead"
 
 const PAGE = 50
 const POLL_MS = 15_000
+
+function dayKey(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+}
+
+/** "Today", "Yesterday", or a weekday date, for the day headings. */
+function dayLabel(iso: string): string {
+  const d = new Date(iso)
+  const today = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+  if (dayKey(iso) === dayKey(today.toISOString())) return "Today"
+  if (dayKey(iso) === dayKey(yesterday.toISOString())) return "Yesterday"
+  return d.toLocaleDateString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: d.getFullYear() === today.getFullYear() ? undefined : "numeric",
+  })
+}
+
+function timeOfDay(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+}
+
+function groupByDay(sessions: SessionRead[]): { key: string; label: string; items: SessionRead[] }[] {
+  const groups: { key: string; label: string; items: SessionRead[] }[] = []
+  for (const session of sessions) {
+    const key = dayKey(session.started_at)
+    const last = groups[groups.length - 1]
+    if (last?.key === key) last.items.push(session)
+    else groups.push({ key, label: dayLabel(session.started_at), items: [session] })
+  }
+  return groups
+}
 
 export default function SessionList({ onOpen }: { onOpen: (id: string) => void }) {
   const [sessions, setSessions] = useState<SessionRead[] | null>(null)
@@ -46,16 +83,6 @@ export default function SessionList({ onOpen }: { onOpen: (id: string) => void }
     })
   }
 
-  if (!sessions)
-    return (
-      <div className="list">
-        {[64, 64, 64, 64, 64].map((height, i) => (
-          <div key={i} className="skeleton" style={{ height }} />
-        ))}
-      </div>
-    )
-  if (sessions.length === 0) return <div className="empty">No sessions yet.</div>
-
   const splitAll = async () => {
     setSplitting(true)
     await api.POST("/v1/sessions/split", {})
@@ -63,34 +90,68 @@ export default function SessionList({ onOpen }: { onOpen: (id: string) => void }
     void refresh()
   }
 
+  const live = sessions?.filter((s) => s.is_open).length ?? 0
+
   return (
-    <div className="list">
-      {sessions.some((s) => s.is_open) && (
-        <button
-          className="btn ghost full"
-          title="end every live session and start processing; connected recorders reopen"
-          disabled={splitting}
-          onClick={() => void splitAll()}
-        >
-          {splitting ? "splitting…" : "split all live"}
-        </button>
+    <div className="sessions-page">
+      <PageHead
+        title="Sessions"
+        meta={
+          sessions &&
+          `${sessions.length}${hasMore ? "+" : ""} recorded${live ? ` · ${live} live` : ""}`
+        }
+      >
+        {live > 0 && (
+          <button
+            className="btn slim"
+            title="end every live session and start processing; connected recorders reopen"
+            disabled={splitting}
+            onClick={() => void splitAll()}
+          >
+            {splitting ? "splitting…" : "split all live"}
+          </button>
+        )}
+      </PageHead>
+
+      {!sessions ? (
+        <div className="list">
+          {[64, 64, 64, 64, 64].map((height, i) => (
+            <div key={i} className="skeleton" style={{ height }} />
+          ))}
+        </div>
+      ) : sessions.length === 0 ? (
+        <div className="empty">No sessions yet. Recordings from your phone or glasses land here.</div>
+      ) : (
+        groupByDay(sessions).map((group) => (
+          <section key={group.key} className="day-group">
+            <h2 className="day-label">{group.label}</h2>
+            <div className="list">
+              {group.items.map((session) => (
+                <button
+                  key={session.id}
+                  className="row session-row"
+                  onClick={() => onOpen(session.id)}
+                >
+                  <span className="session-time">{timeOfDay(session.started_at)}</span>
+                  <div className="row-main">
+                    <span className="row-title">
+                      {session.label ?? session.device ?? shortId(session.id)}
+                    </span>
+                    <span className="row-sub">
+                      {session.is_open ? "recording" : fmtDuration(session.started_at, session.ended_at)}
+                      {session.label && session.device && ` · ${session.device}`}
+                    </span>
+                  </div>
+                  {session.is_open && <span className="badge live">live</span>}
+                </button>
+              ))}
+            </div>
+          </section>
+        ))
       )}
-      {sessions.map((session) => (
-        <button key={session.id} className="row" onClick={() => onOpen(session.id)}>
-          <div className="row-main">
-            <span className="row-title">
-              {session.label ?? session.device ?? shortId(session.id)}
-            </span>
-            <span className="row-sub">
-              {fmtDate(session.started_at)} · {fmtDuration(session.started_at, session.ended_at)}
-            </span>
-          </div>
-          {session.is_open && <span className="badge live">live</span>}
-        </button>
-      ))}
       {hasMore && (
         <button className="btn ghost full" onClick={loadMore} disabled={loadingMore}>
-          {loadingMore ? "loading…" : "more"}
+          {loadingMore ? "loading…" : "load older sessions"}
         </button>
       )}
     </div>

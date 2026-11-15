@@ -3,8 +3,9 @@ import { api, type SessionTrackRead } from "../api/client"
 import { fmtDate, shortId } from "../format"
 import { fmtCoords, splitAtGaps, TRACK_GAP_MS } from "../location"
 import { createTrackMap, type MapMode, type TrackMapHandle, type TrackPt } from "../map/trackMap"
-import { hue } from "../speakers"
+import { categoryHex } from "../speakers"
 import { useSearchParam } from "../useParam"
+import PageHead from "./PageHead"
 
 const MAX_POINTS = 500
 
@@ -54,7 +55,7 @@ function trackName(track: SessionTrackRead): string {
 }
 
 function trackColor(track: SessionTrackRead): string {
-  return `hsl(${hue(track.session_id)} 60% 55%)`
+  return categoryHex(track.session_id)
 }
 
 // The global travel map: every session's track in a date window, one color
@@ -161,6 +162,7 @@ export default function GeoMap({
 
   return (
     <div className="geo-view">
+      <PageHead title="Places" meta="Where your sessions were recorded." />
       <div className="geo-toolbar">
         <label className="geo-range">
           from

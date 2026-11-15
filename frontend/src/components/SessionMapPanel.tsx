@@ -4,9 +4,8 @@ import { usePlayhead } from "../hooks/usePlayhead"
 import { useSessionTrack, type TrackFix } from "../hooks/useSessionTrack"
 import { positionAtMs, splitAtGaps } from "../location"
 import { createTrackMap, type TrackMapHandle } from "../map/trackMap"
+import { token } from "../styles/tokens"
 
-// Matches the location lane's dot in the strip.
-const TRACK_COLOR = "hsl(200 62% 58%)"
 
 // The session's track, expandable under the strip. Owns its map instance;
 // the playhead marker lives in a child so per-frame ticks never re-render
@@ -60,10 +59,11 @@ export default function SessionMapPanel({
 
   useEffect(() => {
     if (!handle) return
+    const color = token("--data-location")
     handle.setTracks(
       splitAtGaps(points).map((segment, i) => ({
         id: `${sessionId}:${i}`,
-        color: TRACK_COLOR,
+        color,
         points: segment.map((p) => ({ atMs: p.at_ms, lat: p.lat, lon: p.lon })),
       })),
     )

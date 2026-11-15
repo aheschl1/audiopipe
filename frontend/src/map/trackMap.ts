@@ -9,6 +9,7 @@ import type {
   MapMouseEvent,
   Marker,
 } from "maplibre-gl"
+import { token } from "../styles/tokens"
 
 // OpenFreeMap: free vector tiles, no key. Future: self-hosted Protomaps.
 export const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
@@ -28,14 +29,17 @@ const HEAT_RADIUS: [number, number][] = [
   [12, 24],
   [16, 48],
 ]
-const HEAT_RAMP: [number, string][] = [
-  [0, "rgba(124,140,255,0)"],
-  [0.08, "rgba(124,140,255,0.6)"],
-  [0.3, "rgb(150,130,255)"],
-  [0.55, "rgb(220,110,220)"],
-  [0.8, "rgb(255,150,90)"],
-  [1, "rgb(255,245,200)"],
-]
+/** The sequential --seq-* tokens as heat-ramp stops. */
+function heatRamp(): [number, string][] {
+  return [
+    [0, token("--seq-0")],
+    [0.08, token("--seq-1")],
+    [0.3, token("--seq-2")],
+    [0.55, token("--seq-3")],
+    [0.8, token("--seq-4")],
+    [1, token("--seq-5")],
+  ]
+}
 const HEAT_OPACITY = 0.9
 
 export type TrackPt = { atMs: number; lat: number; lon: number }
@@ -132,7 +136,7 @@ export async function createTrackMap(
       "heatmap-weight": ["get", "weight"],
       "heatmap-radius": ["interpolate", ["linear"], ["zoom"], ...HEAT_RADIUS.flat()],
       "heatmap-intensity": HEAT_INTENSITY,
-      "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"], ...HEAT_RAMP.flat()],
+      "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"], ...heatRamp().flat()],
       "heatmap-opacity": HEAT_OPACITY,
     },
   })
@@ -167,7 +171,7 @@ export async function createTrackMap(
       "circle-color": ["get", "color"],
       "circle-radius": 4,
       "circle-stroke-width": 1,
-      "circle-stroke-color": "#0d1117",
+      "circle-stroke-color": token("--surface"),
     },
   })
 

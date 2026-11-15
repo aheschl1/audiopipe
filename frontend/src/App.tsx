@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import {
+  Link,
   Navigate,
-  NavLink,
   Route,
   Routes,
   useLocation,
@@ -23,7 +23,22 @@ import SpeakerMap from "./components/SpeakerMap"
 import SpeakersView from "./components/SpeakersView"
 import { useSearchParam } from "./useParam"
 
-const TABS = ["sessions", "search", "speakers", "map", "ab"] as const
+const NAV = [
+  { to: "/sessions", label: "Sessions", match: (path: string) => path.startsWith("/sessions") },
+  { to: "/search", label: "Search", match: (path: string) => path === "/search" },
+  {
+    to: "/speakers",
+    label: "Speakers",
+    match: (path: string, view: string | null) => path === "/speakers" && view !== "map",
+  },
+  {
+    to: "/speakers?view=map",
+    label: "Voice map",
+    match: (path: string, view: string | null) => path === "/speakers" && view === "map",
+  },
+  { to: "/map", label: "Places", match: (path: string) => path === "/map" },
+  { to: "/ab", label: "A/B", match: (path: string) => path.startsWith("/ab") },
+] as const
 
 function useNav() {
   const navigate = useNavigate()
@@ -61,23 +76,8 @@ function AbVoteRoute() {
 
 function SpeakersPage() {
   const { openSession } = useNav()
-  const [sub, setSub] = useSearchParam("view", "list")
-  return (
-    <>
-      <div className="subtabs">
-        {(["list", "map"] as const).map((option) => (
-          <button
-            key={option}
-            className={`chip as-button ${sub === option ? "strong" : ""}`}
-            onClick={() => setSub(option)}
-          >
-            {option === "list" ? "speakers" : "voice map"}
-          </button>
-        ))}
-      </div>
-      {sub === "map" ? <SpeakerMap onOpen={openSession} /> : <SpeakersView onOpen={openSession} />}
-    </>
-  )
+  const [sub] = useSearchParam("view", "list")
+  return sub === "map" ? <SpeakerMap onOpen={openSession} /> : <SpeakersView onOpen={openSession} />
 }
 
 export default function App() {
@@ -111,27 +111,31 @@ export default function App() {
 
   if (!authed) return <Gate onAuthed={() => setAuthed(true)} />
 
+  const view = new URLSearchParams(location.search).get("view")
   const wide =
     location.pathname === "/map" ||
-    (location.pathname === "/speakers" &&
-      new URLSearchParams(location.search).get("view") === "map")
+    location.pathname.startsWith("/sessions/") ||
+    (location.pathname === "/speakers" && view === "map")
 
   return (
     <div className="app">
-      <header className="topbar">
-        <span className="brand">spyware</span>
-        <nav className="tabs">
-          {TABS.map((tab) => (
-            <NavLink
-              key={tab}
-              to={`/${tab}`}
-              className={({ isActive }) => `tab ${isActive ? "active" : ""}`}
+      <nav className="sidebar" aria-label="main">
+        <Link to="/sessions" className="brand">
+          spyware
+        </Link>
+        <div className="nav-items">
+          {NAV.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={`nav-item ${item.match(location.pathname, view) ? "active" : ""}`}
+              aria-current={item.match(location.pathname, view) ? "page" : undefined}
             >
-              {tab}
-            </NavLink>
+              {item.label}
+            </Link>
           ))}
-        </nav>
-        <div className="topbar-right">
+        </div>
+        <div className="nav-foot">
           {me && <span className="whoami">{me.user.display_name ?? me.user.email}</span>}
           <button
             className="btn ghost slim"
@@ -143,7 +147,7 @@ export default function App() {
             log out
           </button>
         </div>
-      </header>
+      </nav>
 
       <main className={`main ${wide ? "wide" : ""}`}>
         <Routes>
