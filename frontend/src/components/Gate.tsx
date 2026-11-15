@@ -18,7 +18,7 @@ export default function Gate({ onAuthed }: { onAuthed: () => void }) {
     if (data) {
       onAuthed()
     } else {
-      setError(typeof err?.detail === "string" ? err.detail : "login failed")
+      setError(typeof err?.detail === "string" ? err.detail : "Sign-in failed. Check your email and password.")
     }
   }
 
@@ -26,14 +26,13 @@ export default function Gate({ onAuthed }: { onAuthed: () => void }) {
     <div className="gate">
       <form className="gate-card" onSubmit={submit}>
         <h1 className="gate-title">
-          <img className="brand-mark" src="/logo.svg" alt="" />
-          context
+          <img className="brand-lockup" src="/lockup.svg" alt="Context" />
         </h1>
-        <div className="gate-subtitle">what you saw and heard, indexed</div>
+        <div className="gate-subtitle">What you saw and heard, indexed</div>
         <input
           className="input"
           type="email"
-          placeholder="email"
+          placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoFocus
@@ -42,14 +41,14 @@ export default function Gate({ onAuthed }: { onAuthed: () => void }) {
         <input
           className="input"
           type="password"
-          placeholder="password"
+          placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
         />
         {error && <div className="gate-error">{error}</div>}
         <button className="btn primary full" disabled={busy}>
-          {busy ? "signing in…" : "sign in"}
+          {busy ? "Signing in…" : "Sign in"}
         </button>
       </form>
     </div>

@@ -80,16 +80,16 @@ export default function SessionMapPanel({
     <div className="session-map">
       <div ref={containerRef} className="session-map-canvas" />
       {handle && <MapPlayheadMarker handle={handle} points={points} audioEl={audioEl} />}
-      {mapFailed && <div className="session-map-note">couldn't load the map</div>}
-      {loading && <div className="session-map-note">loading track…</div>}
+      {mapFailed && <div className="session-map-note">Couldn't load the map.</div>}
+      {loading && <div className="session-map-note">Loading track…</div>}
       {failed && (
-        <div className="session-map-note">couldn't load the track — try reopening</div>
+        <div className="session-map-note">Couldn't load the track. Try reopening the map.</div>
       )}
       {!loading && !failed && points.length === 0 && (
-        <div className="session-map-note">no location data for this session</div>
+        <div className="session-map-note">No location data for this session.</div>
       )}
       {partial && (
-        <div className="session-map-note">long track — showing the first 5000 fixes</div>
+        <div className="session-map-note">Long track. Showing the first 5,000 points.</div>
       )}
     </div>
   )

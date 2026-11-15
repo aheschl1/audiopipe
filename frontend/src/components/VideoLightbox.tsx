@@ -52,9 +52,9 @@ export default function VideoLightbox({
               onClose()
             }}
           >
-            listen from here
+            Listen from here
           </button>
-          <button className="btn ghost slim" onClick={onClose} title="close (esc)">
+          <button className="btn ghost slim" onClick={onClose} title="Close (Esc)">
             ✕
           </button>
         </div>

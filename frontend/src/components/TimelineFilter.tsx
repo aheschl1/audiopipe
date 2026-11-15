@@ -80,7 +80,7 @@ export default function TimelineFilter({
   return (
     <div className="filter-menu" ref={root}>
       <button className={`btn ghost slim ${hidden.size > 0 ? "filtered" : ""}`} onClick={() => setOpen((o) => !o)}>
-        {hidden.size > 0 ? `showing ${ALL_KINDS.length - hidden.size}/${ALL_KINDS.length}` : "filter"} ▾
+        {hidden.size > 0 ? `Showing ${ALL_KINDS.length - hidden.size}/${ALL_KINDS.length}` : "Filter"} ▾
       </button>
       {open && (
         <div className="filter-pop">

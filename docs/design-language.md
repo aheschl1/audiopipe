@@ -130,10 +130,18 @@ Scale (px): `--fs-2xs 11`, `xs 12`, `sm 13`, `md 14` (app body), `lg 16`, `xl 20
 - **Docked selection:** below 1100px, a selected item docks to the bottom edge (white, `--line-strong` top rule), the same pattern as the player.
 - **Empty and loading states:** centred 13px muted text with one sentence that says what will appear. Skeletons are flat `--sunken` blocks shaped like the rows they replace. Errors use a danger wash banner.
 
+## Writing
+
+- Sentence case everywhere: buttons, labels, placeholders, tooltips, table heads, badges and nav. Capitalise only the first word and proper nouns (*Open in People*).
+- Empty states, errors and notes are full sentences that end with a period. Say what went wrong and what to do next (*Couldn't load the track. Try reopening the map.*).
+- Short fragments composed into a line stay lowercase after the first word (*3 photos · with Sam*, *K1 depicts U3*).
+- No emoji. Keyboard keys are capitalised (*Esc*, *J*, *Ctrl+scroll*).
+- Name things the way people see them, not how the pipeline builds them: *voice* and *person*, not *cluster*; *points*, not *fixes*.
+
 ## UX decisions
 
 ### App shell: left rail, not a top bar
-The rail now has two groups. The primary group (*Moments*, *Search*, *People*, *Places*) is about your life. A faint small-caps label, *Recordings & tools*, introduces the second group (*Recordings*, *Voice map*, *A/B*): raw ingest and model tooling. On the narrow top bar the label becomes a 1px divider. Moments is home (`/`). See `docs/moments-ux.md` for the move away from sessions.
+The rail now has two groups. The primary group (*Moments*, *Search*, *People*, *Places*) is about your life. A faint small-caps label, *Recordings & tools*, introduces the second group (*Recordings*, *Voice map*): raw ingest and model tooling. A/B is off the nav and is a deprecation candidate. Its pages stay reachable from the *A/B* action in a recording's header. On the narrow top bar the label becomes a 1px divider. Moments is home (`/`). See `docs/moments-ux.md` for the move away from sessions.
 
 The app first had six destinations (Sessions, Search, Speakers, Voice map, Places, A/B). Six labels crowd a top bar and leave no room to grow. A 200px left rail lists them vertically and frees the full height for content. Account and logout sit at the bottom of the rail, out of the way. The voice map used to be a sub-tab under Speakers. It now has its own entry, because it is a different task (exploring a corpus, not naming people). Its URL (`/speakers?view=map`) is unchanged. Below 900px the rail becomes a sticky top bar with a sideways-scrolling nav, which works for one-handed thumb scrolling. A command palette was considered and deferred: with six destinations, plain links are faster to learn.
 
@@ -168,15 +176,17 @@ Gets the wide layout and its own nav entry. Projection views and filters sit in 
 The travel map gets the wide layout, with a session legend in a right column that drops below the map on phones. Tracks use the palette colours and density uses the blue sequential ramp. The base map is no longer dimmed, because the light basemap now suits the theme.
 
 ### A/B
-A page head explains the purpose. The wins table uses uppercase column labels and ink share bars. The voting view keeps its sticky toolbar. The focused card gets a red ring and the winning candidate a green wash, so the keyboard flow reads at a glance.
+Not in the nav, and a candidate for removal. A page head explains the purpose. The wins table uses uppercase column labels and ink share bars. The voting view keeps its sticky toolbar. The focused card gets a red ring and the winning candidate a green wash, so the keyboard flow reads at a glance.
 
 ## Logo
 
-The mark is a square of dusty pink (`#F2A7B4`) with red liquid sloshing across its lower half (`frontend/public/logo.svg`). The surface tilts, high on the left and low on the right, so the mark reads as liquid in the middle of moving. It is the one deliberate exception to flatness: the mark carries depth so that the UI around it doesn't have to.
+The mark is a square of pink (`--red-line`, `#F5B8C3`) about half full of red liquid (`--red`). The surface tilts, high on the left and low on the right, with a small rise at the right edge, so the liquid reads as mid-slosh. It is flat like the rest of the system: two solid fills, no gradient, highlight or blur.
 
-- The square has sharp corners and no border. The liquid shades from pale pink (`#F5B8C3`) at the surface to `--red` (`#E4002B`) at the bottom, with a soft white highlight just under the surface line.
-- The wordmark is lower-case **context** in Plex Sans semibold, set beside the mark. The sidebar uses a 24 px mark and the login page a 32 px one. The favicon is the SVG itself.
-- Never recolour the square or the liquid, round the square's corners, or set the mark on a red background.
+- Files in `frontend/public/`: `logo.svg` (the mark), `lockup.svg` (mark and wordmark), `favicon.ico` (16, 32, 48), `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` and `manifest.webmanifest`.
+- The wordmark is **Context** in Plex Sans semibold, kerned, tracked at −0.02em and outlined into `lockup.svg`, so it never depends on the web font. Its size is 0.75 of the mark, with a gap of 0.4 of the mark, and the cap height is centred on the mark.
+- Size the lockup by height only: 24 px in the rail and 32 px on the login page. Below 16 px use the mark alone.
+- Keep clear space of at least half the mark's width on every side.
+- Never recolour the square or the liquid, round the corners, add an outline or effect, set the mark on red, or retype the wordmark as live text.
 
 ## Brand layer (future site)
 
@@ -186,4 +196,4 @@ The public site imports the same `tokens.css` and adds a brand sheet on top of i
 - **Space:** the `--sp-6` to `--sp-8` steps become section rhythm, and the grid is 12 columns up to 1200px.
 - **Imagery:** real product screenshots, framed by a hairline, never floating with a shadow.
 - **Motion:** the same rules. A one-time fade-in for content is acceptable, but no parallax or scroll-jacking.
-- **The mark:** the red dot before the wordmark carries over to the site. The site may enlarge it, but it is never redrawn as a logo with effects.
+- **The mark:** the site uses the same `logo.svg` and `lockup.svg`. It may show the mark larger, but never redraws it or adds effects.

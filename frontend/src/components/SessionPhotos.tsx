@@ -20,7 +20,7 @@ export default function SessionPhotos({
           <button
             key={image.segment_id}
             className="contact"
-            title={`photo at ${fmtClock(Math.max(0, image.at_ms))}`}
+            title={`Photo at ${fmtClock(Math.max(0, image.at_ms))}`}
             onClick={() => onOpen(index)}
           >
             {imageThumbUrl(image) ? (

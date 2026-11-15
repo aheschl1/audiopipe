@@ -225,7 +225,7 @@ export default function Timeline({
           >
             <button
               className="event-time"
-              title="listen from here"
+              title="Listen from here"
               onClick={() => onSeek(event.at_ms)}
             >
               {fmtClock(event.at_ms)}
@@ -234,9 +234,9 @@ export default function Timeline({
               {interjection && (
                 <span
                   className="badge interjection"
-                  title="spoken during another speaker's utterance; their transcript contains these words too"
+                  title="Spoken during another speaker's turn. Their transcript contains these words too."
                 >
-                  interjection
+                  Interjection
                 </span>
               )}
               {(event.speaker || event.speaker_id) && (
@@ -271,7 +271,7 @@ export default function Timeline({
                     }}
                   />
                   <button className="btn primary slim" disabled={editBusy}>
-                    {editBusy ? "saving…" : "save"}
+                    {editBusy ? "Saving…" : "Save"}
                   </button>
                   <button
                     type="button"
@@ -279,7 +279,7 @@ export default function Timeline({
                     disabled={editBusy}
                     onClick={() => setEditingKey(null)}
                   >
-                    cancel
+                    Cancel
                   </button>
                 </form>
               ) : (
@@ -287,7 +287,7 @@ export default function Timeline({
                   <span className="transcript-text">{event.text}</span>
                   <button
                     className="btn ghost slim event-edit"
-                    title="correct this transcript"
+                    title="Correct this transcript"
                     onClick={() => {
                       setEditDraft(event.text)
                       setEditingKey(key)
@@ -311,7 +311,7 @@ export default function Timeline({
           >
             <button
               className="event-time"
-              title="listen from here"
+              title="Listen from here"
               onClick={() => onSeek(event.at_ms)}
             >
               {fmtClock(event.at_ms)}
@@ -337,7 +337,7 @@ export default function Timeline({
           >
             <button
               className="event-time"
-              title="listen from here"
+              title="Listen from here"
               onClick={() => onSeek(event.at_ms)}
             >
               {fmtClock(event.at_ms)}
@@ -364,7 +364,7 @@ export default function Timeline({
           >
             <button
               className="event-time"
-              title="listen from here"
+              title="Listen from here"
               onClick={() => onSeek(event.at_ms)}
             >
               {fmtClock(event.at_ms)}
@@ -397,7 +397,7 @@ export default function Timeline({
           <div key={key} ref={flash ? flashRef : undefined} className={`event tags ${flash ? "flash" : ""}`}>
             <button
               className="event-time"
-              title="listen from here"
+              title="Listen from here"
               onClick={() => onSeek(Math.max(0, first.at_ms))}
             >
               {fmtClock(Math.max(0, first.at_ms))}
@@ -405,7 +405,7 @@ export default function Timeline({
             <div className="event-body">
               <button
                 className="chip as-button"
-                title={expanded ? "collapse" : "show every point"}
+                title={expanded ? "Collapse" : "Show every point"}
                 onClick={() =>
                   setExpandedRuns((prev) => {
                     const next = new Set(prev)
@@ -432,7 +432,7 @@ export default function Timeline({
                     <div key={`${point.segment_id}-${point.at_ms}-${i}`} className="row-dim">
                       <button
                         className="event-time"
-                        title="listen from here"
+                        title="Listen from here"
                         onClick={() => onSeek(Math.max(0, point.at_ms))}
                       >
                         {fmtClock(Math.max(0, point.at_ms))}
@@ -456,7 +456,7 @@ export default function Timeline({
         const at = Math.max(0, run[0]!.at_ms)
         return (
           <div key={key} ref={flash ? flashRef : undefined} className={`event visual ${flash ? "flash" : ""}`}>
-            <button className="event-time" title="listen from here" onClick={() => onSeek(at)}>
+            <button className="event-time" title="Listen from here" onClick={() => onSeek(at)}>
               {fmtClock(at)}
             </button>
             <div className="event-body gallery">
@@ -470,7 +470,7 @@ export default function Timeline({
                   {imageThumbUrl(image) ? (
                     <img
                       src={imageThumbUrl(image)}
-                      alt={`image at ${fmtClock(Math.max(0, image.at_ms))}`}
+                      alt={`Image at ${fmtClock(Math.max(0, image.at_ms))}`}
                       loading="lazy"
                     />
                   ) : (
@@ -489,7 +489,7 @@ export default function Timeline({
         if (hidden.has("marker")) return null
         return (
           <div key={key} className="event marker">
-            session started
+            Session started
           </div>
         )
       case "session-end":
@@ -550,7 +550,7 @@ export default function Timeline({
           <div className="empty">
             {allFilteredOut
               ? "Everything here is hidden by the filter."
-              : "Nothing on the timeline yet — pipelines may still be running."}
+              : "Nothing on the timeline yet. Processing may still be running."}
           </div>
         ) : (
           tagged
@@ -561,7 +561,7 @@ export default function Timeline({
             onClick={() => load(events.length, fromMs)}
             disabled={busy}
           >
-            {busy ? "loading…" : "more"}
+            {busy ? "Loading…" : "More"}
           </button>
         )}
       </div>

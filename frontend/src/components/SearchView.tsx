@@ -117,7 +117,7 @@ export default function SearchView({
       setBusy(false)
       setFrames(data ? data.items : null)
       if (!data)
-        setError(response.status === 502 ? "the visual search service is offline" : "search failed")
+        setError(response.status === 502 ? "Image search is offline. Try again later." : "Search failed. Try again.")
     } else if (mode === "transcripts") {
       const { data } = await api.GET("/v1/search/transcripts", {
         params: { query: { q: query.trim(), limit: 30 } },
@@ -128,7 +128,7 @@ export default function SearchView({
         setFuzzy(data.fuzzy)
       } else {
         setResults(null)
-        setError("search failed")
+        setError("Search failed. Try again.")
       }
     } else if (mode === "describe") {
       const { data, response } = await api.GET("/v1/search/audio", {
@@ -140,8 +140,8 @@ export default function SearchView({
         setResults(null)
         setError(
           response.status === 502
-            ? "the audio search service is offline"
-            : "search failed",
+            ? "Sound search is offline. Try again later."
+            : "Search failed. Try again.",
         )
       }
     } else {
@@ -152,7 +152,7 @@ export default function SearchView({
       if (data) setResults(data.items.map(fromTag))
       else {
         setResults(null)
-        setError("search failed")
+        setError("Search failed. Try again.")
       }
     }
   }
@@ -176,10 +176,10 @@ export default function SearchView({
       <div className="mode-toggle">
         {(
           [
-            ["describe", "describe a sound"],
-            ["classes", "filter by class"],
-            ["transcripts", "transcripts"],
-            ["frames", "what was seen"],
+            ["describe", "Describe a sound"],
+            ["classes", "Filter by class"],
+            ["transcripts", "Transcripts"],
+            ["frames", "What was seen"],
           ] as const
         ).map(([value, title]) => (
           <button
@@ -203,12 +203,12 @@ export default function SearchView({
           className="input"
           placeholder={
             mode === "describe"
-              ? "describe a sound — “keyboard typing”, “a dog barking”, “music”…"
+              ? "Describe a sound: “keyboard typing”, “a dog barking”, “music”…"
               : mode === "classes"
-                ? "class name — “speech” matches “Male speech, man speaking”…"
+                ? "Class name: “speech” matches “Male speech, man speaking”…"
                 : mode === "frames"
-                  ? "describe a scene — “a whiteboard”, “someone holding a tissue”, “a street at night”…"
-                  : 'words that were said — supports "quoted phrases", -exclude, or'
+                  ? "Describe a scene: “a whiteboard”, “someone holding a tissue”, “a street at night”…"
+                  : 'Words that were said. Supports "quoted phrases", -exclude, or'
           }
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -223,14 +223,14 @@ export default function SearchView({
           </datalist>
         )}
         <button className="btn primary" disabled={busy || !q.trim()}>
-          {busy ? "searching…" : "search"}
+          {busy ? "Searching…" : "Search"}
         </button>
       </form>
 
       {mode === "classes" && (
         <div className="filter-extras">
           <label className="score-floor">
-            min score
+            Min score
             <input
               type="range"
               min={0}
@@ -264,7 +264,7 @@ export default function SearchView({
 
       {error && <div className="banner error">{error}</div>}
       {fuzzy && (
-        <div className="fuzzy-note">no exact matches — showing close spellings</div>
+        <div className="fuzzy-note">No exact matches. Showing close spellings.</div>
       )}
       {frames && frames.length === 0 && <div className="empty">No matching photos or video.</div>}
       {frames && frames.length > 0 && <FrameResults hits={frames} onOpen={onOpen} />}
@@ -287,7 +287,7 @@ export default function SearchView({
                 key={hit.artifactId}
                 className="row clickable"
                 onClick={() => onOpen(hit.sessionId, hit.startMs, hit.artifactId)}
-                title="open the moment"
+                title="Open the moment"
               >
                 <ClipButton clip={clip} />
                 {hit.headline === null && hit.segments === null && (
@@ -323,13 +323,13 @@ export default function SearchView({
                 </div>
                 <button
                   className="btn ghost slim row-alt"
-                  title="open the full recording at this point"
+                  title="Open the full recording at this point"
                   onClick={(e) => {
                     e.stopPropagation()
                     onOpenRecording(hit.sessionId, hit.startMs)
                   }}
                 >
-                  recording
+                  Recording
                 </button>
                 <ClipProgress clip={clip} />
               </div>

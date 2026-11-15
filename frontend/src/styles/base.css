@@ -83,18 +83,14 @@ input[type="range"] {
 .brand {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
   padding: var(--sp-1) var(--sp-2);
-  font-weight: var(--fw-semibold);
-  font-size: var(--fs-lg);
-  letter-spacing: -0.01em;
-  color: var(--ink);
-  text-decoration: none;
 }
 
-.brand-mark {
-  width: 24px;
+/* The lockup is drawn at a fixed mark-to-word ratio; size it by height only. */
+.brand-lockup {
+  display: block;
   height: 24px;
+  width: auto;
   flex: none;
 }
 
@@ -801,16 +797,10 @@ button.row:hover,
 }
 
 .gate-title {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
   margin: 0;
-  font-size: var(--fs-xl);
-  letter-spacing: -0.01em;
 }
 
-.gate-title .brand-mark {
-  width: 32px;
+.gate-title .brand-lockup {
   height: 32px;
 }
 

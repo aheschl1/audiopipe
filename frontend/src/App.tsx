@@ -48,8 +48,8 @@ const NAV_TOOLS: NavItem[] = [
     label: "Voice map",
     match: (path, view) => path === "/speakers" && view === "map",
   },
-  { to: "/ab", label: "A/B", match: (path) => path.startsWith("/ab") },
 ]
+// A/B is off the nav (deprecation candidate); /ab stays reachable from a recording's header.
 
 function useNav() {
   const navigate = useNavigate()
@@ -211,10 +211,9 @@ export default function App() {
 
   return (
     <div className="app">
-      <nav className="sidebar" aria-label="main">
+      <nav className="sidebar" aria-label="Main">
         <Link to="/" className="brand">
-          <img className="brand-mark" src="/logo.svg" alt="" />
-          context
+          <img className="brand-lockup" src="/lockup.svg" alt="Context" />
         </Link>
         <div className="nav-items">
           {NAV.map((item) => navLink(item))}
@@ -229,7 +228,7 @@ export default function App() {
               void api.DELETE("/v1/auth/session").finally(() => setAuthed(false))
             }}
           >
-            log out
+            Log out
           </button>
         </div>
       </nav>

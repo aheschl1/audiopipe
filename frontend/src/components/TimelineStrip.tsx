@@ -277,7 +277,7 @@ export default function TimelineStrip({
           const colorKey = lane.clusterId ?? lane.localLabel ?? "?"
           const laneName =
             lane.name ??
-            (lane.localLabel ? localLabelTail(lane.localLabel) : "unknown voice")
+            (lane.localLabel ? localLabelTail(lane.localLabel) : "Unknown voice")
           return (
             <div key={lane.key} className="strip-lane" style={{ height: LANE_H }}>
               {lane.blocks.map((block) => (
@@ -393,7 +393,7 @@ export default function TimelineStrip({
                 onPointerMove={(e) =>
                   showBlockTip(e, {
                     color: null,
-                    title: "location",
+                    title: "Location",
                     time: fmtClock(Math.max(0, point.at_ms)),
                     text: describePoint(point),
                   })
@@ -491,54 +491,54 @@ export default function TimelineStrip({
         {soundLanes.length > SOUND_LANES_SHOWN && (
           <button
             className="chip as-button"
-            title="show every sound class, not just the most confident"
+            title="Show every sound class, not just the most confident"
             onClick={() => setShowAllSounds((v) => !v)}
           >
             {showAllSounds
-              ? `top ${SOUND_LANES_SHOWN} sounds`
+              ? `Top ${SOUND_LANES_SHOWN} sounds`
               : `+${soundLanes.length - SOUND_LANES_SHOWN} more sounds`}
           </button>
         )}
         {onMapToggle && (points.length > 0 || truncated) && (
           <button
             className={`chip as-button ${mapOpen ? "strong" : ""}`}
-            title="show where you were on the session's timeline"
+            title="Show where you were on the session's timeline"
             onClick={onMapToggle}
           >
-            {mapOpen ? "hide map" : "map"}
+            {mapOpen ? "Hide map" : "Map"}
           </button>
         )}
         <button
           className={`chip as-button ${follow ? "strong" : ""}`}
-          title="keep the playhead and transcript in view while playing"
+          title="Keep the playhead and transcript in view while playing"
           onClick={() => onFollowChange(!follow)}
         >
-          {follow ? "following" : "follow"}
+          {follow ? "Following" : "Follow"}
         </button>
         <div className="strip-zoom">
           <button
             className="btn ghost slim"
-            title="zoom out"
+            title="Zoom out"
             onClick={() => setZoom((z) => Math.max(1, z / 1.5))}
           >
             −
           </button>
           <button
             className="btn ghost slim"
-            title="zoom in (or ctrl+scroll on the strip)"
+            title="Zoom in (or Ctrl+scroll on the strip)"
             onClick={() => setZoom((z) => Math.min(maxZoom, z * 1.5))}
           >
             +
           </button>
           <button
             className="btn ghost slim"
-            title="fit the whole session"
+            title="Fit the whole session"
             onClick={() => {
               setZoom(1)
               if (scrollRef.current) scrollRef.current.scrollLeft = 0
             }}
           >
-            fit
+            Fit
           </button>
         </div>
       </div>
@@ -578,14 +578,14 @@ export default function TimelineStrip({
           ))}
           {showTagLane && (
             <div className="strip-head" style={{ height: LANE_H }}>
-              <span className="strip-head-tags">sounds</span>
+              <span className="strip-head-tags">Sounds</span>
             </div>
           )}
           {points.length > 0 && (
             <div className="strip-head" style={{ height: LANE_H }}>
               <span className="strip-head-sound" title={`${points.length} location points`}>
                 <span className="speaker-dot" style={{ background: "var(--data-location)" }} />
-                location
+                Location
               </span>
               <span className="strip-talk">{points.length}</span>
             </div>
@@ -594,7 +594,7 @@ export default function TimelineStrip({
             <div className="strip-head" style={{ height: LANE_H }}>
               <span className="strip-head-sound" title={`${visuals.length} images and clips`}>
                 <span className="speaker-dot" style={{ background: "var(--data-media)" }} />
-                visual
+                Visual
               </span>
               <span className="strip-talk">{visuals.length}</span>
             </div>

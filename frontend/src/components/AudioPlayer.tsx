@@ -14,7 +14,7 @@ export default function AudioPlayer({
 
   useEffect(() => setFailed(false), [sessionId])
 
-  if (failed) return <div className="player-fallback">audio unavailable</div>
+  if (failed) return <div className="player-fallback">Audio unavailable.</div>
 
   return (
     <audio

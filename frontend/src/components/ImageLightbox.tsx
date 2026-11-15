@@ -38,14 +38,14 @@ export default function ImageLightbox({
         <img
           className="lightbox-img"
           src={imageFullUrl(image)}
-          alt={`image at ${fmtClock(at)}`}
+          alt={`Image at ${fmtClock(at)}`}
         />
         <div className="lightbox-bar">
           <button
             className="btn ghost slim"
             disabled={index === 0}
             onClick={() => onIndex(index - 1)}
-            title="previous (←)"
+            title="Previous (←)"
           >
             ‹
           </button>
@@ -61,17 +61,17 @@ export default function ImageLightbox({
               onClose()
             }}
           >
-            listen from here
+            Listen from here
           </button>
           <button
             className="btn ghost slim"
             disabled={index === images.length - 1}
             onClick={() => onIndex(index + 1)}
-            title="next (→)"
+            title="Next (→)"
           >
             ›
           </button>
-          <button className="btn ghost slim" onClick={onClose} title="close (esc)">
+          <button className="btn ghost slim" onClick={onClose} title="Close (Esc)">
             ✕
           </button>
         </div>

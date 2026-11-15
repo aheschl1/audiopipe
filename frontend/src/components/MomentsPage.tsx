@@ -216,11 +216,11 @@ function MomentFeed({ day, onJump }: { day: string; onJump: (day: string) => voi
       >
         {anchor && (
           <button className="btn ghost slim" onClick={() => onJump("")}>
-            back to today
+            Back to today
           </button>
         )}
         <label className="jump">
-          <span className="sr-only">jump to a day</span>
+          <span className="sr-only">Jump to a day</span>
           <input
             type="date"
             className="input slim"
@@ -241,7 +241,7 @@ function MomentFeed({ day, onJump }: { day: string; onJump: (day: string) => voi
             <>
               {" or "}
               <button className="link-btn" onClick={() => void refresh()}>
-                try again
+                Try again
               </button>
             </>
           )}
@@ -285,7 +285,7 @@ function MomentFeed({ day, onJump }: { day: string; onJump: (day: string) => voi
       )}
       {next && moments && (
         <button className="btn ghost full" onClick={() => void loadEarlier()} disabled={loadingMore}>
-          {loadingMore ? "loading…" : "show earlier days"}
+          {loadingMore ? "Loading…" : "Show earlier days"}
         </button>
       )}
     </div>

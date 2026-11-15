@@ -68,7 +68,7 @@ function ClusterPanel({
   return (
     <div className="cluster-panel">
       <label className="score-floor">
-        voice distance
+        Voice distance
         <input
           type="range"
           min={0.3}
@@ -79,11 +79,11 @@ function ClusterPanel({
         />
         <span className="score-value">{distance.toFixed(2)}</span>
         {params.overrides.cluster_distance === null && !dirty && (
-          <span className="chip">default</span>
+          <span className="chip">Default</span>
         )}
       </label>
       <label className="score-floor">
-        min talk (ms)
+        Min talk (ms)
         <input
           className="input slim talk-input"
           type="number"
@@ -93,7 +93,7 @@ function ClusterPanel({
           onChange={(e) => setMinTalk(Math.max(0, Number(e.target.value)))}
         />
         {params.overrides.min_talk_ms === null && !dirty && (
-          <span className="chip">default</span>
+          <span className="chip">Default</span>
         )}
       </label>
       <div className="cluster-panel-hint">
@@ -106,7 +106,7 @@ function ClusterPanel({
           disabled={busy || !dirty}
           onClick={() => onSave(distance, minTalk)}
         >
-          save
+          Save
         </button>
         {confirming ? (
           <>
@@ -119,10 +119,10 @@ function ClusterPanel({
                 onRecluster()
               }}
             >
-              {busy ? "rebuilding…" : "rebuild all clusters — confirm"}
+              {busy ? "Rebuilding…" : "Confirm: rebuild all clusters"}
             </button>
             <button className="btn ghost slim" onClick={() => setConfirming(false)}>
-              cancel
+              Cancel
             </button>
           </>
         ) : (
@@ -131,16 +131,16 @@ function ClusterPanel({
             disabled={busy}
             onClick={() => setConfirming(true)}
           >
-            recompute clustering
+            Recompute clustering
           </button>
         )}
         <button className="btn ghost slim" disabled={busy} onClick={onReset}>
-          reset to defaults
+          Reset to defaults
         </button>
       </div>
       {counts && (
         <div className="banner">
-          rebuilt: {counts.clusters} cluster{counts.clusters === 1 ? "" : "s"} from{" "}
+          Rebuilt {counts.clusters} cluster{counts.clusters === 1 ? "" : "s"} from{" "}
           {counts.assigned} voice-print{counts.assigned === 1 ? "" : "s"}
           {counts.pinned > 0 && ` (${counts.pinned} pinned)`}
         </div>
@@ -197,22 +197,22 @@ function MergeMenu({
   return (
     <div className="filter-menu" ref={root}>
       <button className="btn ghost slim" onClick={() => void toggle()}>
-        merge
+        Merge
       </button>
       {open && (
         <div className="filter-pop merge-pop">
           {target ? (
             <div className="merge-confirm">
               <div>
-                merge {speaker.embeddings} voice-print
+                Merge {speaker.embeddings} voice-print
                 {speaker.embeddings === 1 ? "" : "s"} into{" "}
                 <strong>{speakerLabel(target)}</strong>?
               </div>
               {target.distance >= FAR_DISTANCE && (
                 <div className="merge-warning">
-                  these clusters are {target.distance.toFixed(2)} apart — that's
-                  typical of two different voices; merging will pull the
-                  voice-print center between them
+                  These voices are {target.distance.toFixed(2)} apart, which usually means two
+                  different people. Merging will pull the voice-print center between
+                  them.
                 </div>
               )}
               <div className="merge-actions">
@@ -224,10 +224,10 @@ function MergeMenu({
                     setOpen(false)
                   }}
                 >
-                  {busy ? "merging…" : "merge"}
+                  {busy ? "Merging…" : "Merge"}
                 </button>
                 <button className="btn ghost slim" onClick={() => setTarget(null)}>
-                  back
+                  Back
                 </button>
               </div>
             </div>
@@ -303,7 +303,7 @@ function MoveMenu({
   return (
     <div className="filter-menu" ref={root}>
       <button className="btn ghost slim" onClick={() => setOpen((o) => !o)}>
-        move
+        Move
       </button>
       {open && (
         <div className="filter-pop merge-pop">
@@ -330,14 +330,14 @@ function MoveMenu({
           <div className="merge-confirm">
             <input
               className="input slim"
-              placeholder="new cluster name…"
+              placeholder="New voice name…"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
             {!source.name && !name.trim() && (
               <div className="merge-warning">
-                unnamed pairs of clusters may legitimately re-merge on the next
-                rebuild — a name protects the split
+                Give it a name. Unnamed voices can merge back together the next time
+                voices are regrouped.
               </div>
             )}
             <div className="merge-actions">
@@ -349,7 +349,7 @@ function MoveMenu({
                   setOpen(false)
                 }}
               >
-                eject to new cluster
+                Split into a new voice
               </button>
             </div>
           </div>
@@ -588,7 +588,7 @@ export default function SpeakersView({
         title="People"
         meta={
           speakers === null
-            ? "loading…"
+            ? "Loading…"
             : `${speakers.length} voice${speakers.length === 1 ? "" : "s"}, named first`
         }
       >
@@ -631,16 +631,16 @@ export default function SpeakersView({
                       className="input slim"
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
-                      placeholder="name (empty clears)"
+                      placeholder="Name (leave empty to clear)"
                       autoFocus
                     />
-                    <button className="btn primary slim">save</button>
+                    <button className="btn primary slim">Save</button>
                     <button
                       type="button"
                       className="btn ghost slim"
                       onClick={() => setEditing(null)}
                     >
-                      cancel
+                      Cancel
                     </button>
                   </form>
                 ) : (
@@ -661,7 +661,7 @@ export default function SpeakersView({
                         setDraft(speaker.name ?? "")
                       }}
                     >
-                      rename
+                      Rename
                     </button>
                     <MergeMenu
                       speaker={speaker}
@@ -681,10 +681,10 @@ export default function SpeakersView({
                     disabled={busy}
                     onClick={() => void merge(namePrompt.loserId, { id: namePrompt.survivorId })}
                   >
-                    {busy ? "merging…" : "merge"}
+                    {busy ? "Merging…" : "Merge"}
                   </button>
                   <button className="btn ghost slim" onClick={() => setNamePrompt(null)}>
-                    dismiss
+                    Dismiss
                   </button>
                 </div>
               )}
@@ -695,13 +695,13 @@ export default function SpeakersView({
                       className={`mode ${expandedTab === "transcripts" ? "active" : ""}`}
                       onClick={() => setExpandedTab("transcripts")}
                     >
-                      transcripts
+                      Transcripts
                     </button>
                     <button
                       className={`mode ${expandedTab === "prints" ? "active" : ""}`}
                       onClick={() => setExpandedTab("prints")}
                     >
-                      voice-prints
+                      Voice-prints
                     </button>
                   </div>
                   {expandedTab === "transcripts" ? (
@@ -721,7 +721,7 @@ export default function SpeakersView({
                               key={t.artifact_id}
                               className="row clickable"
                               onClick={() => onOpen(t.session_id, t.start_ms)}
-                              title="open in session"
+                              title="Open in recording"
                             >
                               <ClipButton clip={clip} />
                               <span className="event-time as-span">{fmtClock(t.start_ms)}</span>
@@ -808,10 +808,10 @@ function MemberList({
                 {member.pinned && (
                   <button
                     className="chip as-button"
-                    title="pinned to this identity — click to release"
+                    title="Pinned to this person. Click to release."
                     onClick={() => onUnpin(member.artifact_id)}
                   >
-                    📌
+                    Pinned
                   </button>
                 )}
                 <span
@@ -833,7 +833,7 @@ function MemberList({
           })}
           {cache.hasMore && (
             <button className="btn ghost full" onClick={() => onMore(cache.items.length)}>
-              more
+              More
             </button>
           )}
         </>

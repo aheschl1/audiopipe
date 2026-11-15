@@ -79,11 +79,11 @@ export default function SessionList({ onOpen }: { onOpen: (id: string) => void }
         {live > 0 && (
           <button
             className="btn slim"
-            title="end every live session and start processing; connected recorders reopen"
+            title="End every live session and start processing. Connected recorders reopen."
             disabled={splitting}
             onClick={() => void splitAll()}
           >
-            {splitting ? "splitting…" : "split all live"}
+            {splitting ? "Splitting…" : "Split all live"}
           </button>
         )}
       </PageHead>
@@ -113,11 +113,11 @@ export default function SessionList({ onOpen }: { onOpen: (id: string) => void }
                       {session.label ?? session.device ?? shortId(session.id)}
                     </span>
                     <span className="row-sub">
-                      {session.is_open ? "recording" : fmtDuration(session.started_at, session.ended_at)}
+                      {session.is_open ? "Recording" : fmtDuration(session.started_at, session.ended_at)}
                       {session.label && session.device && ` · ${session.device}`}
                     </span>
                   </div>
-                  {session.is_open && <span className="badge live">live</span>}
+                  {session.is_open && <span className="badge live">Live</span>}
                 </button>
               ))}
             </div>
@@ -126,7 +126,7 @@ export default function SessionList({ onOpen }: { onOpen: (id: string) => void }
       )}
       {hasMore && (
         <button className="btn ghost full" onClick={loadMore} disabled={loadingMore}>
-          {loadingMore ? "loading…" : "load older recordings"}
+          {loadingMore ? "Loading…" : "Load older recordings"}
         </button>
       )}
     </div>

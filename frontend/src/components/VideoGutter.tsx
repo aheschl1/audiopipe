@@ -121,7 +121,7 @@ function Filmstrip({
     <div
       className="film"
       style={{ top, height, left: lane * (FILM_W + LANE_GAP), width: FILM_W }}
-      title={`video · ${fmtWallTime(clip.captured_at)} · ${fmtClock(durationMs)}`}
+      title={`Video · ${fmtWallTime(clip.captured_at)} · ${fmtClock(durationMs)}`}
     >
       {picks.map((i, j) => {
         const frame = frames[i]

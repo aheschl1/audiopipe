@@ -163,7 +163,7 @@ export default function SessionView({
           {draft === null ? (
             <h1 className="session-title">
               {title}
-              {session.is_open && <span className="badge live">live</span>}
+              {session.is_open && <span className="badge live">Live</span>}
             </h1>
           ) : (
             <form
@@ -175,7 +175,7 @@ export default function SessionView({
             >
               <input
                 className="input slim"
-                placeholder="name this session…"
+                placeholder="Name this session…"
                 value={draft}
                 autoFocus
                 maxLength={200}
@@ -185,7 +185,7 @@ export default function SessionView({
                 }}
               />
               <button className="btn primary slim" disabled={saving}>
-                {saving ? "saving…" : "save"}
+                {saving ? "Saving…" : "Save"}
               </button>
               <button
                 type="button"
@@ -193,7 +193,7 @@ export default function SessionView({
                 disabled={saving}
                 onClick={() => setDraft(null)}
               >
-                cancel
+                Cancel
               </button>
             </form>
           )}
@@ -201,25 +201,25 @@ export default function SessionView({
             <div className="page-actions">
               <button
                 className="btn ghost slim"
-                title="rename this session"
+                title="Rename this session"
                 onClick={() => setDraft(session.label ?? "")}
               >
-                rename
+                Rename
               </button>
               {session.is_open && (
                 <button
                   className="btn ghost slim"
-                  title="end this session and start processing; a connected recorder reopens"
+                  title="End this session and start processing. A connected recorder reopens."
                   disabled={splitting}
                   onClick={() => void splitSession()}
                 >
-                  {splitting ? "splitting…" : "split"}
+                  {splitting ? "Splitting…" : "Split"}
                 </button>
               )}
               {onAb && (
                 <button
                   className="btn ghost slim"
-                  title="vote on transcript candidates"
+                  title="Vote on transcript candidates"
                   onClick={() => onAb(session.id)}
                 >
                   A/B

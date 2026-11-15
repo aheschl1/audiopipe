@@ -13,7 +13,7 @@ function StatusChip({ state }: { state: State }) {
   if (state.status === "queued")
     return (
       <span className="chip ab-generating">
-        <span className="spinner" /> queued…
+        <span className="spinner" /> Queued…
       </span>
     )
   if (state.status === "running")
@@ -29,7 +29,7 @@ function StatusChip({ state }: { state: State }) {
         {state.candidates}/{state.expected}
       </span>
     )
-  if (state.status === "dead") return <span className="chip ab-dead">failed — regenerate</span>
+  if (state.status === "dead") return <span className="chip ab-dead">Failed</span>
   return <span className="chip">{state.candidates} candidates</span>
 }
 
@@ -99,7 +99,7 @@ export default function AbOverview({ onVote }: { onVote: (sessionId: string) => 
     <div className="ab-overview">
       <PageHead title="A/B transcripts" meta="Vote on competing transcriptions to pick the best model." />
       <div className="ab-tally">
-        <div className="row-title">model × strategy wins</div>
+        <div className="row-title">Wins by model and strategy</div>
         {results === null ? (
           <div className="skeleton" style={{ height: 60 }} />
         ) : results.total === 0 ? (
@@ -108,10 +108,10 @@ export default function AbOverview({ onVote }: { onVote: (sessionId: string) => 
           <table className="ab-tally-table">
             <thead>
               <tr>
-                <th>model</th>
-                <th>strategy</th>
-                <th>wins</th>
-                <th>share</th>
+                <th>Model</th>
+                <th>Strategy</th>
+                <th>Wins</th>
+                <th>Share</th>
               </tr>
             </thead>
             <tbody>
@@ -166,7 +166,7 @@ export default function AbOverview({ onVote }: { onVote: (sessionId: string) => 
                 {state ? <StatusChip state={state} /> : null}
                 {queued[session.id] && !state && (
                   <span className="chip ab-generating">
-                    <span className="spinner" /> queued…
+                    <span className="spinner" /> Queued…
                   </span>
                 )}
                 {(state?.votes ?? 0) > 0 && (
@@ -179,14 +179,14 @@ export default function AbOverview({ onVote }: { onVote: (sessionId: string) => 
                   disabled={busy}
                   onClick={() => void enroll(session.id)}
                 >
-                  {busy ? "generating…" : state ? "regenerate" : "generate"}
+                  {busy ? "Generating…" : state ? "Regenerate" : "Generate"}
                 </button>
                 <button
                   className="btn primary slim"
                   disabled={!state || state.candidates === 0}
                   onClick={() => onVote(session.id)}
                 >
-                  vote
+                  Vote
                 </button>
               </div>
             )

@@ -189,7 +189,7 @@ function Tile({ ctx, item }: { ctx: Ctx; item: MomentItem }) {
     <div
       className={`tile ${state.dim ? "dim" : ""} ${ctx.selected === item.artifact_id ? "selected" : ""}`}
       {...itemProps(ctx, item.artifact_id)}
-      aria-label={`${item.kind === "photo" ? "photo" : "video frame"} at ${clock(item.start_at)}`}
+      aria-label={`${item.kind === "photo" ? "Photo" : "Video frame"} at ${clock(item.start_at)}`}
     >
       <span className="tile-img">
         <img src={artifactUrl(item.artifact_id)} alt="" loading="lazy" />
@@ -293,7 +293,7 @@ function Selected({ ctx, item, onOpen }: { ctx: Ctx; item: MomentItem; onOpen: O
         <span className="section-label">
           {item.label} · {item.kind === "keyframe" ? "video frame" : item.kind}
         </span>
-        <button className="btn ghost slim" onClick={() => ctx.select(null)} title="clear (esc)">
+        <button className="btn ghost slim" onClick={() => ctx.select(null)} title="Clear (Esc)">
           ✕
         </button>
       </div>
@@ -310,7 +310,7 @@ function Selected({ ctx, item, onOpen }: { ctx: Ctx; item: MomentItem; onOpen: O
       <div className="picked-foot">
         <span className="row-dim">{clock(item.start_at)}</span>
         <button className="btn slim" onClick={() => onOpen(item.session_id, item.at_ms ?? undefined)}>
-          {isImage(item) ? "open in recording" : "listen in recording"}
+          {isImage(item) ? "Open in recording" : "Listen in recording"}
         </button>
       </div>
     </div>
@@ -333,7 +333,7 @@ function Facts({ moment }: { moment: MomentDetail }) {
           </>
         )
         return sp.speaker_id ? (
-          <Link key={sp.name} to={personHref(sp.speaker_id)} className="chip as-link" title="open in People">
+          <Link key={sp.name} to={personHref(sp.speaker_id)} className="chip as-link" title="Open in People">
             {body}
           </Link>
         ) : (
@@ -523,7 +523,7 @@ export default function MomentView({
           {status === 404 ? "This moment no longer exists. It may have been regrouped." : "Couldn't load this moment. "}
           {status !== 404 && (
             <button className="link-btn" onClick={() => void load()}>
-              try again
+              Try again
             </button>
           )}
         </div>
@@ -566,7 +566,7 @@ export default function MomentView({
               className="btn ghost slim"
               disabled={!older}
               onClick={() => older && onNeighbour(older)}
-              title="earlier moment (j or ←)"
+              title="Earlier moment (J or ←)"
             >
               ‹ earlier
             </button>
@@ -574,7 +574,7 @@ export default function MomentView({
               className="btn ghost slim"
               disabled={!newer}
               onClick={() => newer && onNeighbour(newer)}
-              title="later moment (k or →)"
+              title="Later moment (K or →)"
             >
               later ›
             </button>
@@ -645,7 +645,7 @@ export default function MomentView({
           )}
           {graph.unrelated > 0 && (
             <button className="btn ghost slim" onClick={() => setShowUnrelated((v) => !v)}>
-              {showUnrelated ? "hide" : "show"} {graph.unrelated} coincidental overlap{graph.unrelated === 1 ? "" : "s"}
+              {showUnrelated ? "Hide" : "Show"} {graph.unrelated} coincidental overlap{graph.unrelated === 1 ? "" : "s"}
             </button>
           )}
         </aside>

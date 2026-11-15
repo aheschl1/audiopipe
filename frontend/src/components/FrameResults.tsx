@@ -25,7 +25,7 @@ export default function FrameResults({
             <img src={artifactUrl(hit.artifact_id)} alt="" loading="lazy" />
           </span>
           <span className="frame-meta">
-            {hit.at_ms !== null && hit.at_ms !== undefined ? fmtClock(hit.at_ms) : "unplaced"}
+            {hit.at_ms !== null && hit.at_ms !== undefined ? fmtClock(hit.at_ms) : "Unplaced"}
             <span className="row-dim"> in {shortId(hit.session_id)}</span>
           </span>
         </button>

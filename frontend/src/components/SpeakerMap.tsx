@@ -94,7 +94,7 @@ export default function SpeakerMap({
   useEffect(() => {
     void loadPlot().then(setPlot, (reason) => {
       console.error("plotly load failed", reason)
-      setError("could not load the plotting library")
+      setError("Couldn't load the plotting library.")
     })
   }, [])
 
@@ -112,7 +112,7 @@ export default function SpeakerMap({
       })
       .then(({ data: body, error: failed }) => {
         if (!live) return
-        if (failed || !body) setError("could not load the projection")
+        if (failed || !body) setError("Couldn't load the voice map.")
         else setData(body)
       })
     return () => {
@@ -146,7 +146,7 @@ export default function SpeakerMap({
         const unassigned = key === UNASSIGNED
         const first = points[0]
         const name = unassigned
-          ? `unassigned (${points.length})`
+          ? `Unassigned (${points.length})`
           : `${first?.name ?? shortId(key)} (${points.length})`
         return {
           type: is3d ? "scatter3d" : "scattergl",
@@ -225,7 +225,7 @@ export default function SpeakerMap({
         y: 1,
         yanchor: "top",
         bgcolor: "rgba(0,0,0,0)",
-        title: { text: `largest voices (${LEGEND_LIMIT})`, font: { size: 10 } },
+        title: { text: `Largest voices (${LEGEND_LIMIT})`, font: { size: 10 } },
       },
       ...(is3d
         ? {
@@ -249,8 +249,8 @@ export default function SpeakerMap({
   }, [data?.basis_id, view, is3d, narrow])
 
   if (error) return <div className="banner">{error}</div>
-  if (!data || !Plot) return <div className="loading">loading the voice map…</div>
-  if (!data.model) return <div className="empty">no voice-prints yet</div>
+  if (!data || !Plot) return <div className="loading">Loading the voice map…</div>
+  if (!data.model) return <div className="empty">No voice-prints yet.</div>
 
   const parts = view.axes.map((index) => ({
     label: `PC${index + 1}`,
@@ -297,7 +297,7 @@ export default function SpeakerMap({
             checked={includeUnassigned}
             onChange={(event) => setIncludeUnassigned(event.target.checked)}
           />
-          unassigned
+          Unassigned
         </label>
 
         <span

@@ -53,7 +53,7 @@ export default function SpeakerChip({
     <span className="filter-menu speaker-chip-root" ref={root}>
       <button
         className={`speaker-chip ${resolved ? "" : "unresolved"}`}
-        title={resolved ? `${text} — click to relabel` : "click to label this voice"}
+        title={resolved ? `${text}. Click to relabel.` : "Click to label this voice"}
         onClick={(event) => {
           event.stopPropagation()
           setOpen((o) => !o)
@@ -199,7 +199,7 @@ function LabelPop({
               disabled={busy}
               onClick={() => void mergeInto(target)}
             >
-              {busy ? "working…" : "everywhere"}
+              {busy ? "Working…" : "Everywhere"}
             </button>
             {canMove && (
               <button
@@ -207,11 +207,11 @@ function LabelPop({
                 disabled={busy}
                 onClick={() => void moveMembers(target.id, null)}
               >
-                just this voice
+                Just this voice
               </button>
             )}
             <button className="btn ghost slim" disabled={busy} onClick={() => setConfirm(null)}>
-              back
+              Back
             </button>
           </div>
           <div className="chip-pop-hint">
@@ -241,24 +241,24 @@ function LabelPop({
           >
             <input
               className="input slim"
-              placeholder="name the new speaker…"
+              placeholder="Name the new speaker…"
               value={ejectName}
               autoFocus
               maxLength={200}
               onChange={(e) => setEjectName(e.target.value)}
             />
             <button className="btn primary slim" disabled={busy}>
-              {busy ? "moving…" : "split"}
+              {busy ? "Moving…" : "Split"}
             </button>
           </form>
           <div className="merge-actions">
             <button className="btn ghost slim" disabled={busy} onClick={() => setConfirm(null)}>
-              back
+              Back
             </button>
           </div>
           <div className="chip-pop-hint">
-            A name is recommended — unnamed clusters may re-merge on the next
-            clustering rebuild.
+            Give it a name. Unnamed voices can merge back together the next time
+            voices are regrouped.
           </div>
         </div>
       </div>
@@ -276,20 +276,20 @@ function LabelPop({
       >
         <input
           className="input slim"
-          placeholder="name this voice…"
+          placeholder="Name this voice…"
           value={draft}
           autoFocus
           onChange={(e) => setDraft(e.target.value)}
         />
         <button className="btn primary slim" disabled={busy}>
-          save
+          Save
         </button>
       </form>
       {candidates === null ? (
         <div className="loading">Loading speakers…</div>
       ) : candidates.length > 0 || canMove ? (
         <>
-          <div className="chip-pop-hint">or, this is:</div>
+          <div className="chip-pop-hint">Or, this is:</div>
           {candidates.map((candidate) => (
             <button
               key={candidate.id}
@@ -314,7 +314,7 @@ function LabelPop({
             >
               <span className="speaker-dot new" />
               <span className="merge-candidate-main">
-                <span>someone new…</span>
+                <span>Someone new…</span>
               </span>
             </button>
           )}
