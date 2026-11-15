@@ -159,11 +159,11 @@ A page head explains the purpose. The wins table uses uppercase column labels an
 
 ## Logo
 
-The mark is a red glass orb on a white rounded tile (`frontend/public/logo.svg`). The lower half sags and leans slightly left, as if the glass has started to melt, and a soft red light gathers on the tile beneath it. It is the one deliberate exception to flatness: the mark carries depth so that the UI around it doesn't have to.
+The mark is a white glass orb on a square of the accent red (`frontend/public/logo.svg`). The lower half of the orb sags and leans slightly left, as if the glass has started to melt, and it casts a soft dark-red shadow on the square. It is the one deliberate exception to flatness: the mark carries depth so that the UI around it doesn't have to.
 
-- The orb's base colour is the accent `--red` (`#E4002B`), deepening to `#7D0016` at the rim. Its highlights are restrained: a blurred top sheen at 32% white and a faint inner glow at the bottom.
+- The square is flat `--red` (`#E4002B`) with sharp corners. The orb shades from pure white to a warm grey at its edge, with a blurred white sheen on top and a faint pink glow at the bottom, as if picking up light reflected off the red.
 - The wordmark is lower-case **context** in Plex Sans semibold, set beside the mark. The sidebar uses a 24 px mark and the login page a 32 px one. The favicon is the SVG itself.
-- Never recolour the orb, flatten it into a plain dot, or place it on red.
+- Never recolour the square or the orb, round the square's corners, or set the mark on a red background.
 
 ## Brand layer (future site)
 
