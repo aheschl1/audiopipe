@@ -123,6 +123,25 @@ class ProcessingSettings(BaseSettings):
     audio_tag_min_consecutive: int = 2
     audio_tag_top_k: int = 15
 
+    # Vision sidecar (SigLIP 2 image/text embeddings) and the keyframe tier.
+    # Candidates are sampled at candidate_fps; a gated frame becomes a
+    # keyframe when its cosine distance to every one of the last
+    # keyframe_memory keyframes reaches keyframe_novelty. Calibrated on a
+    # real phone clip (2026-11-15): one continuous shot drifts 0.02-0.14 from
+    # its first frame, a different room with the same person sits ~0.15, and
+    # unrelated photos ~0.22; 0.10 picked wide shot, close-up and lean-back
+    # out of 11.5s. SigLIP distances are compressed: re-sweep before raising.
+    vision_base_url: str = "http://127.0.0.1:8036/v1"
+    vision_timeout_seconds: float = 300.0
+    keyframe_candidate_fps: float = 2.0
+    keyframe_novelty: float = 0.10
+    keyframe_memory: int = 8
+    keyframe_settle_ms: int = 1_000
+    keyframe_min_gap_ms: int = 1_500
+    keyframe_heartbeat_ms: int = 30_000
+    keyframe_max_per_minute: int = 12
+    keyframe_blur_percentile: float = 25.0
+
     # Sound-span tier: the tagger's windows merged into few long single-class
     # spans. Hysteresis, not one threshold — sigmoid scores wobble, and a class
     # sitting near a single cut-off shatters into fragments. A span opens at

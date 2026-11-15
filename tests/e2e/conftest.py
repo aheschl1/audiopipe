@@ -152,6 +152,10 @@ def test_env(
         # The API embeds search queries through the same stub.
         "API_CLASSIFIER_BASE_URL": stub_audio_services,
         "API_CLASSIFIER_TIMEOUT_SECONDS": "10",
+        "PROCESSING_VISION_BASE_URL": f"{stub_audio_services}/vision",
+        "PROCESSING_VISION_TIMEOUT_SECONDS": "10",
+        "API_VISION_BASE_URL": f"{stub_audio_services}/vision",
+        "API_VISION_TIMEOUT_SECONDS": "10",
         "PROCESSING_DIARIZE_MIN_TURN_MS": "100",
         # The stub's turns are 150ms; the default 3s gate would silently
         # skip every embedding and no cluster test could pass.
@@ -330,7 +334,7 @@ async def wait_for_job(session_id, pipeline: str, status: str, timeout: float = 
         await asyncio.sleep(0.1)
     raise AssertionError(
         f"no {pipeline} job reached {status!r} for session {session_id} "
-        f"within {timeout}s; jobs: {[(j.pipeline, j.status) for j in jobs]}"
+        f"within {timeout}s; jobs: {[(j.pipeline, j.status, j.error) for j in jobs]}"
     )
 
 

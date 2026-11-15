@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from api.schema.timeline import AudioTagLabel
-from database.repos.embeddings import AudioSearchHit
+from database.repos.embeddings import AudioSearchHit, FrameSearchHit
 from database.repos.tags import TagLabelCount, TagWindowHit
 from database.repos.transcripts import TranscriptHit
 from database.schema.artifacts import parse_uuid
@@ -50,6 +50,45 @@ class AudioSearchResponse(BaseModel):
     query: str
     model: str = Field(description="The embedding model that encoded the query.")
     items: list[AudioSearchRead]
+
+
+class FrameSearchRead(BaseModel):
+    """One keyframe matching the query, closest first."""
+
+    model_config = ConfigDict(frozen=True)
+
+    artifact_id: UUID = Field(description="The ``keyframe`` artifact; its JPEG is at /v1/artifacts/{id}/media.")
+    session_id: UUID
+    segment_id: UUID = Field(description="The photo or video segment the frame came from.")
+    at_ms: int | None = Field(description="Session-relative time of the frame, ms; null when the segment has no capture time.")
+    offset_ms: int = Field(description="Offset of the frame into its segment (0 for photos), ms.")
+    width: int
+    height: int
+    reason: str = Field(description="Why it is a keyframe: photo, first, novel or heartbeat.")
+    distance: float = Field(description="Cosine distance between the query and the frame's embedding (lower is closer).")
+
+    @classmethod
+    def from_model(cls, hit: FrameSearchHit) -> "FrameSearchRead":
+        meta = hit.metadata
+        return cls(
+            artifact_id=hit.artifact_id,
+            session_id=hit.session_id,
+            segment_id=UUID(hit.links["segment"]),
+            at_ms=hit.start_ms,
+            offset_ms=int(meta.get("offset_ms", 0)),
+            width=int(meta.get("width", 0)),
+            height=int(meta.get("height", 0)),
+            reason=str(meta.get("reason", "")),
+            distance=hit.distance,
+        )
+
+
+class FrameSearchResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    query: str
+    model: str = Field(description="The embedding model that encoded the query.")
+    items: list[FrameSearchRead]
 
 
 class TagSearchRead(BaseModel):

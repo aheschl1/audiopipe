@@ -79,6 +79,10 @@ class ApiSettings(BaseSettings):
     # contended GPU.
     classifier_base_url: str = "http://127.0.0.1:8035/v1"
     classifier_timeout_seconds: float = 180.0
+    # Text->frame search embeds its query with the vision sidecar's SigLIP
+    # text tower (the worker's keyframe embedder). A cold sidecar loads in ~10s.
+    vision_base_url: str = "http://127.0.0.1:8036/v1"
+    vision_timeout_seconds: float = 120.0
 
 
 @lru_cache(maxsize=1)

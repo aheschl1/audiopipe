@@ -3711,6 +3711,109 @@
         }
       }
     },
+    "/v1/search/frames": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Find keyframes by describing what was seen",
+        "description": "Keyframes (every photo, and the distinct moments of each video) nearest\nthe description in SigLIP 2's joint space. Like audio search, distances\nrank within one query and carry no absolute cutoff.",
+        "operationId": "search_frames_v1_search_frames_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "description": "A visual description, e.g. 'a whiteboard with diagrams' or 'a red car'.",
+              "title": "Q"
+            },
+            "description": "A visual description, e.g. 'a whiteboard with diagrams' or 'a red car'."
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict matches to one session.",
+              "title": "Session Id"
+            },
+            "description": "Restrict matches to one session."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FrameSearchResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/search/tags/labels": {
       "get": {
         "tags": [
@@ -5905,6 +6008,103 @@
           "source"
         ],
         "title": "ExcludedUtterance"
+      },
+      "FrameSearchRead": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Artifact Id",
+            "description": "The ``keyframe`` artifact; its JPEG is at /v1/artifacts/{id}/media."
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "segment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Segment Id",
+            "description": "The photo or video segment the frame came from."
+          },
+          "at_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At Ms",
+            "description": "Session-relative time of the frame, ms; null when the segment has no capture time."
+          },
+          "offset_ms": {
+            "type": "integer",
+            "title": "Offset Ms",
+            "description": "Offset of the frame into its segment (0 for photos), ms."
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Why it is a keyframe: photo, first, novel or heartbeat."
+          },
+          "distance": {
+            "type": "number",
+            "title": "Distance",
+            "description": "Cosine distance between the query and the frame's embedding (lower is closer)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "session_id",
+          "segment_id",
+          "at_ms",
+          "offset_ms",
+          "width",
+          "height",
+          "reason",
+          "distance"
+        ],
+        "title": "FrameSearchRead",
+        "description": "One keyframe matching the query, closest first."
+      },
+      "FrameSearchResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "The embedding model that encoded the query."
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FrameSearchRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "model",
+          "items"
+        ],
+        "title": "FrameSearchResponse"
       },
       "HTTPValidationError": {
         "properties": {

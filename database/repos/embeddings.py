@@ -1,5 +1,5 @@
 """Raw-SQL repositories for the pgvector tables (``speaker_embeddings``,
-``audio_embeddings``).
+``audio_embeddings``, ``visual_embeddings``).
 
 Vectors cross the wire in pgvector's text form (``[1.0,2.0]``) with an
 explicit ``::vector`` cast, so no driver-side type registration is needed.
@@ -17,6 +17,7 @@ from database.schema.embeddings import (
     AudioEmbeddingCreate,
     SpeakerEmbedding,
     SpeakerEmbeddingCreate,
+    VisualEmbeddingCreate,
 )
 
 # embedding reads back as text: psycopg has no codec for the vector OID.
@@ -143,6 +144,64 @@ class AudioEmbeddingsRepo(BaseRepo):
                        e.embedding <=> %s::vector AS distance,
                        a.metadata, e.created_at
                 FROM audio_embeddings e
+                JOIN pipeline_artifacts a ON a.id = e.artifact_id
+                JOIN recording_sessions s ON s.id = e.session_id
+                WHERE {" AND ".join(conditions)}
+                ORDER BY e.embedding <=> %s::vector
+                LIMIT %s
+            """,
+            params,
+        )
+
+
+class FrameSearchHit(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    artifact_id: UUID
+    session_id: UUID
+    start_ms: int | None
+    distance: float
+    links: dict[str, Any]
+    metadata: dict[str, Any]
+
+
+class VisualEmbeddingsRepo(BaseRepo):
+    async def create_many(self, items: Sequence[VisualEmbeddingCreate]) -> int:
+        if not items:
+            return 0
+        params: list = []
+        for item in items:
+            params += [item.artifact_id, item.session_id, item.model, _literal(item.embedding)]
+        values = ", ".join(["(%s, %s, %s, %s::vector)"] * len(items))
+        return await self._execute(
+            f"""
+                INSERT INTO visual_embeddings (artifact_id, session_id, model, embedding)
+                VALUES {values}
+            """,
+            params,
+        )
+
+    async def search(
+        self,
+        vector: Sequence[float],
+        *,
+        user_id: UUID,
+        session_id: UUID | None = None,
+        limit: int = 20,
+    ) -> list[FrameSearchHit]:
+        """Keyframes nearest a SigLIP text embedding, closest first (exact scan)."""
+        conditions = ["s.user_id = %s"]
+        params: list = [_literal(vector), user_id]
+        if session_id is not None:
+            conditions.append("e.session_id = %s")
+            params.append(session_id)
+        params += [_literal(vector), limit]
+        return await self._fetch_all(
+            FrameSearchHit,
+            f"""
+                SELECT e.artifact_id, e.session_id, a.start_ms,
+                       e.embedding <=> %s::vector AS distance, a.links, a.metadata
+                FROM visual_embeddings e
                 JOIN pipeline_artifacts a ON a.id = e.artifact_id
                 JOIN recording_sessions s ON s.id = e.session_id
                 WHERE {" AND ".join(conditions)}

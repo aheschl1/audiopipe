@@ -452,7 +452,7 @@ transcript with speakers resolved at read through the same label → cluster
 
 ## The visual tiers
 
-`thumbnail` and `video-proxy` (`processing/pipelines/visual.py`) work per
+`thumbnail`, `video-proxy` and `keyframe` (`processing/pipelines/visual.py`) work per
 segment, not per session: an image or clip is a whole file, so it is work as
 soon as it lands, open session or not. Jobs carry `payload.segment_id` and dedup
 on `{pipeline}:segment:{id}`.
@@ -468,6 +468,42 @@ rotation to the pixels, and write artifacts linked by `links.segment` with
 attaches them to `image` (`thumbnail_id`) and `video-clip` (`proxy_id`,
 `frames`) events; `/v1/artifacts/{id}/media` serves them, accepting
 `?token=` for `<img>`/`<video>`.
+
+### Keyframes
+
+`keyframe` picks the frames that downstream visual work (OCR, captions,
+roll-ups) should read, so those tiers never touch every frame. Every photo is a
+keyframe (`reason: photo`). A clip is sampled at 2 fps into 384 px candidates,
+each scored for focus (Laplacian variance) and exposure and embedded by the
+vision sidecar (SigLIP 2 so400m, 1152-d). `processing/keyframes.py` then walks
+the candidates:
+
+- **Gate:** frames below the clip's 25th sharpness percentile, or too dark or
+  blown out, never trigger a pick (an all-bad clip is taken unfiltered).
+- **Trigger:** a gated frame whose cosine distance to each of the last 8
+  keyframes is at least `keyframe_novelty` (0.10) opens a `novel` pick. The
+  first gated frame opens `first`, and 30 s without a pick opens `heartbeat`.
+- **Settle:** the pick is the sharpest gated frame in the next 1 s, so a camera
+  still mid-swing doesn't win.
+- **Limits:** picks are at least 1.5 s apart, and novelty picks stop at 12 per
+  rolling minute (heartbeats still fire).
+
+The threshold was calibrated on a real phone clip. Within one continuous shot,
+frames drift 0.02–0.14 from the first frame. A different room with the same
+person sits about 0.15 away, and unrelated photos about 0.22. SigLIP distances
+are compressed, so small threshold changes matter: re-sweep before tuning.
+
+Each pick is re-decoded at 1024 px and stored as a JPEG artifact
+(`kind: keyframe`, `links.segment`, metadata `offset_ms`, `reason`, `novelty`,
+`sharpness`). It is placed on the timeline as a 1 ms span at the segment's
+capture time plus the offset, or left unplaced if that falls before the
+session start. Its embedding goes to `visual_embeddings` in the same
+transaction. `GET /v1/search/frames?q=` embeds the text with the same sidecar
+and ranks keyframes by cosine distance. Text-to-image distances sit around
+0.8–1.0 with SigLIP; only the order is meaningful.
+
+Not yet: photo-burst dedup and speech-onset triggers (the transcript usually
+isn't ready when a clip lands).
 
 ## Callbacks and chaining
 

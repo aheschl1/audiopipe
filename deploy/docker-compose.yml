@@ -1,4 +1,4 @@
-# The full stack: API, worker, web tier, and the three GPU model sidecars.
+# The full stack: API, worker, web tier, and the four GPU model sidecars.
 #
 # Postgres and MinIO are optional here, behind the `stores` profile. Bring your
 # own by setting DATABASE_HOST and STORAGE_ENDPOINT_URL in .env, or run them in
@@ -11,7 +11,7 @@
 # deliberately does not pass the profile.
 #
 # Local development is unaffected either way. `make sidecars` starts just the
-# three model containers, published on 127.0.0.1:8033-8035 — exactly where the
+# four model containers, published on 127.0.0.1:8033-8036 — exactly where the
 # code's own defaults point — so a host-run `make api` / `make worker` finds
 # them with no configuration. The docker-network addresses below are overrides
 # that exist only inside this stack; there is no mode flag in the code.
@@ -39,6 +39,9 @@ x-app: &app
     PROCESSING_DIARIZER_BASE_URL: http://diar-pyannote:8000/v1
     PROCESSING_CLASSIFIER_BASE_URL: http://audio-tagger:8000/v1
     API_CLASSIFIER_BASE_URL: http://audio-tagger:8000/v1
+    # Same rule: keyframes and text->frame search must share one embedder.
+    PROCESSING_VISION_BASE_URL: http://vision:8000/v1
+    API_VISION_BASE_URL: http://vision:8000/v1
   networks: [audio-net]
 
 # `required: false` so these resolve to a no-op when the profile is off.
@@ -110,6 +113,7 @@ services:
       asr-parakeet: {condition: service_healthy}
       diar-pyannote: {condition: service_healthy}
       audio-tagger: {condition: service_healthy}
+      vision: {condition: service_healthy}
     # PROCESSING_SHUTDOWN_GRACE_SECONDS is 20s, above Docker's 10s default;
     # without this every `compose down` SIGKILLs a job mid-flight.
     stop_grace_period: 30s
@@ -255,6 +259,27 @@ services:
     networks: [audio-net]
     restart: unless-stopped
 
+  # SigLIP 2 for keyframe selection and text->frame search. Loads on the first
+  # request and exits after IDLE_EXIT_SECONDS idle, so it holds no GPU memory
+  # between bursts; its health is green while unloaded.
+  vision:
+    <<: *gpu
+    build:
+      context: ../sidecars/vision
+    container_name: vision
+    ports:
+      - "${SIDECAR_BIND:-127.0.0.1}:8036:8000"
+    volumes:
+      - vision-hf-cache:/root/.cache/huggingface
+    environment:
+      HF_HOME: /root/.cache/huggingface
+      IDLE_EXIT_SECONDS: ${VISION_IDLE_EXIT_SECONDS:-600}
+    healthcheck:
+      <<: *sidecar-healthcheck
+      start_period: 60s
+    networks: [audio-net]
+    restart: unless-stopped
+
 networks:
   # A bridge of its own. Do not move the app onto a store's bridge: published
   # ports are not DNAT'd for traffic arriving on the target's own bridge, so a
@@ -275,5 +300,8 @@ volumes:
   audio-tagger-hf-cache:
     name: ${TAGGER_HF_CACHE:-audio-pipeline-audio-tagger-hf-cache}
     external: ${TAGGER_HF_CACHE_EXTERNAL:-false}
+  vision-hf-cache:
+    name: ${VISION_HF_CACHE:-audio-pipeline-vision-hf-cache}
+    external: ${VISION_HF_CACHE_EXTERNAL:-false}
   postgres-data:
   minio-data:

@@ -931,6 +931,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/search/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find keyframes by describing what was seen
+         * @description Keyframes (every photo, and the distinct moments of each video) nearest
+         *     the description in SigLIP 2's joint space. Like audio search, distances
+         *     rank within one query and carry no absolute cutoff.
+         */
+        get: operations["search_frames_v1_search_frames_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/search/tags/labels": {
         parameters: {
             query?: never;
@@ -1811,6 +1833,65 @@ export interface components {
              * @description Who excluded it: ``manual`` or a filter name.
              */
             source: string;
+        };
+        /**
+         * FrameSearchRead
+         * @description One keyframe matching the query, closest first.
+         */
+        FrameSearchRead: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             * @description The ``keyframe`` artifact; its JPEG is at /v1/artifacts/{id}/media.
+             */
+            artifact_id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Segment Id
+             * Format: uuid
+             * @description The photo or video segment the frame came from.
+             */
+            segment_id: string;
+            /**
+             * At Ms
+             * @description Session-relative time of the frame, ms; null when the segment has no capture time.
+             */
+            at_ms: number | null;
+            /**
+             * Offset Ms
+             * @description Offset of the frame into its segment (0 for photos), ms.
+             */
+            offset_ms: number;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /**
+             * Reason
+             * @description Why it is a keyframe: photo, first, novel or heartbeat.
+             */
+            reason: string;
+            /**
+             * Distance
+             * @description Cosine distance between the query and the frame's embedding (lower is closer).
+             */
+            distance: number;
+        };
+        /** FrameSearchResponse */
+        FrameSearchResponse: {
+            /** Query */
+            query: string;
+            /**
+             * Model
+             * @description The embedding model that encoded the query.
+             */
+            model: string;
+            /** Items */
+            items: components["schemas"]["FrameSearchRead"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -5696,6 +5777,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AudioSearchResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_frames_v1_search_frames_get: {
+        parameters: {
+            query: {
+                /** @description A visual description, e.g. 'a whiteboard with diagrams' or 'a red car'. */
+                q: string;
+                /** @description Restrict matches to one session. */
+                session_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FrameSearchResponse"];
                 };
             };
             /** @description Unauthorized */

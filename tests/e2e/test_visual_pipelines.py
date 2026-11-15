@@ -84,6 +84,58 @@ async def test_artifacts_without_a_servable_blob_are_404(
     assert response.status_code == 404
 
 
+async def test_keyframes_are_placed_embedded_and_searchable(
+    worker: None, client: httpx.AsyncClient, account: Account, other_account: Account
+) -> None:
+    session = await make_session(account)
+    start = session.started_at
+    image = await _upload(
+        client, account, session.id, jpeg_bytes(),
+        resource="image", captured_at=(start + timedelta(seconds=1)).isoformat(),
+    )
+    video = await _upload(
+        client, account, session.id, mp4_bytes(seconds=3),
+        resource="video", captured_at=(start + timedelta(seconds=5)).isoformat(),
+        duration_ms="3000",
+    )
+    for _ in range(2):
+        await wait_for_job(session.id, "keyframe", JobStatus.SUCCEEDED, timeout=60)
+
+    from database.pipe import DatabasePipe
+
+    async with DatabasePipe() as pipe:
+        frames = await pipe.artifacts.list_for_session(session.id, pipeline="keyframe")
+    by_segment = {f.links["segment"]: f for f in frames}
+    assert set(by_segment) == {image["id"], video["id"]}
+    assert by_segment[image["id"]].start_ms == 1000
+    assert by_segment[image["id"]].metadata["reason"] == "photo"
+    # The stub embeds every frame identically: the clip is one scene.
+    assert by_segment[video["id"]].metadata["reason"] == "first"
+    assert 5000 <= by_segment[video["id"]].start_ms < 8000
+
+    found = await client.get(
+        "/v1/search/frames", params={"q": "a gradient"}, headers=account.headers
+    )
+    assert found.status_code == 200, found.text
+    body = found.json()
+    assert body["model"] == "stub-siglip"
+    assert {hit["segment_id"] for hit in body["items"]} == {image["id"], video["id"]}
+    assert all(abs(hit["distance"]) < 1e-6 for hit in body["items"])
+
+    token = (
+        await client.post(f"/v1/sessions/{session.id}/playback", headers=account.headers)
+    ).json()["token"]
+    jpeg = await client.get(
+        f"/v1/artifacts/{body['items'][0]['artifact_id']}/media", params={"token": token}
+    )
+    assert jpeg.headers["content-type"] == "image/jpeg"
+
+    theirs = await client.get(
+        "/v1/search/frames", params={"q": "a gradient"}, headers=other_account.headers
+    )
+    assert theirs.json()["items"] == []
+
+
 async def test_a_rerun_replaces_its_earlier_output(account: Account) -> None:
     # A worker killed between writing artifacts and finishing the job runs it again.
     from uuid import uuid4

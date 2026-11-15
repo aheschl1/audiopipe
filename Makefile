@@ -78,7 +78,7 @@ test-e2e:
 COMPOSE := docker compose -f deploy/docker-compose.yml
 
 sidecars:
-	$(COMPOSE) up -d --build asr-parakeet diar-pyannote audio-tagger
+	$(COMPOSE) up -d --build asr-parakeet diar-pyannote audio-tagger vision
 
 stack-up:
 	$(COMPOSE) up -d --build

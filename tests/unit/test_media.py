@@ -38,3 +38,33 @@ def test_frame_count_is_one_per_second_capped() -> None:
     assert media.frame_count(300) == 1
     assert media.frame_count(11_553) == 12
     assert media.frame_count(600_000) == media.MAX_FRAMES
+
+
+def test_candidate_frames_sample_at_the_requested_rate() -> None:
+    candidates = media.candidate_frames(mp4_bytes(seconds=3), fps=2.0)
+    assert [c.offset_ms for c in candidates] == [0, 500, 1000, 1500, 2000, 2500]
+    assert all(c.jpeg[:2] == b"\xff\xd8" and c.sharpness >= 0 for c in candidates)
+    # The fixture's green channel ramps up over the clip.
+    assert candidates[-1].brightness > candidates[0].brightness
+
+
+def test_frames_at_returns_the_requested_offsets() -> None:
+    stills = media.frames_at(mp4_bytes(seconds=3, width=320, height=240), [1500, 0], max_side=200)
+    assert sorted(stills) == [0, 1500]
+    assert (stills[1500].width, stills[1500].height) == (200, 150)
+    assert stills[1500].offset_ms == 1500
+
+
+def test_image_still_is_both_a_keyframe_and_a_candidate() -> None:
+    still, candidate = media.image_still(jpeg_bytes(2000, 1000))
+    assert (still.width, still.height) == (1024, 512)
+    assert candidate.offset_ms == 0 and candidate.jpeg[:2] == b"\xff\xd8"
+
+
+def test_sharpness_separates_edges_from_flat() -> None:
+    import numpy as np
+
+    flat = np.full((64, 64), 128.0)
+    checker = np.indices((64, 64)).sum(axis=0) % 2 * 255.0
+    assert media.sharpness(flat) == 0
+    assert media.sharpness(checker) > 1000

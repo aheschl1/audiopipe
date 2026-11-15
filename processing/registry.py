@@ -22,7 +22,11 @@ from processing.pipelines.speech_detect import SpeechDetectPipeline
 from processing.pipelines.stats_echo import StatsEchoPipeline
 from processing.pipelines.transcribe import TranscribePipeline
 from processing.pipelines.transcribe_ab import TranscribeAbPipeline
-from processing.pipelines.visual import ThumbnailPipeline, VideoProxyPipeline
+from processing.pipelines.visual import (
+    KeyframePipeline,
+    ThumbnailPipeline,
+    VideoProxyPipeline,
+)
 
 PIPELINES: tuple[type[Pipeline], ...] = (
     SessionStatsPipeline,
@@ -37,6 +41,7 @@ PIPELINES: tuple[type[Pipeline], ...] = (
     ConversationPipeline,
     ThumbnailPipeline,
     VideoProxyPipeline,
+    KeyframePipeline,
 )
 
 

@@ -1,4 +1,4 @@
-"""Stand-in audio model services for the e2e suite.
+"""Stand-in model services for the e2e suite.
 
 Speaks just enough of the transcription, diarization and classification
 contracts for the worker tiers, with deterministic canned answers; response
@@ -87,6 +87,11 @@ STUB_TAGGER_MODEL = "stub-tagger"
 STUB_CLAP_MODEL = "stub-clap"
 # Nearest STUB_WINDOWS[0] by cosine distance, so search tests rank window one first.
 STUB_TEXT_EMBEDDING = [1.0, 0.0, 0.0, 0.0]
+# The vision sidecar, under {base}/vision: one identical vector per image, so a
+# short clip yields exactly its "first" keyframe and every frame matches the
+# text query at distance 0.
+STUB_VISION_MODEL = "stub-siglip"
+STUB_VISION_EMBEDDING = [0.0, 0.0, 0.0, 1.0]
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -94,7 +99,17 @@ class _Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("content-length", 0))
         body = self.rfile.read(length)
         url = urlparse(self.path)
-        if url.path.endswith("/audio/transcriptions"):
+        if "/vision/" in url.path:
+            if url.path.endswith("/images/embeddings"):
+                count = body.count(b'name="files"')
+                vectors = [STUB_VISION_EMBEDDING] * count
+            elif url.path.endswith("/text/embeddings"):
+                vectors = [STUB_VISION_EMBEDDING] * len(json.loads(body)["texts"])
+            else:
+                self.send_error(404)
+                return
+            payload = {"embeddings": vectors, "model": STUB_VISION_MODEL}
+        elif url.path.endswith("/audio/transcriptions"):
             model = parse_qs(url.query).get("model", ["parakeet"])[0]
             whisper = model == "whisper"
             payload = {

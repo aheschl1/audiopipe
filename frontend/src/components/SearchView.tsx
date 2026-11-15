@@ -3,14 +3,16 @@ import { api, type AudioSearchRead, type Schemas } from "../api/client"
 import { fmtClock, shortId } from "../format"
 import ClipButton, { ClipProgress } from "./ClipButton"
 import { useSearchParam } from "../useParam"
+import FrameResults from "./FrameResults"
 import PageHead from "./PageHead"
 
 type TagSearchRead = Schemas["TagSearchRead"]
 type TagLabelRead = Schemas["TagLabelRead"]
 type TranscriptSearchRead = Schemas["TranscriptSearchRead"]
 type SnippetSegment = Schemas["SnippetSegment"]
+type FrameSearchRead = Schemas["FrameSearchRead"]
 
-type Mode = "describe" | "classes" | "transcripts"
+type Mode = "describe" | "classes" | "transcripts" | "frames"
 
 // One row shape serves every search mode.
 type Hit = {
@@ -63,11 +65,12 @@ function fromTranscript(hit: TranscriptSearchRead): Hit {
   }
 }
 
-// Two ways to find a moment:
+// Ways to find a moment:
 // - describe (contrastive): free text through CLAP's text encoder, ranked by
 //   embedding distance. Open vocabulary; ranks are relative per query.
 // - classes (filtering): the tagger's stored per-class sigmoid scores —
 //   deterministic, thresholdable, no model in the loop.
+// - frames (contrastive, visual): free text through SigLIP against keyframes.
 export default function SearchView({
   onOpen,
 }: {
@@ -75,7 +78,9 @@ export default function SearchView({
 }) {
   const [modeParam, setMode] = useSearchParam("mode", "describe")
   const mode: Mode =
-    modeParam === "classes" || modeParam === "transcripts" ? modeParam : "describe"
+    modeParam === "classes" || modeParam === "transcripts" || modeParam === "frames"
+      ? modeParam
+      : "describe"
   // The submitted query lives in the URL; the input box is local until submit.
   const [urlQ, setUrlQ] = useSearchParam("q", "")
   const [q, setQ] = useState(urlQ)
@@ -83,6 +88,7 @@ export default function SearchView({
   const [minScore, setMinScore] = useState(0.3)
   const [known, setKnown] = useState<TagLabelRead[]>([])
   const [results, setResults] = useState<Hit[] | null>(null)
+  const [frames, setFrames] = useState<FrameSearchRead[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fuzzy, setFuzzy] = useState(false)
@@ -102,7 +108,15 @@ export default function SearchView({
     setBusy(true)
     setError(null)
     setFuzzy(false)
-    if (mode === "transcripts") {
+    if (mode === "frames") {
+      const { data, response } = await api.GET("/v1/search/frames", {
+        params: { query: { q: query.trim(), limit: 30 } },
+      })
+      setBusy(false)
+      setFrames(data ? data.items : null)
+      if (!data)
+        setError(response.status === 502 ? "the visual search service is offline" : "search failed")
+    } else if (mode === "transcripts") {
       const { data } = await api.GET("/v1/search/transcripts", {
         params: { query: { q: query.trim(), limit: 30 } },
       })
@@ -153,13 +167,17 @@ export default function SearchView({
 
   return (
     <div className="search-view">
-      <PageHead title="Search" meta="Find a moment by what was said or what it sounded like." />
+      <PageHead
+        title="Search"
+        meta="Find a moment by what was said, what it sounded like, or what was seen."
+      />
       <div className="mode-toggle">
         {(
           [
             ["describe", "describe a sound"],
             ["classes", "filter by class"],
             ["transcripts", "transcripts"],
+            ["frames", "what was seen"],
           ] as const
         ).map(([value, title]) => (
           <button
@@ -169,6 +187,7 @@ export default function SearchView({
               // The query survives a mode switch; stale results don't.
               setMode(value, { q: null })
               setResults(null)
+              setFrames(null)
               setError(null)
             }}
           >
@@ -185,7 +204,9 @@ export default function SearchView({
               ? "describe a sound — “keyboard typing”, “a dog barking”, “music”…"
               : mode === "classes"
                 ? "class name — “speech” matches “Male speech, man speaking”…"
-                : 'words that were said — supports "quoted phrases", -exclude, or'
+                : mode === "frames"
+                  ? "describe a scene — “a whiteboard”, “someone holding a tissue”, “a street at night”…"
+                  : 'words that were said — supports "quoted phrases", -exclude, or'
           }
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -243,6 +264,8 @@ export default function SearchView({
       {fuzzy && (
         <div className="fuzzy-note">no exact matches — showing close spellings</div>
       )}
+      {frames && frames.length === 0 && <div className="empty">No matching photos or video.</div>}
+      {frames && frames.length > 0 && <FrameResults hits={frames} onOpen={onOpen} />}
       {results && results.length === 0 && (
         <div className="empty">
           {mode === "transcripts" ? "Nothing like that was said." : "No matching audio."}

@@ -17,6 +17,8 @@ from av.video.frame import VideoFrame
 
 THUMB_SIDE = 320
 PROXY_SIDE = 720
+KEYFRAME_SIDE = 1024
+CANDIDATE_SIDE = 384
 FRAMES_PER_SECOND = 1.0
 MAX_FRAMES = 24
 
@@ -27,6 +29,14 @@ class Still:
     width: int
     height: int
     offset_ms: int = 0
+
+
+@dataclass(frozen=True)
+class Candidate:
+    offset_ms: int
+    jpeg: bytes
+    sharpness: float
+    brightness: float
 
 
 @dataclass(frozen=True)
@@ -103,6 +113,77 @@ def video_frames(
             if len(stills) == n:
                 break
         return stills
+
+
+def sharpness(gray: np.ndarray) -> float:
+    """Variance of the 4-neighbour Laplacian: low means blurred or featureless."""
+    g = gray.astype(np.float32)
+    lap = g[1:-1, :-2] + g[1:-1, 2:] + g[:-2, 1:-1] + g[2:, 1:-1] - 4 * g[1:-1, 1:-1]
+    return float(lap.var())
+
+
+def _gray(arr: np.ndarray) -> np.ndarray:
+    return arr @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
+
+
+def _sampled(data: bytes, wanted: Callable[[float], bool]):
+    """Decoded frames whose offset from the first frame ``wanted`` accepts, in order."""
+    with av.open(io.BytesIO(data)) as container:
+        stream = container.streams.video[0]
+        stream.thread_type = "AUTO"
+        start: float | None = None
+        for frame in container.decode(stream):
+            if frame.time is None:
+                continue
+            start = frame.time if start is None else start
+            at_ms = (frame.time - start) * 1000
+            if wanted(at_ms):
+                yield round(at_ms), frame
+
+
+def candidate_frames(data: bytes, fps: float, max_side: int = CANDIDATE_SIDE) -> list[Candidate]:
+    """Small upright stills every 1/fps seconds, scored for focus and exposure."""
+    step = 1000 / fps
+    next_at = 0.0
+    out: list[Candidate] = []
+
+    def wanted(at_ms: float) -> bool:
+        nonlocal next_at
+        if at_ms < next_at:
+            return False
+        next_at = (at_ms // step + 1) * step
+        return True
+
+    for at_ms, frame in _sampled(data, wanted):
+        arr = _upright(frame, max_side)
+        gray = _gray(arr)
+        out.append(Candidate(at_ms, _jpeg(arr).data, sharpness(gray), float(gray.mean())))
+    return out
+
+
+def frames_at(data: bytes, offsets: list[int], max_side: int = KEYFRAME_SIDE) -> dict[int, Still]:
+    """Upright stills at these decoded-frame offsets (as candidate_frames reported them)."""
+    pending = sorted(set(offsets))
+    out: dict[int, Still] = {}
+
+    def wanted(at_ms: float) -> bool:
+        return bool(pending) and round(at_ms) >= pending[0]
+
+    for at_ms, frame in _sampled(data, wanted):
+        still = _jpeg(_upright(frame, max_side))
+        out[pending.pop(0)] = Still(still.data, still.width, still.height, at_ms)
+        if not pending:
+            break
+    return out
+
+
+def image_still(data: bytes, max_side: int = KEYFRAME_SIDE) -> tuple[Still, Candidate]:
+    """A photo as both a keyframe-sized still and a scored candidate."""
+    with av.open(io.BytesIO(data)) as container:
+        frame = next(container.decode(video=0))
+        big, small = _upright(frame, max_side), _upright(frame, CANDIDATE_SIDE)
+    gray = _gray(small)
+    return _jpeg(big), Candidate(0, _jpeg(small).data, sharpness(gray), float(gray.mean()))
 
 
 def _upright_size(data: bytes, max_side: int) -> tuple[int, int]:
