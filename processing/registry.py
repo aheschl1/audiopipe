@@ -13,8 +13,10 @@ from database.pipe import DatabasePipe
 from database.schema.jobs import Job, JobCreate
 from processing.base import Callback, Pipeline
 from processing.pipelines.audio_tag import AudioTagPipeline
+from processing.pipelines.automation import AutomationPipeline
 from processing.pipelines.conversation import ConversationPipeline
 from processing.pipelines.diarize import DiarizePipeline
+from processing.pipelines.moment import MomentPipeline
 from processing.pipelines.session_stats import SessionStatsPipeline
 from processing.pipelines.speaker_cluster import SpeakerClusterPipeline
 from processing.pipelines.sound_span import SoundSpanPipeline
@@ -22,6 +24,11 @@ from processing.pipelines.speech_detect import SpeechDetectPipeline
 from processing.pipelines.stats_echo import StatsEchoPipeline
 from processing.pipelines.transcribe import TranscribePipeline
 from processing.pipelines.transcribe_ab import TranscribeAbPipeline
+from processing.pipelines.visual import (
+    KeyframePipeline,
+    ThumbnailPipeline,
+    VideoProxyPipeline,
+)
 
 PIPELINES: tuple[type[Pipeline], ...] = (
     SessionStatsPipeline,
@@ -34,6 +41,11 @@ PIPELINES: tuple[type[Pipeline], ...] = (
     AudioTagPipeline,
     SoundSpanPipeline,
     ConversationPipeline,
+    ThumbnailPipeline,
+    VideoProxyPipeline,
+    KeyframePipeline,
+    MomentPipeline,
+    AutomationPipeline,
 )
 
 

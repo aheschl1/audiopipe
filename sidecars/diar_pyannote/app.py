@@ -1,6 +1,6 @@
 """Speaker-diarization server for DiariZen (WavLM + Conformer segmentation).
 
-The owned serving layer for the audio-pipeline's diarize tier. DiariZen does
+The owned serving layer for the context's diarize tier. DiariZen does
 the segmentation and clustering; this file speaks a small JSON contract so the
 tier (or any HTTP client) can be pointed at a different diarizer later without
 code changes.

@@ -1,24 +1,38 @@
 """Recording sessions: create, list, inspect, end, and per-resource media.
 
 Resources enter a session through the streaming websocket (see
-``api.routes.stream``), not through these routes.
+``api.routes.stream``); whole-file resources (image, video) may also be
+uploaded over REST.
 """
 
-import resources as resource_registry
-
+import json
 from collections.abc import AsyncIterator
-from datetime import timedelta
+from datetime import UTC, datetime
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import JSONResponse, StreamingResponse
 
+import resources as resource_registry
 from api import session_audio, timeline_events
+from api.config import get_settings
+from resources import ResourceValidationError
+from services import segments as segment_service
 from services import stitch
-from api.deps import CurrentUser, OwnedSession, Paging, Pipe, PlayableSession, Range
+from api.deps import CurrentUser, OwnedSession, Paging, Pipe, Range
 from api.ranges import RangeNotSatisfiable, etag_matches, parse_range
 from api.schema.artifacts import ArtifactRead
-from api.schema.auth import PlaybackTokenRead
 from api.schema.common import ErrorResponse, Page
 from api.schema.conversations import ConversationRead
 from api.schema.locations import LocationPointRead
@@ -32,6 +46,7 @@ from api.schema.sessions import (
 )
 from api.schema.speakers import SessionSpeakerRead
 from api.schema.timeline import TimelineEvent
+from database.exceptions import SessionEndedError
 from database.schema.sessions import SessionCreate
 from storage.pipe import BlobPipe
 
@@ -112,32 +127,6 @@ async def end_session(session: OwnedSession, pipe: Pipe) -> SessionRead:
     return SessionRead.from_model(await pipe.sessions.end(session.id))
 
 
-# Minutes, not hours: the token rides in the audio URL's query string, where
-# it lands in server logs and browser history. Short life bounds that leak.
-_PLAYBACK_TTL = timedelta(minutes=15)
-_PLAYBACK_TOKEN_NAME = "playback"
-
-
-@router.post("/{session_id}/playback", summary="Mint a short-lived media playback token")
-async def create_playback_token(session: OwnedSession, pipe: Pipe) -> PlaybackTokenRead:
-    """A token for the media route's ``?token=`` parameter.
-
-    Media elements (``<audio src>``) cannot send an Authorization header, so
-    the session-media route also accepts a token in the URL. This mints one
-    whose lifetime is minutes; the player re-mints when it expires. It is a
-    real API token, just time-boxed — expired ``playback`` rows are purged
-    opportunistically on each mint.
-    """
-    await pipe.tokens.purge_expired_named(session.user_id, _PLAYBACK_TOKEN_NAME)
-    issued = await pipe.tokens.issue(
-        session.user_id, name=_PLAYBACK_TOKEN_NAME, ttl=_PLAYBACK_TTL
-    )
-    assert issued.record.expires_at is not None  # ttl was given
-    return PlaybackTokenRead(
-        token=issued.token.get_secret_value(), expires_at=issued.record.expires_at
-    )
-
-
 @router.get("/{session_id}/segments", summary="List a session's segments")
 async def list_session_segments(
     session: OwnedSession,
@@ -150,6 +139,93 @@ async def list_session_segments(
         session.id, resource=resource, limit=paging.probe_limit, offset=paging.offset
     )
     return Page.build(rows, paging, segment_read)
+
+
+@router.post(
+    "/{session_id}/segments",
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload one image or video segment",
+    responses={
+        409: {"model": ErrorResponse, "description": "The session has ended."},
+        413: {"model": ErrorResponse, "description": "The file exceeds the upload cap."},
+    },
+)
+async def upload_segment(
+    session: OwnedSession,
+    file: Annotated[UploadFile, File(description="The image, or one self-contained clip.")],
+    resource: Annotated[str, Form(description="`image` or `video`.")],
+    captured_at: Annotated[
+        datetime | None, Form(description="When it was captured; defaults to now.")
+    ] = None,
+    duration_ms: Annotated[int | None, Form(description="Clip length (video only).")] = None,
+    attrs: Annotated[
+        str | None, Form(description="JSON object of the resource's attrs.")
+    ] = None,
+    metadata: Annotated[
+        str | None, Form(description="JSON object stored on the segment.")
+    ] = None,
+) -> SegmentRead:
+    """For resources a client produces as whole files rather than a stream.
+
+    The content type is sniffed from the bytes; a declared one must agree.
+    Sequence numbers are assigned server-side from a range of their own
+    (2**30 up), so an upload can go into a session that is streaming at the
+    same time without colliding with its frames.
+    """
+    try:
+        resource_type = resource_registry.get(resource)
+    except KeyError:
+        resource_type = None
+    if resource_type is None or not resource_type.uploadable:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"resource {resource!r} is not uploadable"
+        )
+    if not session.is_open:
+        raise HTTPException(status.HTTP_409_CONFLICT, "recording session has ended")
+
+    limit = get_settings().upload_max_bytes
+    data = await file.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(
+            status.HTTP_413_CONTENT_TOO_LARGE, f"upload exceeds {limit} bytes"
+        )
+    declared = file.content_type
+    if declared in (None, "", "application/octet-stream"):
+        declared = None
+    try:
+        segment = await segment_service.ingest_segment(
+            session.id,
+            data,
+            resource=resource,
+            content_type=declared,
+            filename=file.filename,
+            upload=True,
+            captured_at=captured_at or datetime.now(UTC),
+            duration_ms=duration_ms,
+            attrs=_json_object(attrs, "attrs"),
+            metadata=_json_object(metadata, "metadata"),
+        )
+    except ResourceValidationError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    except SessionEndedError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, "recording session has ended") from exc
+    return segment_read(segment)
+
+
+def _json_object(raw: str | None, field: str) -> dict:
+    if raw is None or raw == "":
+        return {}
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"{field} is not JSON: {exc}"
+        ) from exc
+    if not isinstance(value, dict):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"{field} must be a JSON object"
+        )
+    return value
 
 
 @router.get("/{session_id}/resources", summary="What this session holds, per resource")
@@ -239,7 +315,8 @@ async def get_session_timeline(
     window: Range,
 ) -> Page[TimelineEvent]:
     """What happened when: session frames, speech starts/ends, transcripts,
-    sound tags, the sound spans built from them, and location points.
+    sound tags, the sound spans built from them, location points, images
+    and video clips.
 
     Events carry a ``type`` discriminator; clients must ignore types they do
     not recognise — future processing tiers add new ones. `limit`/`offset`
@@ -251,8 +328,9 @@ async def get_session_timeline(
 
     An unprocessed (or speechless) session serves just its session frames;
     processing status stays introspectable via `.../artifacts?kind=speech-map`.
-    Location points come straight from the stored segments — no pipeline —
-    so they appear live while the session is still streaming.
+    Location points, images and video clips come straight from the stored
+    segments — no pipeline — so they appear live while the session is still
+    streaming.
     """
     rows = await pipe.artifacts.list_for_session(
         session.id, from_ms=window.from_ms, to_ms=window.to_ms, limit=_MAX_TIMELINE_ARTIFACTS
@@ -264,6 +342,14 @@ async def get_session_timeline(
             session.id, resource=resource, limit=_MAX_TIMELINE_ARTIFACTS
         )
     ]
+    # Unwindowed: these carry no span, and the window query keeps spans only.
+    visuals = [
+        artifact
+        for pipeline in timeline_events.VISUAL_PIPELINES
+        for artifact in await pipe.artifacts.list_for_session(
+            session.id, pipeline=pipeline, limit=_MAX_TIMELINE_ARTIFACTS
+        )
+    ]
     labels = await pipe.speakers.labels_for_session(session.id)
     speaker_map = {
         label.speaker: label for label in labels if label.speaker_id is not None
@@ -272,6 +358,7 @@ async def get_session_timeline(
         session,
         rows,
         segments=segments,
+        visuals=visuals,
         from_ms=window.from_ms,
         to_ms=window.to_ms,
         speakers=speaker_map,
@@ -384,7 +471,7 @@ async def _stream_stitched(
     },
 )
 async def get_session_media(
-    session: PlayableSession, resource: str, request: Request
+    session: OwnedSession, resource: str, request: Request
 ) -> Response:
     """The session's whole stream of one resource as a single media object.
 

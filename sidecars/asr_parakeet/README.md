@@ -9,10 +9,10 @@ with `?model=parakeet|whisper` (default parakeet):
 - **faster-whisper large-v3** int8_float16 (~3 GB) — the A/B contender
   slot, **disabled by default** (`ASR_WHISPER_ENABLED=1` to load it; weights
   re-download on boot). The 2026-08 experiment concluded parakeet·chunk wins
-  (audio-pipeline `docs/asr-ab-results.md`). Served with `vad_filter=True` +
+  (context `docs/asr-ab-results.md`). Served with `vad_filter=True` +
   `condition_on_previous_text=False` when enabled.
 
-Consumed by the audio-pipeline's `transcribe` tier (parakeet) and
+Consumed by the context's `transcribe` tier (parakeet) and
 `transcribe-ab` tier (both), via
 `PROCESSING_TRANSCRIBER_BASE_URL=http://127.0.0.1:8033/v1`.
 

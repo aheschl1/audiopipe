@@ -24,7 +24,7 @@ enqueue wiring in the API**: workers find their own work by querying the same
 database the API writes.
 
 Run them with `make worker` (`uv run python -m processing`), or a subset with
-`--only <name>` (repeatable). `audio-pipeline-worker` is the script entry.
+`--only <name>` (repeatable). `context-worker` is the script entry.
 
 ## Topology
 
@@ -408,21 +408,17 @@ conversations in three pure stages:
    are 60 s) is stamped `block`. The effective pause tolerance is therefore
    `min(conversation gap, diarize block gap)` — raise both together.
 2. **Speaker-shift split.** Within each run, the user — present in every
-   conversation, so never a participant signal — is set aside: every label
-   in the block that resolves to the cluster named
-   `PROCESSING_CONVERSATION_USER_NAME`, or, when none does (unset, or not
-   yet clustered), the block's dominant label. The artifact records
-   `user_labels` and `user_source` (`identity`/`dominant`). Then and the remaining speaker sets of the trailing and leading
+   conversation, so never a participant signal — is set aside as the
+   block's dominant label (most talk time), recorded as `user_labels`. Then
+   the remaining speaker sets of the trailing and leading
    `PROCESSING_CONVERSATION_CHURN_WINDOW` (4) turns are compared. Where they
    are disjoint and each side holds `PROCESSING_CONVERSATION_CHURN_MIN_TURNS`
    (2) non-user turns, the run splits with `closure: speaker_change`. A
    single interjection never reaches the floor; a user talking alone (a
    phone call) never splits. This is what catches a hop from one person to
    another with little or no silence — the one shape silence cannot see.
-   The tier runs on `diarize-map`, before that session's new labels are
-   clustered, so a fresh session usually gets the dominant-label fallback;
-   `conversations rebuild --all` regroups from identity once clustering has
-   settled (no GPU work).
+   `conversations rebuild --all` regroups every session from its existing
+   diarization (no GPU work).
 3. **Floor.** Runs shorter than `PROCESSING_CONVERSATION_MIN_TURNS` (2) are
    dropped, after the splits, so a short remainder is discarded rather than
    kept. Transcripts are never consulted, so the tier needs no transcribe
@@ -449,6 +445,132 @@ gap and split a run. `GET /v1/sessions/{id}/conversations` lists a
 session's conversations; `GET /v1/conversations/{id}` adds the ordered
 transcript with speakers resolved at read through the same label → cluster
 → name chain the timeline uses.
+
+## The visual tiers
+
+`thumbnail`, `video-proxy` and `keyframe` (`processing/pipelines/visual.py`) work per
+segment, not per session: an image or clip is a whole file, so it is work as
+soon as it lands, open session or not. Jobs carry `payload.segment_id` and dedup
+on `{pipeline}:segment:{id}`.
+
+- `thumbnail`: one upright JPEG (≤320 px) per image; for a clip, one still
+  per second (capped at 24), each with `metadata.offset_ms` into the clip.
+- `video-proxy`: an upright 720p H.264/AAC MP4 with `moov` first, so any
+  source codec (phone HEVC, RTMP MPEG-TS) plays and seeks in a browser.
+
+Both decode with PyAV (bundled FFmpeg, no system ffmpeg), apply the display
+rotation to the pixels, and write artifacts linked by `links.segment` with
+`metadata.content_type`/`byte_size`. Originals are untouched. The timeline
+attaches them to `image` (`thumbnail_id`) and `video-clip` (`proxy_id`,
+`frames`) events; `/v1/artifacts/{id}/media` serves them, authenticated
+by the web app's sign-in cookie (or a bearer header).
+
+### Keyframes
+
+`keyframe` picks the frames that downstream visual work (OCR, captions,
+roll-ups) should read, so those tiers never touch every frame. Every photo is a
+keyframe (`reason: photo`). A clip is sampled at 2 fps into 384 px candidates,
+each scored for focus (Laplacian variance) and exposure and embedded by the
+vision sidecar (SigLIP 2 so400m, 1152-d). `processing/keyframes.py` then walks
+the candidates:
+
+- **Gate:** frames below the clip's 25th sharpness percentile, or too dark or
+  blown out, never trigger a pick (an all-bad clip is taken unfiltered).
+- **Trigger:** a gated frame whose cosine distance to each of the last 8
+  keyframes is at least `keyframe_novelty` (0.10) opens a `novel` pick. The
+  first gated frame opens `first`, and 30 s without a pick opens `heartbeat`.
+- **Settle:** the pick is the sharpest gated frame in the next 1 s, so a camera
+  still mid-swing doesn't win.
+- **Limits:** picks are at least 1.5 s apart, and novelty picks stop at 12 per
+  rolling minute (heartbeats still fire).
+
+The threshold was calibrated on a real phone clip. Within one continuous shot,
+frames drift 0.02–0.14 from the first frame. A different room with the same
+person sits about 0.15 away, and unrelated photos about 0.22. SigLIP distances
+are compressed, so small threshold changes matter: re-sweep before tuning.
+
+Each pick is re-decoded at 1024 px and stored as a JPEG artifact
+(`kind: keyframe`, `links.segment`, metadata `offset_ms`, `reason`, `novelty`,
+`sharpness`). It is placed on the timeline as a 1 ms span at the segment's
+capture time plus the offset, or left unplaced if that falls before the
+session start. Its embedding goes to `visual_embeddings` in the same
+transaction. `GET /v1/search/frames?q=` embeds the text with the same sidecar
+and ranks keyframes by cosine distance. Text-to-image distances sit around
+0.8–1.0 with SigLIP; only the order is meaningful.
+
+Not yet: photo-burst dedup and speech-onset triggers (the transcript usually
+isn't ready when a clip lands).
+
+## The moment tier
+
+`moment` describes the day in **moments**: wall-clock stretches of recording
+bounded by `PROCESSING_MOMENT_GAP_MS` (10 min) of nothing, **across sessions**.
+One dinner can be an audio session plus a dozen single-photo sessions. Moments
+live in their own `moments` table, per user. They are not artifacts, because a
+moment has no single session.
+
+- **Activity.** Everything is placed by timeline time: session start plus
+  offset. Each audio session is one span from its start. Photos and clips
+  count through their keyframes, so a frame the keyframe tier left unplaced
+  (captured before its session started) is not activity. Location pings
+  don't count; they would chain a whole day together.
+- **When a window becomes a job.** The gap must have passed since its last
+  capture. No audio session in it may still be streaming. Its last upload and
+  its newest transcript, keyframe or sound span must be
+  `MOMENT_SETTLE_SECONDS` (2 min) old. No other pipeline may have queued or
+  running work for its sessions. The dedup key hashes per-session segment
+  and artifact counts, so a late transcript or a re-diarize rebuilds the
+  window. Discovery runs at most every
+  `MOMENT_DISCOVER_INTERVAL_SECONDS` (60 s).
+- **Splitting.** A window longer than `MOMENT_MAX_MS` (90 min) is cut at its
+  largest quiet gap of at least `MOMENT_SPLIT_GAP_MS` (2 min), or into equal
+  slices if it has none. Sound spans don't count as activity here; each one
+  joins every piece it overlaps.
+- **The call.** Each moment goes to an OpenAI-compatible chat endpoint
+  (`PROCESSING_LLM_*`; the key falls back to `OPENAI_API_KEY`) as a labelled
+  manifest. It lists transcripts as U1, U2…, with unnamed speakers shown as
+  "voice N". Confident sound
+  spans other than speech are S1…. Up to 12 images are attached, every photo
+  first and then keyframes spread through time, as P1… and K1…. Each
+  image–utterance pair within 2 s of each other is listed as a candidate for
+  the model to judge. The model returns a title, summary, people, topic
+  tags (up to 5, when any apply), visible text and links. It is not asked
+  for places.
+- **Links** land in `artifact_links`: from, to, `relation`
+  (`depicts`/`mentions`/`reads`/`same_scene`/`unrelated`), confidence, why.
+  Each link belongs to the moment that asserted it, and a link is deleted
+  when either of its artifacts is. Links between labels the model wasn't
+  shown, or between items more than `MOMENT_LINK_MAX_MS` (10 min) apart, are
+  dropped. `unrelated` is kept, so the UI can hide coincidences.
+- **Publishing.** A job replaces every moment of the user that overlaps its
+  window, in one transaction. A moment stores a snapshot of the items it was
+  shown, so `GET /v1/moments/{id}` needs no joins. Moments whose sessions are
+  all gone are pruned at discovery.
+
+With the default OpenAI base URL and no key the tier stays idle. To use a
+local server, set `PROCESSING_LLM_BASE_URL`; no key is needed.
+
+## The automation tier
+
+`automation` runs the user's rules (`/v1/automations`) on new moments. A rule
+has a trigger (only `moment` today), conditions that must all hold, and
+actions. The only action today, `extract`, has the model fill named fields,
+which show on the moment page.
+
+- **Conditions:** any of `people`, any of `topics`, any of `keywords` (whole
+  words in the title, summary or transcript), `min_minutes`, and `ask`, a
+  yes/no question for the model. The cheap ones run first; the model is asked
+  only when they pass, and one call answers `ask` and fills every field.
+
+Discovery pairs each enabled rule with moments created since it was turned on
+(`active_since`) and within `automation_lookback_hours`, so a new or
+re-enabled rule never sweeps the history. Each pair runs once and leaves a
+run: `matched`, `skipped` (with why) or `failed` (with the error; the job
+fails too, so the worker retries it). A rebuilt moment is a new row, so its
+rules run again and its fields are filled from the new version.
+
+Anyone talking near the recorder can steer the model's verdict and field
+values; treat them as untrusted text.
 
 ## Callbacks and chaining
 

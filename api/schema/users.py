@@ -35,6 +35,7 @@ class UserRead(BaseModel):
     id: UUID
     email: EmailStr
     display_name: str | None
+    read_only: bool
     created_at: datetime
 
     @classmethod
@@ -43,6 +44,7 @@ class UserRead(BaseModel):
             id=user.id,
             email=user.email,
             display_name=user.display_name,
+            read_only=user.read_only,
             created_at=user.created_at,
         )
 

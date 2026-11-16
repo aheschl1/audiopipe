@@ -7,6 +7,8 @@ export type EventKind =
   | "sound-span"
   | "audio-tag"
   | "location-point"
+  | "image"
+  | "video-clip"
   | "marker"
 
 export const ALL_KINDS: { key: EventKind; label: string }[] = [
@@ -15,6 +17,8 @@ export const ALL_KINDS: { key: EventKind; label: string }[] = [
   { key: "sound-span", label: "Sound spans" },
   { key: "audio-tag", label: "Sound tags" },
   { key: "location-point", label: "Location" },
+  { key: "image", label: "Images" },
+  { key: "video-clip", label: "Video" },
   { key: "marker", label: "Session markers" },
 ]
 
@@ -76,7 +80,7 @@ export default function TimelineFilter({
   return (
     <div className="filter-menu" ref={root}>
       <button className={`btn ghost slim ${hidden.size > 0 ? "filtered" : ""}`} onClick={() => setOpen((o) => !o)}>
-        {hidden.size > 0 ? `showing ${ALL_KINDS.length - hidden.size}/${ALL_KINDS.length}` : "filter"} ▾
+        {hidden.size > 0 ? `Showing ${ALL_KINDS.length - hidden.size}/${ALL_KINDS.length}` : "Filter"} ▾
       </button>
       {open && (
         <div className="filter-pop">

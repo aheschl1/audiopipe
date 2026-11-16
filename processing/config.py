@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -123,6 +124,72 @@ class ProcessingSettings(BaseSettings):
     audio_tag_min_consecutive: int = 2
     audio_tag_top_k: int = 15
 
+    # Vision sidecar (SigLIP 2 image/text embeddings) and the keyframe tier.
+    # Candidates are sampled at candidate_fps; a gated frame becomes a
+    # keyframe when its cosine distance to every one of the last
+    # keyframe_memory keyframes reaches keyframe_novelty. Calibrated on a
+    # real phone clip (2026-11-15): one continuous shot drifts 0.02-0.14 from
+    # its first frame, a different room with the same person sits ~0.15, and
+    # unrelated photos ~0.22; 0.10 picked wide shot, close-up and lean-back
+    # out of 11.5s. SigLIP distances are compressed: re-sweep before raising.
+    vision_base_url: str = "http://127.0.0.1:8036/v1"
+    vision_timeout_seconds: float = 300.0
+    keyframe_candidate_fps: float = 2.0
+    keyframe_novelty: float = 0.10
+    keyframe_memory: int = 8
+    keyframe_settle_ms: int = 1_000
+    keyframe_min_gap_ms: int = 1_500
+    keyframe_heartbeat_ms: int = 30_000
+    keyframe_max_per_minute: int = 12
+    keyframe_blur_percentile: float = 25.0
+
+    # Language model for the moment tier: any OpenAI-compatible chat endpoint
+    # that takes images (OpenAI, vLLM, llama-server, Ollama). The key falls
+    # back to OPENAI_API_KEY; a local server needs none. With the default base
+    # URL and no key, tiers that need it stay idle.
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_api_key: str | None = Field(
+        None,
+        validation_alias=AliasChoices("PROCESSING_LLM_API_KEY", "OPENAI_API_KEY", "OPENAI_APIKEY"),
+    )
+    llm_model: str = "gpt-5.6-terra"
+    llm_image_detail: str | None = None  # OpenAI's low/high/auto; omitted when unset
+    llm_reasoning_effort: str | None = None  # sent only when set
+    llm_json_mode: bool = True  # response_format json_object
+    llm_timeout_seconds: float = 300.0
+
+    # Moment tier: wall-clock stretches of recording bounded by gaps of
+    # moment_gap_ms, across sessions. A stretch closes once that gap has passed,
+    # nothing in it is still being processed, and its last upload is
+    # moment_settle_seconds old. Stretches longer than moment_max_ms split at
+    # their largest quiet gap (at least moment_split_gap_ms), else evenly.
+    moment_gap_ms: int = 600_000
+    moment_settle_seconds: float = 120.0
+    moment_max_ms: int = 5_400_000
+    moment_split_gap_ms: int = 120_000
+    moment_max_images: int = 12
+    moment_max_utterances: int = 400
+    moment_max_sounds: int = 12
+    # The tagger is noisy below this; weaker spans are left out of the prompt.
+    moment_min_sound_peak: float = 0.6
+    # Frames within this much of an utterance or sound become candidate pairs.
+    moment_candidate_slack_ms: int = 2_000
+    # Links between items further apart than this are dropped.
+    moment_link_max_ms: int = 600_000
+    moment_lookback_days: int = 365
+    # IANA zone for the clock times the model sees (e.g. America/Toronto);
+    # unset uses the host's, which in the containers is UTC.
+    moment_timezone: str | None = None
+    moment_discover_interval_seconds: float = 60.0
+
+    # Automation tier: only moments created this recently are matched, which
+    # keeps discovery cheap.
+    automation_lookback_hours: float = 48.0
+
+    @property
+    def llm_enabled(self) -> bool:
+        return bool(self.llm_api_key) or "api.openai.com" not in self.llm_base_url
+
     # Sound-span tier: the tagger's windows merged into few long single-class
     # spans. Hysteresis, not one threshold — sigmoid scores wobble, and a class
     # sitting near a single cut-off shatters into fragments. A span opens at
@@ -155,12 +222,9 @@ class ProcessingSettings(BaseSettings):
     # Speaker-shift split: compare the non-user speaker sets of the trailing
     # and leading `churn_window` turns; split where they are disjoint and each
     # side holds at least `churn_min_turns` non-user turns (one interjection
-    # is not a new conversation). The user is every label in the block that
-    # resolves to the speaker cluster named `conversation_user_name`; with no
-    # such label (unset, or not yet clustered) the block's dominant label.
+    # is not a new conversation). The user is the block's dominant label.
     conversation_churn_window: int = 4
     conversation_churn_min_turns: int = 2
-    conversation_user_name: str | None = None
 
     # Speaker clustering tier: batch agglomerative clustering (average
     # linkage, cosine) over per-(block, speaker) embeddings; merging stops at

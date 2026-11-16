@@ -3,9 +3,13 @@ import { api, type SessionRead } from "../api/client"
 import { stopClip } from "../clipPlayer"
 import { fmtDate, fmtDuration, shortId } from "../format"
 import { usePlayhead } from "../hooks/usePlayhead"
+import { useReadOnly } from "../readOnly"
 import { useSessionEvents } from "../hooks/useSessionEvents"
+import { imageEvents } from "../visual"
 import AudioPlayer from "./AudioPlayer"
+import ImageLightbox from "./ImageLightbox"
 import SessionMapPanel from "./SessionMapPanel"
+import SessionPhotos from "./SessionPhotos"
 import TagSummary from "./TagSummary"
 import Timeline from "./Timeline"
 import TimelineStrip from "./TimelineStrip"
@@ -31,6 +35,7 @@ export default function SessionView({
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [splitting, setSplitting] = useState(false)
+  const readOnly = useReadOnly()
   // The audio element as state (not a ref): the strip and playhead hooks
   // need to re-subscribe when it mounts.
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null)
@@ -42,6 +47,15 @@ export default function SessionView({
   const [refreshKey, setRefreshKey] = useState(0)
 
   const { events, truncated } = useSessionEvents(sessionId, refreshKey)
+  const images = useMemo(() => imageEvents(events ?? []), [events])
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const openImage = useCallback(
+    (segmentId: string) => {
+      const index = images.findIndex((image) => image.segment_id === segmentId)
+      if (index >= 0) setLightboxIndex(index)
+    },
+    [images],
+  )
 
   // The session has its own full player; a still-running inline clip from
   // the search/speakers page would double the audio.
@@ -139,44 +153,20 @@ export default function SessionView({
 
   if (!session) return <div className="loading">Loading session…</div>
 
+  const title = session.label ?? session.device ?? shortId(session.id)
+
   return (
     <div className="session-view">
-      <div className="session-header">
-        <button className="btn ghost slim" onClick={onBack}>
-          ← back
+      <header className="session-header">
+        <button className="crumb" onClick={onBack}>
+          ← Recordings
         </button>
-        <div>
+        <div className="session-head-row">
           {draft === null ? (
-            <h2 className="session-title">
-              {session.label ?? session.device ?? shortId(session.id)}
-              {session.is_open && <span className="badge live">live</span>}
-              <button
-                className="btn ghost slim"
-                title="rename this session"
-                onClick={() => setDraft(session.label ?? "")}
-              >
-                rename
-              </button>
-              {session.is_open && (
-                <button
-                  className="btn ghost slim"
-                  title="end this session and start processing; a connected recorder reopens"
-                  disabled={splitting}
-                  onClick={() => void splitSession()}
-                >
-                  {splitting ? "splitting…" : "split"}
-                </button>
-              )}
-              {onAb && (
-                <button
-                  className="btn ghost slim"
-                  title="vote on transcript candidates"
-                  onClick={() => onAb(session.id)}
-                >
-                  A/B
-                </button>
-              )}
-            </h2>
+            <h1 className="session-title">
+              {title}
+              {session.is_open && <span className="badge live">Live</span>}
+            </h1>
           ) : (
             <form
               className="session-rename"
@@ -187,7 +177,7 @@ export default function SessionView({
             >
               <input
                 className="input slim"
-                placeholder="name this session…"
+                placeholder="Name this session…"
                 value={draft}
                 autoFocus
                 maxLength={200}
@@ -197,7 +187,7 @@ export default function SessionView({
                 }}
               />
               <button className="btn primary slim" disabled={saving}>
-                {saving ? "saving…" : "save"}
+                {saving ? "Saving…" : "Save"}
               </button>
               <button
                 type="button"
@@ -205,17 +195,50 @@ export default function SessionView({
                 disabled={saving}
                 onClick={() => setDraft(null)}
               >
-                cancel
+                Cancel
               </button>
             </form>
           )}
-          <div className="session-sub">
-            {fmtDate(session.started_at)} · {fmtDuration(session.started_at, session.ended_at)}
-            {session.device && ` · ${session.device}`}
-          </div>
+          {draft === null && !readOnly && (
+            <div className="page-actions">
+              <button
+                className="btn ghost slim"
+                title="Rename this session"
+                onClick={() => setDraft(session.label ?? "")}
+              >
+                Rename
+              </button>
+              {session.is_open && (
+                <button
+                  className="btn ghost slim"
+                  title="End this session and start processing. A connected recorder reopens."
+                  disabled={splitting}
+                  onClick={() => void splitSession()}
+                >
+                  {splitting ? "Splitting…" : "Split"}
+                </button>
+              )}
+              {onAb && (
+                <button
+                  className="btn ghost slim"
+                  title="Vote on transcript candidates"
+                  onClick={() => onAb(session.id)}
+                >
+                  A/B
+                </button>
+              )}
+            </div>
+          )}
         </div>
+        <div className="session-sub">
+          {fmtDate(session.started_at)} · {fmtDuration(session.started_at, session.ended_at)}
+          {session.device && ` · ${session.device}`}
+        </div>
+      </header>
+      <div className="player-dock">
+        <span className="player-dock-title">{title}</span>
+        <AudioPlayer sessionId={sessionId} audioRef={setAudioEl} />
       </div>
-      <AudioPlayer sessionId={sessionId} audioRef={setAudioEl} />
       {events && events.length > 0 && (
         <TimelineStrip
           events={events}
@@ -227,27 +250,47 @@ export default function SessionView({
           onSpeakersChanged={onSpeakersChanged}
           mapOpen={showMap}
           onMapToggle={() => setShowMap((v) => !v)}
+          onOpenImage={openImage}
         />
       )}
-      {showMap && (
-        <SessionMapPanel
-          sessionId={sessionId}
-          events={events}
-          truncated={truncated}
-          audioEl={audioEl}
+      <div className="session-body">
+        <aside className="session-aside">
+          {showMap && (
+            <SessionMapPanel
+              sessionId={sessionId}
+              events={events}
+              truncated={truncated}
+              audioEl={audioEl}
+              onSeek={seekTo}
+            />
+          )}
+          <TagSummary sessionId={sessionId} />
+          {images.length > 0 && (
+            <SessionPhotos images={images} onOpen={setLightboxIndex} />
+          )}
+        </aside>
+        <div className="session-main">
+          <TimelineList
+            sessionId={sessionId}
+            onSeek={seekTo}
+            focusMs={seekMs}
+            activeId={activeId}
+            follow={follow && head.playing}
+            refreshKey={refreshKey}
+            onSpeakersChanged={onSpeakersChanged}
+            onOpenImage={openImage}
+          />
+        </div>
+      </div>
+      {lightboxIndex !== null && (
+        <ImageLightbox
+          images={images}
+          index={lightboxIndex}
+          onIndex={setLightboxIndex}
+          onClose={() => setLightboxIndex(null)}
           onSeek={seekTo}
         />
       )}
-      <TagSummary sessionId={sessionId} />
-      <TimelineList
-        sessionId={sessionId}
-        onSeek={seekTo}
-        focusMs={seekMs}
-        activeId={activeId}
-        follow={follow && head.playing}
-        refreshKey={refreshKey}
-        onSpeakersChanged={onSpeakersChanged}
-      />
     </div>
   )
 }

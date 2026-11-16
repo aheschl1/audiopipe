@@ -1,4 +1,4 @@
-"""Audio search, two ways.
+"""Search over audio, transcripts and keyframes.
 
 - ``/search/audio`` — **contrastive**: the query text is embedded by the
   classifier service's CLAP text encoder (same joint space as the stored
@@ -13,6 +13,10 @@
   falling back to trigram close-spelling matches when strict finds nothing.
   A semantic ``mode`` is planned but deliberately deferred (chunk-overlap
   design first); adding it stays non-breaking.
+
+- ``/search/frames`` — **contrastive, visual**: the query is embedded by the
+  vision sidecar's SigLIP 2 text tower and ranked against keyframe
+  embeddings.
 
 Together they are the retrieval primitives for question-answering over
 recordings: the audio routes answer "when did I hear X", transcripts answer
@@ -30,6 +34,8 @@ from api.deps import CurrentUser, Pipe
 from api.schema.search import (
     AudioSearchRead,
     AudioSearchResponse,
+    FrameSearchRead,
+    FrameSearchResponse,
     TagLabelRead,
     TagLabelsResponse,
     TagSearchRead,
@@ -40,41 +46,51 @@ from api.schema.search import (
 
 router = APIRouter(prefix="/search", tags=["search"])
 
-_BAD_GATEWAY = HTTPException(
+_AUDIO_DOWN = HTTPException(
     status_code=status.HTTP_502_BAD_GATEWAY,
     detail="the audio embedding service is unavailable",
 )
+_VISION_DOWN = HTTPException(
+    status_code=status.HTTP_502_BAD_GATEWAY,
+    detail="the vision embedding service is unavailable",
+)
 
 
-async def _embed_query(text: str) -> tuple[list[float], str]:
-    """The query in CLAP's text space, via the classifier sidecar."""
-    settings = get_settings()
+async def _embed_text(
+    base_url: str, timeout: float, text: str, down: HTTPException
+) -> tuple[list[float], str]:
+    """The query in a sidecar's text space (``POST {base}/text/embeddings``)."""
     try:
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(settings.classifier_timeout_seconds, connect=5.0)
-        ) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(timeout, connect=5.0)) as client:
             response = await client.post(
-                f"{settings.classifier_base_url.rstrip('/')}/text/embeddings",
-                json={"texts": [text]},
+                f"{base_url.rstrip('/')}/text/embeddings", json={"texts": [text]}
             )
     except httpx.HTTPError as exc:
-        raise _BAD_GATEWAY from exc
+        raise down from exc
     if response.status_code >= 400:
-        raise _BAD_GATEWAY
+        raise down
     try:
         body = response.json()
         (vector,) = body["embeddings"]
         model = body["model"]
     except (ValueError, KeyError, TypeError):
-        raise _BAD_GATEWAY from None
+        raise down from None
     if (
         not isinstance(vector, list)
         or not vector
         or not all(isinstance(v, (int, float)) and math.isfinite(v) for v in vector)
         or not isinstance(model, str)
     ):
-        raise _BAD_GATEWAY
+        raise down
     return vector, model
+
+
+async def _embed_query(text: str) -> tuple[list[float], str]:
+    """The query in CLAP's text space, via the classifier sidecar."""
+    settings = get_settings()
+    return await _embed_text(
+        settings.classifier_base_url, settings.classifier_timeout_seconds, text, _AUDIO_DOWN
+    )
 
 
 @router.get("/audio", summary="Find audio windows by describing their sound")
@@ -96,6 +112,29 @@ async def search_audio(
     )
     return AudioSearchResponse(
         query=q, model=model, items=[AudioSearchRead.from_model(hit) for hit in hits]
+    )
+
+
+@router.get("/frames", summary="Find keyframes by describing what was seen")
+async def search_frames(
+    user: CurrentUser,
+    pipe: Pipe,
+    q: str = Query(min_length=1, max_length=500, description="A visual description, e.g. 'a whiteboard with diagrams' or 'a red car'."),
+    session_id: UUID | None = Query(None, description="Restrict matches to one session."),
+    limit: int = Query(20, ge=1, le=100),
+) -> FrameSearchResponse:
+    """Keyframes (every photo, and the distinct moments of each video) nearest
+    the description in SigLIP 2's joint space. Like audio search, distances
+    rank within one query and carry no absolute cutoff."""
+    settings = get_settings()
+    vector, model = await _embed_text(
+        settings.vision_base_url, settings.vision_timeout_seconds, q, _VISION_DOWN
+    )
+    hits = await pipe.visual_embeddings.search(
+        vector, user_id=user.id, session_id=session_id, limit=limit
+    )
+    return FrameSearchResponse(
+        query=q, model=model, items=[FrameSearchRead.from_model(hit) for hit in hits]
     )
 
 

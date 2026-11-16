@@ -57,6 +57,7 @@ async def ingest_segment(
     content_type: str | None = None,
     filename: str | None = None,
     sequence: int | None = None,
+    upload: bool = False,
     captured_at: datetime | None = None,
     offset_ms: int | None = None,
     duration_ms: int | None = None,
@@ -64,6 +65,10 @@ async def ingest_segment(
     metadata: dict[str, Any] | None = None,
 ) -> ResourceSegment:
     """Store one segment's bytes and register it against its session.
+
+    ``upload=True`` numbers the segment in the REST upload range
+    (:data:`~database.schema.segments.UPLOAD_SEQUENCE_BASE` up) instead of
+    the stream's range, so it can never collide with a live stream.
 
     Nothing is locked across a blob upload: the sequence number is a
     snapshot read committed before the PUT, and the ``(session_id, sequence)``
@@ -94,6 +99,7 @@ async def ingest_segment(
                 checksum=checksum,
                 filename=filename,
                 sequence=sequence,
+                upload=upload,
                 offset_ms=offset_ms,
                 metadata=metadata,
             )
@@ -101,6 +107,12 @@ async def ingest_segment(
             if sequence is not None or attempts_left == 0:
                 raise
     raise AssertionError("unreachable")  # the loop returns or raises
+
+
+async def _touch(pipe: DatabasePipe, session_id: UUID, upload: bool) -> None:
+    """Uploads refuse a session that ended while their bytes were in flight."""
+    if not await pipe.sessions.touch(session_id) and upload:
+        raise SessionEndedError(session_id)
 
 
 async def _ingest_once(
@@ -112,6 +124,7 @@ async def _ingest_once(
     checksum: bytes,
     filename: str | None,
     sequence: int | None,
+    upload: bool,
     offset_ms: int | None,
     metadata: dict[str, Any] | None,
 ) -> ResourceSegment:
@@ -121,10 +134,14 @@ async def _ingest_once(
         if session is None:
             raise NotFoundError("recording session", session_id)
         if sequence is None:
-            sequence = await pipe.segments.next_sequence(session_id)
+            sequence = await (
+                pipe.segments.next_upload_sequence(session_id)
+                if upload
+                else pipe.segments.next_sequence(session_id)
+            )
         if validated.payload is not None:
             # Inline: the row is the storage — one transaction, done.
-            await pipe.sessions.touch(session_id)
+            await _touch(pipe, session_id, upload)
             return await pipe.segments.create(
                 _row(session, segment_id, sequence, resource, validated, checksum,
                      byte_size=len(data), offset_ms=offset_ms, metadata=metadata)
@@ -141,7 +158,7 @@ async def _ingest_once(
         info = await blobs.put(key, data, content_type=validated.content_type)
         try:
             async with DatabasePipe() as pipe:
-                await pipe.sessions.touch(session_id)
+                await _touch(pipe, session_id, upload)
                 return await pipe.segments.create(
                     _row(session, segment_id, sequence, resource, validated, checksum,
                          byte_size=info.byte_size, offset_ms=offset_ms, metadata=metadata,

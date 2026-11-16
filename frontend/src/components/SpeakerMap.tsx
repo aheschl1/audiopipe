@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react"
 import type { ComponentType } from "react"
 import { api, type ProjectionPointRead, type SpeakerProjectionRead } from "../api/client"
 import { shortId } from "../format"
-import { hue } from "../speakers"
+import { categoryHex } from "../speakers"
+import { token } from "../styles/tokens"
 import SpeakerMapInspector from "./SpeakerMapInspector"
 import { useSearchParam } from "../useParam"
+import PageHead from "./PageHead"
 
 // Each view names the components it shows, so the explained-variance figure
 // is derived from the axes on screen rather than assumed to be PC1+PC2.
@@ -19,8 +21,19 @@ type View = (typeof VIEWS)[number]
 
 const UNASSIGNED = "unassigned"
 const LEGEND_LIMIT = 14
-const MUTED = "#8d96a8"
-const GRID = "#1f2530"
+
+/** Plotly can't read CSS variables, so resolve the tokens it needs once per render. */
+function plotTheme() {
+  return {
+    ink: token("--ink"),
+    muted: token("--muted"),
+    faint: token("--faint"),
+    line: token("--line"),
+    lineStrong: token("--line-strong"),
+    surface: token("--surface"),
+    sans: token("--font-sans"),
+  }
+}
 
 // Phones get no legend and hairline margins: a fixed 176px legend gutter is
 // nearly half a phone's width, which leaves the drawing area too small to read.
@@ -81,7 +94,7 @@ export default function SpeakerMap({
   useEffect(() => {
     void loadPlot().then(setPlot, (reason) => {
       console.error("plotly load failed", reason)
-      setError("could not load the plotting library")
+      setError("Couldn't load the plotting library.")
     })
   }, [])
 
@@ -99,7 +112,7 @@ export default function SpeakerMap({
       })
       .then(({ data: body, error: failed }) => {
         if (!live) return
-        if (failed || !body) setError("could not load the projection")
+        if (failed || !body) setError("Couldn't load the voice map.")
         else setData(body)
       })
     return () => {
@@ -125,6 +138,7 @@ export default function SpeakerMap({
       else groups.set(key, [point])
     }
 
+    const theme = plotTheme()
     const [ax, ay, az] = view.axes
     return [...groups.entries()]
       .sort((a, b) => b[1].length - a[1].length)
@@ -132,7 +146,7 @@ export default function SpeakerMap({
         const unassigned = key === UNASSIGNED
         const first = points[0]
         const name = unassigned
-          ? `unassigned (${points.length})`
+          ? `Unassigned (${points.length})`
           : `${first?.name ?? shortId(key)} (${points.length})`
         return {
           type: is3d ? "scatter3d" : "scattergl",
@@ -155,13 +169,13 @@ export default function SpeakerMap({
           ]),
           marker: {
             size: points.map((point) => markerSize(point.talk_ms, is3d)),
-            color: unassigned ? "rgba(141,150,168,.45)" : `hsl(${hue(key)} 55% 55%)`,
+            color: unassigned ? theme.faint : categoryHex(key),
             ...(is3d
-              ? { opacity: unassigned ? 0.45 : 0.9 }
+              ? { opacity: unassigned ? 0.4 : 0.9 }
               : {
                   line: {
                     width: unassigned ? 1 : 0.5,
-                    color: unassigned ? MUTED : "rgba(0,0,0,.45)",
+                    color: unassigned ? theme.faint : theme.surface,
                   },
                 }),
           },
@@ -173,11 +187,13 @@ export default function SpeakerMap({
   }, [data, view, is3d, narrow])
 
   const layout = useMemo(() => {
+    const theme = plotTheme()
     const axis = (index: number) => ({
       title: { text: `PC${index + 1}` },
-      gridcolor: GRID,
-      zerolinecolor: "#272d38",
-      ...(is3d ? { backgroundcolor: "#0b0d12", showbackground: true } : {}),
+      gridcolor: theme.line,
+      zerolinecolor: theme.lineStrong,
+      linecolor: theme.line,
+      ...(is3d ? { backgroundcolor: theme.surface, showbackground: true } : {}),
     })
     const [ax, ay, az] = view.axes
 
@@ -187,8 +203,14 @@ export default function SpeakerMap({
       // same thing; the view key is in it so switching pairs resets the frame.
       uirevision: `${data?.basis_id ?? "empty"}:${view.key}`,
       paper_bgcolor: "rgba(0,0,0,0)",
-      plot_bgcolor: "#0b0d12",
-      font: { color: MUTED, size: 11 },
+      plot_bgcolor: theme.surface,
+      font: { color: theme.muted, size: 11, family: theme.sans },
+      modebar: { bgcolor: "rgba(0,0,0,0)", color: theme.faint, activecolor: theme.ink },
+      hoverlabel: {
+        bgcolor: theme.surface,
+        bordercolor: theme.lineStrong,
+        font: { color: theme.ink, family: theme.sans, size: 12 },
+      },
       margin: narrow
         ? { l: is3d ? 0 : 40, r: 8, t: 8, b: is3d ? 0 : 34 }
         : is3d
@@ -203,7 +225,7 @@ export default function SpeakerMap({
         y: 1,
         yanchor: "top",
         bgcolor: "rgba(0,0,0,0)",
-        title: { text: `largest voices (${LEGEND_LIMIT})`, font: { size: 10 } },
+        title: { text: `Largest voices (${LEGEND_LIMIT})`, font: { size: 10 } },
       },
       ...(is3d
         ? {
@@ -227,8 +249,8 @@ export default function SpeakerMap({
   }, [data?.basis_id, view, is3d, narrow])
 
   if (error) return <div className="banner">{error}</div>
-  if (!data || !Plot) return <div className="loading">loading the voice map…</div>
-  if (!data.model) return <div className="empty">no voice-prints yet</div>
+  if (!data || !Plot) return <div className="loading">Loading the voice map…</div>
+  if (!data.model) return <div className="empty">No voice-prints yet.</div>
 
   const parts = view.axes.map((index) => ({
     label: `PC${index + 1}`,
@@ -238,6 +260,10 @@ export default function SpeakerMap({
 
   return (
     <div className="map-view">
+      <PageHead
+        title="Voice map"
+        meta="Every voice-print, placed by similarity. Close points sound alike."
+      />
       <div className="map-toolbar">
         <div className="mode-toggle">
           {VIEWS.map((option) => (
@@ -271,7 +297,7 @@ export default function SpeakerMap({
             checked={includeUnassigned}
             onChange={(event) => setIncludeUnassigned(event.target.checked)}
           />
-          unassigned
+          Unassigned
         </label>
 
         <span

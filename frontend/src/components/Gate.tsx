@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react"
-import { setToken } from "../api/auth"
+import { Link } from "react-router"
 import { api } from "../api/client"
 
 // Full-screen login card; the app renders nothing else until authed.
@@ -14,27 +14,28 @@ export default function Gate({ onAuthed }: { onAuthed: () => void }) {
     event.preventDefault()
     setBusy(true)
     setError(null)
-    const { data, error: err } = await api.POST("/v1/auth/login", {
-      body: { email, password, name: "web" },
-    })
+    const { data, error: err } = await api.POST("/v1/auth/session", { body: { email, password } })
     setBusy(false)
     if (data) {
-      setToken(data.token)
       onAuthed()
     } else {
-      setError(typeof err?.detail === "string" ? err.detail : "login failed")
+      setError(typeof err?.detail === "string" ? err.detail : "Sign-in failed. Check your email and password.")
     }
   }
 
   return (
     <div className="gate">
       <form className="gate-card" onSubmit={submit}>
-        <h1 className="gate-title">spyware</h1>
-        <div className="gate-subtitle">your audio, indexed</div>
+        <h1 className="gate-title">
+          <Link to="/">
+            <img className="brand-lockup" src="/lockup.svg" alt="Context" />
+          </Link>
+        </h1>
+        <div className="gate-subtitle">Context for everyday, built for smart glasses</div>
         <input
           className="input"
           type="email"
-          placeholder="email"
+          placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoFocus
@@ -43,14 +44,14 @@ export default function Gate({ onAuthed }: { onAuthed: () => void }) {
         <input
           className="input"
           type="password"
-          placeholder="password"
+          placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
         />
         {error && <div className="gate-error">{error}</div>}
         <button className="btn primary full" disabled={busy}>
-          {busy ? "signing in…" : "sign in"}
+          {busy ? "Signing in…" : "Sign in"}
         </button>
       </form>
     </div>

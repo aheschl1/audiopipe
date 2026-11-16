@@ -90,6 +90,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign the web app in with a cookie
+         * @description Verify the credentials and set an HttpOnly ``context_session`` cookie.
+         *
+         *     The cookie holds a token that expires after ``API_WEB_SESSION_DAYS``. It is
+         *     sent on every same-site request, media elements included; writes made
+         *     with it must also send the ``X-Requested-With`` header.
+         */
+        post: operations["create_web_session_v1_auth_session_post"];
+        /**
+         * Sign the web app out
+         * @description Revoke the cookie's token and clear the cookie. Idempotent.
+         */
+        delete: operations["delete_web_session_v1_auth_session_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me": {
         parameters: {
             query?: never;
@@ -235,32 +263,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/sessions/{session_id}/playback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Mint a short-lived media playback token
-         * @description A token for the media route's ``?token=`` parameter.
-         *
-         *     Media elements (``<audio src>``) cannot send an Authorization header, so
-         *     the session-media route also accepts a token in the URL. This mints one
-         *     whose lifetime is minutes; the player re-mints when it expires. It is a
-         *     real API token, just time-boxed — expired ``playback`` rows are purged
-         *     opportunistically on each mint.
-         */
-        post: operations["create_playback_token_v1_sessions__session_id__playback_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/sessions/{session_id}/segments": {
         parameters: {
             query?: never;
@@ -274,7 +276,16 @@ export interface paths {
          */
         get: operations["list_session_segments_v1_sessions__session_id__segments_get"];
         put?: never;
-        post?: never;
+        /**
+         * Upload one image or video segment
+         * @description For resources a client produces as whole files rather than a stream.
+         *
+         *     The content type is sniffed from the bytes; a declared one must agree.
+         *     Sequence numbers are assigned server-side from a range of their own
+         *     (2**30 up), so an upload can go into a session that is streaming at the
+         *     same time without colliding with its frames.
+         */
+        post: operations["upload_segment_v1_sessions__session_id__segments_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -378,7 +389,8 @@ export interface paths {
         /**
          * A session's ordered event timeline
          * @description What happened when: session frames, speech starts/ends, transcripts,
-         *     sound tags, the sound spans built from them, and location points.
+         *     sound tags, the sound spans built from them, location points, images
+         *     and video clips.
          *
          *     Events carry a ``type`` discriminator; clients must ignore types they do
          *     not recognise — future processing tiers add new ones. `limit`/`offset`
@@ -390,8 +402,9 @@ export interface paths {
          *
          *     An unprocessed (or speechless) session serves just its session frames;
          *     processing status stays introspectable via `.../artifacts?kind=speech-map`.
-         *     Location points come straight from the stored segments — no pipeline —
-         *     so they appear live while the session is still streaming.
+         *     Location points, images and video clips come straight from the stored
+         *     segments — no pipeline — so they appear live while the session is still
+         *     streaming.
          */
         get: operations["get_session_timeline_v1_sessions__session_id__timeline_get"];
         put?: never;
@@ -920,6 +933,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/search/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find keyframes by describing what was seen
+         * @description Keyframes (every photo, and the distinct moments of each video) nearest
+         *     the description in SigLIP 2's joint space. Like audio search, distances
+         *     rank within one query and carry no absolute cutoff.
+         */
+        get: operations["search_frames_v1_search_frames_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/search/tags/labels": {
         parameters: {
             query?: never;
@@ -1099,6 +1134,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/artifacts/{artifact_id}/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download an artifact's stored blob
+         * @description For artifacts that record their blob's ``content_type`` and ``byte_size``
+         *     in metadata — the visual pipelines' thumbnails and proxies. Browsers
+         *     authenticate `<img>`/`<video>` with the sign-in cookie.
+         */
+        get: operations["get_artifact_media_v1_artifacts__artifact_id__media_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/moments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your moments, newest first */
+        get: operations["list_moments_v1_moments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/moments/links/{artifact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Links touching one artifact
+         * @description Every relation any of your moments drew to or from this artifact.
+         */
+        get: operations["artifact_links_v1_moments_links__artifact_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/moments/at": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The moment containing a point in a recording
+         * @description For opening a search hit as a moment. Falls back to the nearest of the
+         *     session's moments within an hour; 404 when it has none.
+         */
+        get: operations["moment_at_v1_moments_at_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/moments/{moment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One moment with its items and links */
+        get: operations["get_moment_v1_moments__moment_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/automations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your automations, oldest first */
+        get: operations["list_automations_v1_automations_get"];
+        put?: never;
+        /**
+         * Create an automation
+         * @description It runs on moments created from now on, not on earlier ones.
+         */
+        post: operations["create_automation_v1_automations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/automations/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recent automation runs
+         * @description Newest first. Without ``automation_id`` or ``status``, only runs that matched or failed.
+         */
+        get: operations["list_runs_v1_automations_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/automations/{automation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One automation */
+        get: operations["get_automation_v1_automations__automation_id__get"];
+        /**
+         * Replace an automation
+         * @description Turning a rule back on doesn't catch it up on moments made while it was off.
+         */
+        put: operations["update_automation_v1_automations__automation_id__put"];
+        post?: never;
+        /** Delete an automation */
+        delete: operations["delete_automation_v1_automations__automation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1218,6 +1413,21 @@ export interface components {
             strategy: string;
             /** Text */
             text: string;
+        };
+        /** ArtifactLinksResponse */
+        ArtifactLinksResponse: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+            /** Links */
+            links: components["schemas"]["MomentLink"][];
+            /**
+             * Moment Ids
+             * @description The moments that asserted these links.
+             */
+            moment_ids: string[];
         };
         /**
          * ArtifactRead
@@ -1441,6 +1651,171 @@ export interface components {
              */
             score: number;
         };
+        /** AutomationRead */
+        AutomationRead: {
+            /** Name */
+            name: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Trigger
+             * @description Runs on each new moment.
+             * @default moment
+             * @constant
+             */
+            trigger: "moment";
+            conditions: components["schemas"]["Conditions-Output"];
+            /** Actions */
+            actions: components["schemas"]["ExtractAction-Output"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Active Since
+             * Format: date-time
+             * @description Only moments created after this are considered.
+             */
+            active_since: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Matches
+             * @description Moments it has matched.
+             */
+            matches: number;
+            /**
+             * Skipped
+             * @description Moments it ran on that didn't match.
+             */
+            skipped: number;
+            /**
+             * Failures
+             * @description Runs that failed.
+             */
+            failures: number;
+            /**
+             * Last Match At
+             * @description When the last matched moment started.
+             */
+            last_match_at: string | null;
+        };
+        /** AutomationRunRead */
+        AutomationRunRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Automation Id
+             * Format: uuid
+             */
+            automation_id: string;
+            /** Automation Name */
+            automation_name: string;
+            /**
+             * Moment Id
+             * Format: uuid
+             */
+            moment_id: string;
+            /** Moment Title */
+            moment_title: string;
+            /**
+             * Moment Start At
+             * Format: date-time
+             */
+            moment_start_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "matched" | "skipped" | "failed";
+            /**
+             * Fields
+             * @description What an extract action filled in.
+             */
+            fields: {
+                [key: string]: string | null;
+            };
+            /**
+             * Reason
+             * @description Why the conditions did or didn't hold, when the model was asked.
+             */
+            reason: string | null;
+            /** Error */
+            error: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** AutomationWrite */
+        AutomationWrite: {
+            /** Name */
+            name: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Trigger
+             * @description Runs on each new moment.
+             * @default moment
+             * @constant
+             */
+            trigger: "moment";
+            conditions?: components["schemas"]["Conditions-Input"];
+            /** Actions */
+            actions: components["schemas"]["ExtractAction-Input"][];
+        };
+        /** Body_upload_segment_v1_sessions__session_id__segments_post */
+        Body_upload_segment_v1_sessions__session_id__segments_post: {
+            /**
+             * File
+             * @description The image, or one self-contained clip.
+             */
+            file: string;
+            /**
+             * Resource
+             * @description `image` or `video`.
+             */
+            resource: string;
+            /**
+             * Captured At
+             * @description When it was captured; defaults to now.
+             */
+            captured_at?: string | null;
+            /**
+             * Duration Ms
+             * @description Clip length (video only).
+             */
+            duration_ms?: number | null;
+            /**
+             * Attrs
+             * @description JSON object of the resource's attrs.
+             */
+            attrs?: string | null;
+            /**
+             * Metadata
+             * @description JSON object stored on the segment.
+             */
+            metadata?: string | null;
+        };
         /**
          * ClusterParamsOverrides
          * @description Per-field overrides; null = inherit the server default for that field.
@@ -1485,6 +1860,50 @@ export interface components {
              * @description Voice-prints from less speech than this are not clustered.
              */
             min_talk_ms: number;
+        };
+        /**
+         * Conditions
+         * @description All set conditions must hold; the lists match when any entry does (case-insensitive).
+         */
+        "Conditions-Input": {
+            /** People */
+            people?: string[];
+            /** Topics */
+            topics?: string[];
+            /**
+             * Keywords
+             * @description Matched against the title, summary and transcript.
+             */
+            keywords?: string[];
+            /** Min Minutes */
+            min_minutes?: number | null;
+            /**
+             * Ask
+             * @description A yes/no question the model answers about the moment, e.g. 'is a deadline agreed?'.
+             */
+            ask?: string | null;
+        };
+        /**
+         * Conditions
+         * @description All set conditions must hold; the lists match when any entry does (case-insensitive).
+         */
+        "Conditions-Output": {
+            /** People */
+            people: string[];
+            /** Topics */
+            topics: string[];
+            /**
+             * Keywords
+             * @description Matched against the title, summary and transcript.
+             */
+            keywords: string[];
+            /** Min Minutes */
+            min_minutes: number | null;
+            /**
+             * Ask
+             * @description A yes/no question the model answers about the moment, e.g. 'is a deadline agreed?'.
+             */
+            ask: string | null;
         };
         /**
          * ConversationDetail
@@ -1746,6 +2165,111 @@ export interface components {
              */
             source: string;
         };
+        /**
+         * ExtractAction
+         * @description Have the model fill these fields from the moment; they show on the moment page.
+         */
+        "ExtractAction-Input": {
+            /**
+             * Type
+             * @constant
+             */
+            type: "extract";
+            /** Fields */
+            fields: components["schemas"]["FieldSpec-Input"][];
+        };
+        /**
+         * ExtractAction
+         * @description Have the model fill these fields from the moment; they show on the moment page.
+         */
+        "ExtractAction-Output": {
+            /**
+             * Type
+             * @constant
+             */
+            type: "extract";
+            /** Fields */
+            fields: components["schemas"]["FieldSpec-Output"][];
+        };
+        /** FieldSpec */
+        "FieldSpec-Input": {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+        };
+        /** FieldSpec */
+        "FieldSpec-Output": {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+        };
+        /**
+         * FrameSearchRead
+         * @description One keyframe matching the query, closest first.
+         */
+        FrameSearchRead: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             * @description The ``keyframe`` artifact; its JPEG is at /v1/artifacts/{id}/media.
+             */
+            artifact_id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Segment Id
+             * Format: uuid
+             * @description The photo or video segment the frame came from.
+             */
+            segment_id: string;
+            /**
+             * At Ms
+             * @description Session-relative time of the frame, ms; null when the segment has no capture time.
+             */
+            at_ms: number | null;
+            /**
+             * Offset Ms
+             * @description Offset of the frame into its segment (0 for photos), ms.
+             */
+            offset_ms: number;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /**
+             * Reason
+             * @description Why it is a keyframe: photo, first, novel or heartbeat.
+             */
+            reason: string;
+            /**
+             * Distance
+             * @description Cosine distance between the query and the frame's embedding (lower is closer).
+             */
+            distance: number;
+        };
+        /** FrameSearchResponse */
+        FrameSearchResponse: {
+            /** Query */
+            query: string;
+            /**
+             * Model
+             * @description The embedding model that encoded the query.
+             */
+            model: string;
+            /** Items */
+            items: components["schemas"]["FrameSearchRead"][];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1755,6 +2279,99 @@ export interface components {
         HealthRead: {
             /** Status */
             status: string;
+        };
+        /** ImageAttrs */
+        ImageAttrs: {
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+        };
+        /**
+         * ImageEvent
+         * @description One still image, fetched from ``/v1/segments/{segment_id}/media``.
+         *
+         *     ``at_ms`` is wall-clock-derived, as for ``location-point``.
+         */
+        ImageEvent: {
+            /**
+             * At Ms
+             * @description Position of this event on the session timeline, ms.
+             */
+            at_ms: number;
+            /**
+             * Segment Id
+             * Format: uuid
+             * @description The resource segment this event derives from.
+             */
+            segment_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "image";
+            /**
+             * Captured At
+             * Format: date-time
+             * @description Wall-clock time the image was taken.
+             */
+            captured_at: string;
+            /** Content Type */
+            content_type: string;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /**
+             * Thumbnail Id
+             * @description Small upright JPEG artifact (``/v1/artifacts/{id}/media``); null until the thumbnail pipeline has run.
+             */
+            thumbnail_id?: string | null;
+        };
+        /** ImageSegmentRead */
+        ImageSegmentRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Sequence */
+            sequence: number;
+            /**
+             * Ingested At
+             * Format: date-time
+             */
+            ingested_at: string;
+            /** Captured At */
+            captured_at: string | null;
+            /** Offset Ms */
+            offset_ms: number | null;
+            /** Duration Ms */
+            duration_ms: number | null;
+            /** Byte Size */
+            byte_size: number;
+            /** Content Type */
+            content_type: string;
+            /**
+             * Checksum Sha256
+             * @description Hex-encoded SHA-256 of the wire payload.
+             */
+            checksum_sha256: string | null;
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            resource: "image";
+            attrs: components["schemas"]["ImageAttrs"];
         };
         /**
          * LocationPointEvent
@@ -1914,6 +2531,272 @@ export interface components {
             /** Usage */
             usage: components["schemas"]["ResourceUsageRead"][];
         };
+        /** MomentAutomation */
+        MomentAutomation: {
+            /**
+             * Automation Id
+             * Format: uuid
+             */
+            automation_id: string;
+            /** Name */
+            name: string;
+            /** Fields */
+            fields: {
+                [key: string]: string | null;
+            };
+        };
+        /** MomentCounts */
+        MomentCounts: {
+            /** Utterances */
+            utterances: number;
+            /** Frames */
+            frames: number;
+            /** Photos */
+            photos: number;
+            /** Links */
+            links: number;
+        };
+        /** MomentCover */
+        MomentCover: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             * @description A keyframe; its JPEG is at /v1/artifacts/{id}/media.
+             */
+            artifact_id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+        };
+        /** MomentDetail */
+        MomentDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /**
+             * End At
+             * Format: date-time
+             */
+            end_at: string;
+            /** Title */
+            title: string;
+            /** Summary */
+            summary: string;
+            /**
+             * People
+             * @description Participants as the model named them; prefer ``speakers``.
+             */
+            people: string[];
+            /** Speakers */
+            speakers: components["schemas"]["MomentSpeaker"][];
+            /**
+             * Topics
+             * @description Short topic tags from the model; empty when none apply.
+             */
+            topics: string[];
+            /** Visible Text */
+            visible_text: string[];
+            /** Session Ids */
+            session_ids: string[];
+            counts: components["schemas"]["MomentCounts"];
+            /** Cover */
+            cover: components["schemas"]["MomentCover"][];
+            /** Model */
+            model: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Items */
+            items: components["schemas"]["MomentItem"][];
+            /** Links */
+            links: components["schemas"]["MomentLink"][];
+            /**
+             * Automations
+             * @description Your automations that matched this moment.
+             */
+            automations: components["schemas"]["MomentAutomation"][];
+            /**
+             * Previous Id
+             * @description Your moment just before this one.
+             */
+            previous_id: string | null;
+            /**
+             * Next Id
+             * @description Your moment just after this one.
+             */
+            next_id: string | null;
+        };
+        /**
+         * MomentItem
+         * @description One labelled artifact the model was shown.
+         */
+        MomentItem: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+            /**
+             * Label
+             * @description The label the model saw, e.g. U3, K2, P1, S1.
+             */
+            label: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "utterance" | "keyframe" | "photo" | "sound";
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * At Ms
+             * @description Session-relative ms, for opening the session view there.
+             */
+            at_ms: number | null;
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /** End At */
+            end_at: string | null;
+            /**
+             * Text
+             * @description The utterance's words, or the sound span's class.
+             */
+            text: string | null;
+            /**
+             * Speaker
+             * @description Speaker name if curated, else 'voice N'.
+             */
+            speaker: string | null;
+            /**
+             * Speaker Id
+             * @description The speaker cluster, when the voice is clustered.
+             */
+            speaker_id?: string | null;
+            /** Segment Id */
+            segment_id: string | null;
+            /** Offset Ms */
+            offset_ms: number | null;
+            /** Width */
+            width: number | null;
+            /** Height */
+            height: number | null;
+        };
+        /** MomentLink */
+        MomentLink: {
+            /**
+             * From Artifact Id
+             * Format: uuid
+             */
+            from_artifact_id: string;
+            /**
+             * To Artifact Id
+             * Format: uuid
+             */
+            to_artifact_id: string;
+            /**
+             * Relation
+             * @enum {string}
+             */
+            relation: "depicts" | "mentions" | "reads" | "same_scene" | "unrelated";
+            /** Confidence */
+            confidence: number;
+            /** Why */
+            why: string;
+        };
+        /** MomentListResponse */
+        MomentListResponse: {
+            /** Items */
+            items: components["schemas"]["MomentRead"][];
+            /**
+             * Next Before
+             * @description Pass as ``before`` for the next (older) page; null at the end.
+             */
+            next_before: string | null;
+            /**
+             * Building
+             * @description Moments being written up right now (queued or running).
+             */
+            building: number;
+        };
+        /** MomentRead */
+        MomentRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /**
+             * End At
+             * Format: date-time
+             */
+            end_at: string;
+            /** Title */
+            title: string;
+            /** Summary */
+            summary: string;
+            /**
+             * People
+             * @description Participants as the model named them; prefer ``speakers``.
+             */
+            people: string[];
+            /** Speakers */
+            speakers: components["schemas"]["MomentSpeaker"][];
+            /**
+             * Topics
+             * @description Short topic tags from the model; empty when none apply.
+             */
+            topics: string[];
+            /** Visible Text */
+            visible_text: string[];
+            /** Session Ids */
+            session_ids: string[];
+            counts: components["schemas"]["MomentCounts"];
+            /** Cover */
+            cover: components["schemas"]["MomentCover"][];
+            /** Model */
+            model: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * MomentSpeaker
+         * @description Someone heard in the moment, from its transcripts (not the model's guess).
+         */
+        MomentSpeaker: {
+            /** Name */
+            name: string;
+            /** Speaker Id */
+            speaker_id: string | null;
+        };
         /** Page[ArtifactRead] */
         Page_ArtifactRead_: {
             /** Items */
@@ -2039,23 +2922,6 @@ export interface components {
              * @description True when more rows exist past this slice.
              */
             has_more: boolean;
-        };
-        /**
-         * PlaybackTokenRead
-         * @description A minutes-lived token for media-element audio URLs (``?token=``).
-         */
-        PlaybackTokenRead: {
-            /**
-             * Token
-             * @description Short-lived token for the audio route's ?token= parameter.
-             */
-            token: string;
-            /**
-             * Expires At
-             * Format: date-time
-             * @description When the token stops working; mint a new one after.
-             */
-            expires_at: string;
         };
         /**
          * ProjectionClusterRead
@@ -2218,7 +3084,7 @@ export interface components {
             /** Total Bytes */
             total_bytes: number;
         };
-        SegmentRead: components["schemas"]["AudioSegmentRead"] | components["schemas"]["LocationSegmentRead"];
+        SegmentRead: components["schemas"]["AudioSegmentRead"] | components["schemas"]["LocationSegmentRead"] | components["schemas"]["ImageSegmentRead"] | components["schemas"]["VideoSegmentRead"];
         /**
          * SessionCreateRequest
          * @description Body for starting a session; the owner comes from the bearer token.
@@ -2944,7 +3810,7 @@ export interface components {
             /** Items */
             items: components["schemas"]["TagSearchRead"][];
         };
-        TimelineEvent: components["schemas"]["SessionStartEvent"] | components["schemas"]["SessionEndEvent"] | components["schemas"]["SpeechEndEvent"] | components["schemas"]["SpeechStartEvent"] | components["schemas"]["TranscriptEvent"] | components["schemas"]["AudioTagEvent"] | components["schemas"]["SoundSpanEvent"] | components["schemas"]["ConversationEvent"] | components["schemas"]["LocationPointEvent"];
+        TimelineEvent: components["schemas"]["SessionStartEvent"] | components["schemas"]["SessionEndEvent"] | components["schemas"]["SpeechEndEvent"] | components["schemas"]["SpeechStartEvent"] | components["schemas"]["TranscriptEvent"] | components["schemas"]["AudioTagEvent"] | components["schemas"]["SoundSpanEvent"] | components["schemas"]["ConversationEvent"] | components["schemas"]["LocationPointEvent"] | components["schemas"]["ImageEvent"] | components["schemas"]["VideoClipEvent"];
         /**
          * TokenIssued
          * @description The plaintext exists exactly once, here; the server stores only a hash.
@@ -3137,6 +4003,8 @@ export interface components {
             email: string;
             /** Display Name */
             display_name: string | null;
+            /** Read Only */
+            read_only: boolean;
             /**
              * Created At
              * Format: date-time
@@ -3155,6 +4023,147 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VideoAttrs */
+        VideoAttrs: {
+            /** Codec */
+            codec?: string | null;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Fps */
+            fps?: number | null;
+        };
+        /**
+         * VideoClipEvent
+         * @description One stored video clip over ``[at_ms, end_ms)``, positioned at its start.
+         *
+         *     Wall-clock-derived, as for ``location-point``.
+         */
+        VideoClipEvent: {
+            /**
+             * At Ms
+             * @description Position of this event on the session timeline, ms.
+             */
+            at_ms: number;
+            /**
+             * Segment Id
+             * Format: uuid
+             * @description The resource segment this event derives from.
+             */
+            segment_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "video-clip";
+            /**
+             * End Ms
+             * @description End (exclusive) of the clip, ms.
+             */
+            end_ms: number;
+            /**
+             * Captured At
+             * Format: date-time
+             * @description Wall-clock start of the clip.
+             */
+            captured_at: string;
+            /** Content Type */
+            content_type: string;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /**
+             * Proxy Id
+             * @description Browser-playable H.264 MP4 artifact of the clip; null until the video-proxy pipeline has run. Prefer it over the original, whose codec (often HEVC) browsers may not decode.
+             */
+            proxy_id?: string | null;
+            /**
+             * Frames
+             * @description Evenly spaced stills, in clip order; empty until thumbnailed.
+             * @default []
+             */
+            frames: components["schemas"]["VideoFrameRef"][];
+        };
+        /**
+         * VideoFrameRef
+         * @description One still of a clip, served by ``/v1/artifacts/{artifact_id}/media``.
+         */
+        VideoFrameRef: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+            /**
+             * Offset Ms
+             * @description Position of the still within the clip, ms.
+             */
+            offset_ms: number;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+        };
+        /** VideoSegmentRead */
+        VideoSegmentRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Sequence */
+            sequence: number;
+            /**
+             * Ingested At
+             * Format: date-time
+             */
+            ingested_at: string;
+            /** Captured At */
+            captured_at: string | null;
+            /** Offset Ms */
+            offset_ms: number | null;
+            /** Duration Ms */
+            duration_ms: number | null;
+            /** Byte Size */
+            byte_size: number;
+            /** Content Type */
+            content_type: string;
+            /**
+             * Checksum Sha256
+             * @description Hex-encoded SHA-256 of the wire payload.
+             */
+            checksum_sha256: string | null;
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            resource: "video";
+            attrs: components["schemas"]["VideoAttrs"];
+        };
+        /** WebSessionRequest */
+        WebSessionRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /**
+             * Password
+             * Format: password
+             */
+            password: string;
         };
     };
     responses: never;
@@ -3328,6 +4337,93 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_web_session_v1_auth_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_web_session_v1_auth_session_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3715,56 +4811,6 @@ export interface operations {
             };
         };
     };
-    create_playback_token_v1_sessions__session_id__playback_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description A recording session belonging to you. */
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PlaybackTokenRead"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     list_session_segments_v1_sessions__session_id__segments_get: {
         parameters: {
             query?: {
@@ -3802,6 +4848,78 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_segment_v1_sessions__session_id__segments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A recording session belonging to you. */
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_segment_v1_sessions__session_id__segments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The session has ended. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The file exceeds the upload cap. */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4201,10 +5319,7 @@ export interface operations {
     };
     get_session_media_v1_sessions__session_id__resources__resource__media_get: {
         parameters: {
-            query?: {
-                /** @description Bearer token as a query parameter, for media elements that cannot send an Authorization header. Mint a short-lived one via POST /v1/sessions/{session_id}/playback. Ignored when the header is present. */
-                token?: string | null;
-            };
+            query?: never;
             header?: never;
             path: {
                 resource: string;
@@ -5365,6 +6480,59 @@ export interface operations {
             };
         };
     };
+    search_frames_v1_search_frames_get: {
+        parameters: {
+            query: {
+                /** @description A visual description, e.g. 'a whiteboard with diagrams' or 'a red car'. */
+                q: string;
+                /** @description Restrict matches to one session. */
+                session_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FrameSearchResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_tag_labels_v1_search_tags_labels_get: {
         parameters: {
             query?: never;
@@ -5835,6 +7003,570 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ConversationRead"];
                 };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_artifact_media_v1_artifacts__artifact_id__media_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description An artifact of one of your sessions. */
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The blob. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": unknown;
+                    "video/mp4": unknown;
+                };
+            };
+            /** @description The requested byte range. */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "video/mp4": unknown;
+                };
+            };
+            /** @description The client's cached copy is still current. */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not yours, or the artifact stores no servable blob. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The requested range lies outside the object. */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_moments_v1_moments_get: {
+        parameters: {
+            query?: {
+                /** @description Only moments starting before this instant. */
+                before?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MomentListResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    artifact_links_v1_moments_links__artifact_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactLinksResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    moment_at_v1_moments_at_get: {
+        parameters: {
+            query: {
+                /** @description The recording the point is in. */
+                session_id: string;
+                /** @description Session-relative ms, as search hits and timeline events give it. */
+                at_ms: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MomentRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_moment_v1_moments__moment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                moment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MomentDetail"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_automations_v1_automations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRead"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_automation_v1_automations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_runs_v1_automations_runs_get: {
+        parameters: {
+            query?: {
+                /** @description One rule's runs, skipped ones included. */
+                automation_id?: string | null;
+                /** @description Only runs with this result. */
+                status?: ("matched" | "skipped" | "failed") | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRunRead"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_automation_v1_automations__automation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_automation_v1_automations__automation_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_automation_v1_automations__automation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Unauthorized */
             401: {

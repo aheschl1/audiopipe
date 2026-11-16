@@ -19,11 +19,11 @@ def _point(t: int, **overrides) -> dict:
 
 
 def test_registry_names_and_lookup() -> None:
-    assert resources.names() == ("audio", "location")
+    assert resources.names() == ("audio", "location", "image", "video")
     assert resources.get("audio").storage == "blob"
     assert resources.get("location").storage == "inline"
     with pytest.raises(KeyError):
-        resources.get("video")
+        resources.get("thermal")
 
 
 def test_audio_accepts_any_bytes_and_normalizes_attrs() -> None:
@@ -118,3 +118,67 @@ def test_location_rejects_wrong_content_type_and_attrs() -> None:
             good, content_type=None, declared_attrs={"codec": "gps"},
             captured_at=None, duration_ms=None,
         )
+
+
+_JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
+_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+_MP4 = b"\x00\x00\x00\x18ftypiso6" + b"\x00" * 32
+_TS = (b"\x47" + b"\x00" * 187) * 3
+_AT = datetime(2026, 11, 12, 9, 0, tzinfo=UTC)
+
+
+def _image(payload: bytes, **kwargs):
+    args = dict(content_type=None, declared_attrs={}, captured_at=_AT, duration_ms=None)
+    return resources.get("image").validate_chunk(payload, **(args | kwargs))
+
+
+def _video(payload: bytes, **kwargs):
+    args = dict(content_type=None, declared_attrs={}, captured_at=_AT, duration_ms=2_000)
+    return resources.get("video").validate_chunk(payload, **(args | kwargs))
+
+
+def test_image_sniffs_content_type_and_keeps_attrs() -> None:
+    chunk = _image(_PNG, declared_attrs={"width": 640, "height": 480})
+    assert chunk.content_type == "image/png"
+    assert chunk.payload is None
+    assert chunk.attrs == {"width": 640, "height": 480}
+    assert _image(_JPEG, content_type="image/jpeg").content_type == "image/jpeg"
+
+
+@pytest.mark.parametrize(
+    "payload, kwargs",
+    [
+        (b"not an image at all", {}),
+        (_JPEG, {"content_type": "image/png"}),
+        (_JPEG, {"captured_at": None}),
+        (_JPEG, {"duration_ms": 100}),
+        (_JPEG, {"declared_attrs": {"width": 0}}),
+        (_JPEG, {"declared_attrs": {"exposure": 1}}),
+    ],
+)
+def test_image_rejects(payload: bytes, kwargs: dict) -> None:
+    with pytest.raises(ResourceValidationError):
+        _image(payload, **kwargs)
+
+
+def test_video_sniffs_mp4_and_ts() -> None:
+    assert _video(_MP4).content_type == "video/mp4"
+    chunk = _video(_TS, declared_attrs={"codec": "h264", "fps": 30})
+    assert chunk.content_type == "video/mp2t"
+    assert chunk.attrs == {"codec": "h264", "fps": 30.0}
+    assert chunk.duration_ms == 2_000
+
+
+@pytest.mark.parametrize(
+    "payload, kwargs",
+    [
+        (_JPEG, {}),
+        (_MP4, {"content_type": "video/mp2t"}),
+        (_MP4, {"captured_at": None}),
+        (_MP4, {"duration_ms": None}),
+        (_MP4, {"duration_ms": 0}),
+    ],
+)
+def test_video_rejects(payload: bytes, kwargs: dict) -> None:
+    with pytest.raises(ResourceValidationError):
+        _video(payload, **kwargs)

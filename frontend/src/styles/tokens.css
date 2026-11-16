@@ -1,0 +1,126 @@
+/* Core tokens: shared by the app and the future brand site. See docs/design-language.md. */
+
+:root {
+  color-scheme: light;
+
+  /* neutrals */
+  --paper: #ffffff;
+  --surface: #ffffff;
+  --sunken: #f6f5f2;
+  --sunken-2: #eeede9;
+  --line-faint: #efede9;
+  --line: #e3e1dc;
+  --line-strong: #cbc8c0;
+  --ink: #1a1a17;
+  --ink-2: #3d3c38;
+  --muted: #5c5b56;
+  --faint: #8a8882;
+  --scrim: rgb(255 255 255 / 0.97);
+
+  /* accent */
+  --red: #e4002b;
+  --red-hover: #c80025;
+  --red-press: #a8001f;
+  --red-ink: #c80025;
+  --red-wash: #fdedef;
+  --red-line: #f5b8c3;
+  --on-red: #ffffff;
+  --focus: var(--red);
+
+  /* semantic */
+  --ok: #1c7a4a;
+  --ok-wash: #eaf4ee;
+  --warn: #8f6400;
+  --warn-wash: #fbf3e0;
+  --danger: #a8001f;
+  --danger-wash: #fbecee;
+  --danger-line: #f0c2ca;
+
+  /* categorical data palette (never red) */
+  --cat-1: #2d6cb0;
+  --cat-2: #16807a;
+  --cat-3: #4b8236;
+  --cat-4: #6a50b0;
+  --cat-5: #8a5e3b;
+  --cat-6: #526478;
+  --cat-7: #8c4a8c;
+  --cat-8: #77751f;
+  --data-location: #2b7799;
+  --data-media: #b67810;
+  --data-neutral: var(--faint);
+
+  /* sequential ramp (density, heat) */
+  --seq-0: rgb(45 108 176 / 0);
+  --seq-1: #c5d8ee;
+  --seq-2: #86afdb;
+  --seq-3: #4b86c4;
+  --seq-4: #2d6cb0;
+  --seq-5: #17406e;
+
+  /* type */
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-serif: "IBM Plex Serif", Georgia, serif;
+  --fs-2xs: 11px;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 24px;
+  --fs-display-1: 32px;
+  --fs-display-2: 44px;
+  --fs-display-3: 64px;
+  --lh-tight: 1.25;
+  --lh-snug: 1.4;
+  --lh-body: 1.55;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --tracking-caps: 0.06em;
+
+  /* space (4px base) */
+  --sp-0: 2px;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+
+  /* radii, borders */
+  --r-1: 2px;
+  --r-2: 4px;
+  --r-3: 6px;
+  --r-round: 999px;
+  --bw: 1px;
+  --bw-strong: 2px;
+
+  /* motion */
+  --dur-fast: 100ms;
+  --dur: 140ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* layout */
+  --topbar-h: 0px;
+  --sidebar-w: 200px;
+  --dock-h: 56px;
+  --column: 880px;
+  --column-wide: 1280px;
+  --gutter: var(--sp-4);
+}
+
+@media (max-width: 899px) {
+  :root {
+    --topbar-h: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+  }
+}

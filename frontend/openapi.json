@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "audio-pipeline",
+    "title": "context",
     "summary": "Recording sessions and their audio segments. Audio is uploaded over the streaming websocket described in docs/streaming-protocol.md.",
     "version": "0.1.0"
   },
@@ -196,6 +196,101 @@
         }
       }
     },
+    "/v1/auth/session": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign the web app in with a cookie",
+        "description": "Verify the credentials and set an HttpOnly ``context_session`` cookie.\n\nThe cookie holds a token that expires after ``API_WEB_SESSION_DAYS``. It is\nsent on every same-site request, media elements included; writes made\nwith it must also send the ``X-Requested-With`` header.",
+        "operationId": "create_web_session_v1_auth_session_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign the web app out",
+        "description": "Revoke the cookie's token and clear the cookie. Idempotent.",
+        "operationId": "delete_web_session_v1_auth_session_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/me": {
       "get": {
         "tags": [
@@ -239,6 +334,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ]
       }
@@ -254,6 +352,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "requestBody": {
@@ -319,6 +420,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -445,6 +549,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ]
       }
@@ -459,6 +566,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -530,6 +640,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -601,6 +714,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -682,6 +798,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -742,77 +861,6 @@
         }
       }
     },
-    "/v1/sessions/{session_id}/playback": {
-      "post": {
-        "tags": [
-          "sessions"
-        ],
-        "summary": "Mint a short-lived media playback token",
-        "description": "A token for the media route's ``?token=`` parameter.\n\nMedia elements (``<audio src>``) cannot send an Authorization header, so\nthe session-media route also accepts a token in the URL. This mints one\nwhose lifetime is minutes; the player re-mints when it expires. It is a\nreal API token, just time-boxed \u2014 expired ``playback`` rows are purged\nopportunistically on each mint.",
-        "operationId": "create_playback_token_v1_sessions__session_id__playback_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "session_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "description": "A recording session belonging to you.",
-              "title": "Session Id"
-            },
-            "description": "A recording session belonging to you."
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlaybackTokenRead"
-                }
-              }
-            }
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/sessions/{session_id}/segments": {
       "get": {
         "tags": [
@@ -824,6 +872,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -923,6 +974,108 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Upload one image or video segment",
+        "description": "For resources a client produces as whole files rather than a stream.\n\nThe content type is sniffed from the bytes; a declared one must agree.\nSequence numbers are assigned server-side from a range of their own\n(2**30 up), so an upload can go into a session that is streaming at the\nsame time without colliding with its frames.",
+        "operationId": "upload_segment_v1_sessions__session_id__segments_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "A recording session belonging to you.",
+              "title": "Session Id"
+            },
+            "description": "A recording session belonging to you."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_segment_v1_sessions__session_id__segments_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "The session has ended.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The file exceeds the upload cap.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/sessions/{session_id}/resources": {
@@ -936,6 +1089,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -1011,6 +1167,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -1139,6 +1298,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -1303,6 +1465,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -1426,11 +1591,14 @@
           "sessions"
         ],
         "summary": "A session's ordered event timeline",
-        "description": "What happened when: session frames, speech starts/ends, transcripts,\nsound tags, the sound spans built from them, and location points.\n\nEvents carry a ``type`` discriminator; clients must ignore types they do\nnot recognise \u2014 future processing tiers add new ones. `limit`/`offset`\npage over events (one artifact can yield several, so offsets here do not\nline up with the artifacts route). A `from_ms`/`to_ms` window keeps only\nevents positioned inside it, so adjacent windows partition the stream \u2014\na span straddling a boundary contributes its `speech-end` alone, and a\n`sound-span` that began before the window is left out entirely.\n\nAn unprocessed (or speechless) session serves just its session frames;\nprocessing status stays introspectable via `.../artifacts?kind=speech-map`.\nLocation points come straight from the stored segments \u2014 no pipeline \u2014\nso they appear live while the session is still streaming.",
+        "description": "What happened when: session frames, speech starts/ends, transcripts,\nsound tags, the sound spans built from them, location points, images\nand video clips.\n\nEvents carry a ``type`` discriminator; clients must ignore types they do\nnot recognise \u2014 future processing tiers add new ones. `limit`/`offset`\npage over events (one artifact can yield several, so offsets here do not\nline up with the artifacts route). A `from_ms`/`to_ms` window keeps only\nevents positioned inside it, so adjacent windows partition the stream \u2014\na span straddling a boundary contributes its `speech-end` alone, and a\n`sound-span` that began before the window is left out entirely.\n\nAn unprocessed (or speechless) session serves just its session frames;\nprocessing status stays introspectable via `.../artifacts?kind=speech-map`.\nLocation points, images and video clips come straight from the stored\nsegments \u2014 no pipeline \u2014 so they appear live while the session is still\nstreaming.",
         "operationId": "get_session_timeline_v1_sessions__session_id__timeline_get",
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -1559,6 +1727,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -1650,6 +1821,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -1725,6 +1899,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -1748,24 +1925,6 @@
               "title": "Session Id"
             },
             "description": "A recording session belonging to you."
-          },
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Bearer token as a query parameter, for media elements that cannot send an Authorization header. Mint a short-lived one via POST /v1/sessions/{session_id}/playback. Ignored when the header is present.",
-              "title": "Token"
-            },
-            "description": "Bearer token as a query parameter, for media elements that cannot send an Authorization header. Mint a short-lived one via POST /v1/sessions/{session_id}/playback. Ignored when the header is present."
           }
         ],
         "responses": {
@@ -1834,6 +1993,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -1933,6 +2095,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -2004,6 +2169,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -2084,6 +2252,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -2219,6 +2390,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -2320,6 +2494,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -2420,6 +2597,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -2544,6 +2724,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ]
       },
@@ -2609,6 +2792,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ]
       }
@@ -2655,6 +2841,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ]
       }
@@ -2702,6 +2891,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ]
       }
@@ -2717,6 +2909,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -2838,6 +3033,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -2909,6 +3107,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -2990,6 +3191,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -3061,6 +3265,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -3142,6 +3349,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -3236,6 +3446,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -3327,6 +3540,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -3408,6 +3624,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -3502,6 +3721,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -3594,6 +3816,112 @@
         }
       }
     },
+    "/v1/search/frames": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Find keyframes by describing what was seen",
+        "description": "Keyframes (every photo, and the distinct moments of each video) nearest\nthe description in SigLIP 2's joint space. Like audio search, distances\nrank within one query and carry no absolute cutoff.",
+        "operationId": "search_frames_v1_search_frames_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "description": "A visual description, e.g. 'a whiteboard with diagrams' or 'a red car'.",
+              "title": "Q"
+            },
+            "description": "A visual description, e.g. 'a whiteboard with diagrams' or 'a red car'."
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict matches to one session.",
+              "title": "Session Id"
+            },
+            "description": "Restrict matches to one session."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FrameSearchResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/search/tags/labels": {
       "get": {
         "tags": [
@@ -3637,6 +3965,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ]
       }
@@ -3652,6 +3983,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -3769,6 +4103,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -3903,6 +4240,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ]
       }
@@ -3918,6 +4258,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -3986,6 +4329,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -4056,6 +4402,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -4136,6 +4485,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -4205,6 +4557,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -4286,6 +4641,9 @@
         "security": [
           {
             "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
           }
         ],
         "parameters": [
@@ -4320,6 +4678,856 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/artifacts/{artifact_id}/media": {
+      "get": {
+        "tags": [
+          "artifacts"
+        ],
+        "summary": "Download an artifact's stored blob",
+        "description": "For artifacts that record their blob's ``content_type`` and ``byte_size``\nin metadata \u2014 the visual pipelines' thumbnails and proxies. Browsers\nauthenticate `<img>`/`<video>` with the sign-in cookie.",
+        "operationId": "get_artifact_media_v1_artifacts__artifact_id__media_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "An artifact of one of your sessions.",
+              "title": "Artifact Id"
+            },
+            "description": "An artifact of one of your sessions."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The blob.",
+            "content": {
+              "image/jpeg": {},
+              "video/mp4": {}
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not yours, or the artifact stores no servable blob."
+          },
+          "206": {
+            "content": {
+              "video/mp4": {}
+            },
+            "description": "The requested byte range."
+          },
+          "304": {
+            "description": "The client's cached copy is still current."
+          },
+          "416": {
+            "description": "The requested range lies outside the object."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/moments": {
+      "get": {
+        "tags": [
+          "moments"
+        ],
+        "summary": "Your moments, newest first",
+        "operationId": "list_moments_v1_moments_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only moments starting before this instant.",
+              "title": "Before"
+            },
+            "description": "Only moments starting before this instant."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MomentListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/moments/links/{artifact_id}": {
+      "get": {
+        "tags": [
+          "moments"
+        ],
+        "summary": "Links touching one artifact",
+        "description": "Every relation any of your moments drew to or from this artifact.",
+        "operationId": "artifact_links_v1_moments_links__artifact_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Artifact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactLinksResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/moments/at": {
+      "get": {
+        "tags": [
+          "moments"
+        ],
+        "summary": "The moment containing a point in a recording",
+        "description": "For opening a search hit as a moment. Falls back to the nearest of the\nsession's moments within an hour; 404 when it has none.",
+        "operationId": "moment_at_v1_moments_at_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The recording the point is in.",
+              "title": "Session Id"
+            },
+            "description": "The recording the point is in."
+          },
+          {
+            "name": "at_ms",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Session-relative ms, as search hits and timeline events give it.",
+              "title": "At Ms"
+            },
+            "description": "Session-relative ms, as search hits and timeline events give it."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MomentRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/moments/{moment_id}": {
+      "get": {
+        "tags": [
+          "moments"
+        ],
+        "summary": "One moment with its items and links",
+        "operationId": "get_moment_v1_moments__moment_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "moment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Moment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MomentDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/automations": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Your automations, oldest first",
+        "operationId": "list_automations_v1_automations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AutomationRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Automations V1 Automations Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Create an automation",
+        "description": "It runs on moments created from now on, not on earlier ones.",
+        "operationId": "create_automation_v1_automations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/v1/automations/runs": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Recent automation runs",
+        "description": "Newest first. Without ``automation_id`` or ``status``, only runs that matched or failed.",
+        "operationId": "list_runs_v1_automations_runs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "One rule's runs, skipped ones included.",
+              "title": "Automation Id"
+            },
+            "description": "One rule's runs, skipped ones included."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "matched",
+                    "skipped",
+                    "failed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only runs with this result.",
+              "title": "Status"
+            },
+            "description": "Only runs with this result."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AutomationRunRead"
+                  },
+                  "title": "Response List Runs V1 Automations Runs Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/automations/{automation_id}": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "One automation",
+        "operationId": "get_automation_v1_automations__automation_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Replace an automation",
+        "description": "Turning a rule back on doesn't catch it up on moments made while it was off.",
+        "operationId": "update_automation_v1_automations__automation_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Delete an automation",
+        "operationId": "delete_automation_v1_automations__automation_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "401": {
             "content": {
@@ -4651,6 +5859,38 @@
           "text"
         ],
         "title": "AbVoteResponse"
+      },
+      "ArtifactLinksResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Artifact Id"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/MomentLink"
+            },
+            "type": "array",
+            "title": "Links"
+          },
+          "moment_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Moment Ids",
+            "description": "The moments that asserted these links."
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "links",
+          "moment_ids"
+        ],
+        "title": "ArtifactLinksResponse"
       },
       "ArtifactRead": {
         "properties": {
@@ -5048,6 +6288,317 @@
         "title": "AudioTagLabel",
         "description": "One scored sound-event class on a window."
       },
+      "AutomationRead": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "trigger": {
+            "type": "string",
+            "const": "moment",
+            "title": "Trigger",
+            "description": "Runs on each new moment.",
+            "default": "moment"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/Conditions-Output"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/ExtractAction-Output"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Actions"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "active_since": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Active Since",
+            "description": "Only moments created after this are considered."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "matches": {
+            "type": "integer",
+            "title": "Matches",
+            "description": "Moments it has matched."
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped",
+            "description": "Moments it ran on that didn't match."
+          },
+          "failures": {
+            "type": "integer",
+            "title": "Failures",
+            "description": "Runs that failed."
+          },
+          "last_match_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Match At",
+            "description": "When the last matched moment started."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "enabled",
+          "trigger",
+          "conditions",
+          "actions",
+          "id",
+          "active_since",
+          "created_at",
+          "updated_at",
+          "matches",
+          "skipped",
+          "failures",
+          "last_match_at"
+        ],
+        "title": "AutomationRead"
+      },
+      "AutomationRunRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "automation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Automation Id"
+          },
+          "automation_name": {
+            "type": "string",
+            "title": "Automation Name"
+          },
+          "moment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Moment Id"
+          },
+          "moment_title": {
+            "type": "string",
+            "title": "Moment Title"
+          },
+          "moment_start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Moment Start At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "matched",
+              "skipped",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "fields": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Fields",
+            "description": "What an extract action filled in."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the conditions did or didn't hold, when the model was asked."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "automation_id",
+          "automation_name",
+          "moment_id",
+          "moment_title",
+          "moment_start_at",
+          "status",
+          "fields",
+          "reason",
+          "error",
+          "created_at"
+        ],
+        "title": "AutomationRunRead"
+      },
+      "AutomationWrite": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "trigger": {
+            "type": "string",
+            "const": "moment",
+            "title": "Trigger",
+            "description": "Runs on each new moment.",
+            "default": "moment"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/Conditions-Input"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/ExtractAction-Input"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Actions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "actions"
+        ],
+        "title": "AutomationWrite"
+      },
+      "Body_upload_segment_v1_sessions__session_id__segments_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "The image, or one self-contained clip."
+          },
+          "resource": {
+            "type": "string",
+            "title": "Resource",
+            "description": "`image` or `video`."
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At",
+            "description": "When it was captured; defaults to now."
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms",
+            "description": "Clip length (video only)."
+          },
+          "attrs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attrs",
+            "description": "JSON object of the resource's attrs."
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "JSON object stored on the segment."
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "resource"
+        ],
+        "title": "Body_upload_segment_v1_sessions__session_id__segments_post"
+      },
       "ClusterParamsOverrides": {
         "properties": {
           "cluster_distance": {
@@ -5127,6 +6678,143 @@
         ],
         "title": "ClusterParamsValues",
         "description": "A complete, resolved set of clustering knobs."
+      },
+      "Conditions-Input": {
+        "properties": {
+          "people": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "People"
+          },
+          "topics": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Topics"
+          },
+          "keywords": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Keywords",
+            "description": "Matched against the title, summary and transcript."
+          },
+          "min_minutes": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1440.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Minutes"
+          },
+          "ask": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ask",
+            "description": "A yes/no question the model answers about the moment, e.g. 'is a deadline agreed?'."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Conditions",
+        "description": "All set conditions must hold; the lists match when any entry does (case-insensitive)."
+      },
+      "Conditions-Output": {
+        "properties": {
+          "people": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "People"
+          },
+          "topics": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Topics"
+          },
+          "keywords": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Keywords",
+            "description": "Matched against the title, summary and transcript."
+          },
+          "min_minutes": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1440.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Minutes"
+          },
+          "ask": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ask",
+            "description": "A yes/no question the model answers about the moment, e.g. 'is a deadline agreed?'."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "people",
+          "topics",
+          "keywords",
+          "min_minutes",
+          "ask"
+        ],
+        "title": "Conditions",
+        "description": "All set conditions must hold; the lists match when any entry does (case-insensitive)."
       },
       "ConversationDetail": {
         "properties": {
@@ -5628,6 +7316,200 @@
         ],
         "title": "ExcludedUtterance"
       },
+      "ExtractAction-Input": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "extract",
+            "title": "Type"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldSpec-Input"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Fields"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "fields"
+        ],
+        "title": "ExtractAction",
+        "description": "Have the model fill these fields from the moment; they show on the moment page."
+      },
+      "ExtractAction-Output": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "extract",
+            "title": "Type"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldSpec-Output"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Fields"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "fields"
+        ],
+        "title": "ExtractAction",
+        "description": "Have the model fill these fields from the moment; they show on the moment page."
+      },
+      "FieldSpec-Input": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "FieldSpec"
+      },
+      "FieldSpec-Output": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "FieldSpec"
+      },
+      "FrameSearchRead": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Artifact Id",
+            "description": "The ``keyframe`` artifact; its JPEG is at /v1/artifacts/{id}/media."
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "segment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Segment Id",
+            "description": "The photo or video segment the frame came from."
+          },
+          "at_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At Ms",
+            "description": "Session-relative time of the frame, ms; null when the segment has no capture time."
+          },
+          "offset_ms": {
+            "type": "integer",
+            "title": "Offset Ms",
+            "description": "Offset of the frame into its segment (0 for photos), ms."
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Why it is a keyframe: photo, first, novel or heartbeat."
+          },
+          "distance": {
+            "type": "number",
+            "title": "Distance",
+            "description": "Cosine distance between the query and the frame's embedding (lower is closer)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "session_id",
+          "segment_id",
+          "at_ms",
+          "offset_ms",
+          "width",
+          "height",
+          "reason",
+          "distance"
+        ],
+        "title": "FrameSearchRead",
+        "description": "One keyframe matching the query, closest first."
+      },
+      "FrameSearchResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "The embedding model that encoded the query."
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FrameSearchRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "model",
+          "items"
+        ],
+        "title": "FrameSearchResponse"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -5653,6 +7535,219 @@
           "status"
         ],
         "title": "HealthRead"
+      },
+      "ImageAttrs": {
+        "properties": {
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ImageAttrs"
+      },
+      "ImageEvent": {
+        "properties": {
+          "at_ms": {
+            "type": "integer",
+            "title": "At Ms",
+            "description": "Position of this event on the session timeline, ms."
+          },
+          "segment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Segment Id",
+            "description": "The resource segment this event derives from."
+          },
+          "type": {
+            "type": "string",
+            "const": "image",
+            "title": "Type",
+            "default": "image"
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Captured At",
+            "description": "Wall-clock time the image was taken."
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "thumbnail_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Id",
+            "description": "Small upright JPEG artifact (``/v1/artifacts/{id}/media``); null until the thumbnail pipeline has run."
+          }
+        },
+        "type": "object",
+        "required": [
+          "at_ms",
+          "segment_id",
+          "captured_at",
+          "content_type"
+        ],
+        "title": "ImageEvent",
+        "description": "One still image, fetched from ``/v1/segments/{segment_id}/media``.\n\n``at_ms`` is wall-clock-derived, as for ``location-point``."
+      },
+      "ImageSegmentRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "ingested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ingested At"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "offset_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset Ms"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "byte_size": {
+            "type": "integer",
+            "title": "Byte Size"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "checksum_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum Sha256",
+            "description": "Hex-encoded SHA-256 of the wire payload."
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "resource": {
+            "type": "string",
+            "const": "image",
+            "title": "Resource",
+            "default": "image"
+          },
+          "attrs": {
+            "$ref": "#/components/schemas/ImageAttrs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "session_id",
+          "sequence",
+          "ingested_at",
+          "captured_at",
+          "offset_ms",
+          "duration_ms",
+          "byte_size",
+          "content_type",
+          "checksum_sha256",
+          "metadata",
+          "attrs"
+        ],
+        "title": "ImageSegmentRead"
       },
       "LocationPointEvent": {
         "properties": {
@@ -5963,6 +8058,619 @@
         "title": "MeRead",
         "description": "`GET /v1/me`: who the token belongs to, and what they have stored.\n\n``usage`` holds one entry per resource the caller has captured, ordered by\nresource name; a resource never captured has no entry."
       },
+      "MomentAutomation": {
+        "properties": {
+          "automation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Automation Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "fields": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "automation_id",
+          "name",
+          "fields"
+        ],
+        "title": "MomentAutomation"
+      },
+      "MomentCounts": {
+        "properties": {
+          "utterances": {
+            "type": "integer",
+            "title": "Utterances"
+          },
+          "frames": {
+            "type": "integer",
+            "title": "Frames"
+          },
+          "photos": {
+            "type": "integer",
+            "title": "Photos"
+          },
+          "links": {
+            "type": "integer",
+            "title": "Links"
+          }
+        },
+        "type": "object",
+        "required": [
+          "utterances",
+          "frames",
+          "photos",
+          "links"
+        ],
+        "title": "MomentCounts"
+      },
+      "MomentCover": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Artifact Id",
+            "description": "A keyframe; its JPEG is at /v1/artifacts/{id}/media."
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "session_id",
+          "width",
+          "height"
+        ],
+        "title": "MomentCover"
+      },
+      "MomentDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "people": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "People",
+            "description": "Participants as the model named them; prefer ``speakers``."
+          },
+          "speakers": {
+            "items": {
+              "$ref": "#/components/schemas/MomentSpeaker"
+            },
+            "type": "array",
+            "title": "Speakers"
+          },
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Topics",
+            "description": "Short topic tags from the model; empty when none apply."
+          },
+          "visible_text": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Visible Text"
+          },
+          "session_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Session Ids"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/MomentCounts"
+          },
+          "cover": {
+            "items": {
+              "$ref": "#/components/schemas/MomentCover"
+            },
+            "type": "array",
+            "title": "Cover"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MomentItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/MomentLink"
+            },
+            "type": "array",
+            "title": "Links"
+          },
+          "automations": {
+            "items": {
+              "$ref": "#/components/schemas/MomentAutomation"
+            },
+            "type": "array",
+            "title": "Automations",
+            "description": "Your automations that matched this moment."
+          },
+          "previous_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Id",
+            "description": "Your moment just before this one."
+          },
+          "next_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Id",
+            "description": "Your moment just after this one."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "start_at",
+          "end_at",
+          "title",
+          "summary",
+          "people",
+          "speakers",
+          "topics",
+          "visible_text",
+          "session_ids",
+          "counts",
+          "cover",
+          "model",
+          "created_at",
+          "items",
+          "links",
+          "automations",
+          "previous_id",
+          "next_id"
+        ],
+        "title": "MomentDetail"
+      },
+      "MomentItem": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Artifact Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "The label the model saw, e.g. U3, K2, P1, S1."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "utterance",
+              "keyframe",
+              "photo",
+              "sound"
+            ],
+            "title": "Kind"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "at_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At Ms",
+            "description": "Session-relative ms, for opening the session view there."
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text",
+            "description": "The utterance's words, or the sound span's class."
+          },
+          "speaker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speaker",
+            "description": "Speaker name if curated, else 'voice N'."
+          },
+          "speaker_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speaker Id",
+            "description": "The speaker cluster, when the voice is clustered."
+          },
+          "segment_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segment Id"
+          },
+          "offset_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset Ms"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "label",
+          "kind",
+          "session_id",
+          "at_ms",
+          "start_at",
+          "end_at",
+          "text",
+          "speaker",
+          "segment_id",
+          "offset_ms",
+          "width",
+          "height"
+        ],
+        "title": "MomentItem",
+        "description": "One labelled artifact the model was shown."
+      },
+      "MomentLink": {
+        "properties": {
+          "from_artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "From Artifact Id"
+          },
+          "to_artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "To Artifact Id"
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "depicts",
+              "mentions",
+              "reads",
+              "same_scene",
+              "unrelated"
+            ],
+            "title": "Relation"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "why": {
+            "type": "string",
+            "title": "Why"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_artifact_id",
+          "to_artifact_id",
+          "relation",
+          "confidence",
+          "why"
+        ],
+        "title": "MomentLink"
+      },
+      "MomentListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MomentRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before",
+            "description": "Pass as ``before`` for the next (older) page; null at the end."
+          },
+          "building": {
+            "type": "integer",
+            "title": "Building",
+            "description": "Moments being written up right now (queued or running)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_before",
+          "building"
+        ],
+        "title": "MomentListResponse"
+      },
+      "MomentRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "people": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "People",
+            "description": "Participants as the model named them; prefer ``speakers``."
+          },
+          "speakers": {
+            "items": {
+              "$ref": "#/components/schemas/MomentSpeaker"
+            },
+            "type": "array",
+            "title": "Speakers"
+          },
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Topics",
+            "description": "Short topic tags from the model; empty when none apply."
+          },
+          "visible_text": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Visible Text"
+          },
+          "session_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Session Ids"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/MomentCounts"
+          },
+          "cover": {
+            "items": {
+              "$ref": "#/components/schemas/MomentCover"
+            },
+            "type": "array",
+            "title": "Cover"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "start_at",
+          "end_at",
+          "title",
+          "summary",
+          "people",
+          "speakers",
+          "topics",
+          "visible_text",
+          "session_ids",
+          "counts",
+          "cover",
+          "model",
+          "created_at"
+        ],
+        "title": "MomentRead"
+      },
+      "MomentSpeaker": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "speaker_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speaker Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "speaker_id"
+        ],
+        "title": "MomentSpeaker",
+        "description": "Someone heard in the moment, from its transcripts (not the model's guess)."
+      },
       "Page_ArtifactRead_": {
         "properties": {
           "items": {
@@ -6250,28 +8958,6 @@
           "has_more"
         ],
         "title": "Page[TimelineEvent]"
-      },
-      "PlaybackTokenRead": {
-        "properties": {
-          "token": {
-            "type": "string",
-            "title": "Token",
-            "description": "Short-lived token for the audio route's ?token= parameter."
-          },
-          "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Expires At",
-            "description": "When the token stops working; mint a new one after."
-          }
-        },
-        "type": "object",
-        "required": [
-          "token",
-          "expires_at"
-        ],
-        "title": "PlaybackTokenRead",
-        "description": "A minutes-lived token for media-element audio URLs (``?token=``)."
       },
       "ProjectionClusterRead": {
         "properties": {
@@ -6602,13 +9288,21 @@
           },
           {
             "$ref": "#/components/schemas/LocationSegmentRead"
+          },
+          {
+            "$ref": "#/components/schemas/ImageSegmentRead"
+          },
+          {
+            "$ref": "#/components/schemas/VideoSegmentRead"
           }
         ],
         "discriminator": {
           "propertyName": "resource",
           "mapping": {
             "audio": "#/components/schemas/AudioSegmentRead",
-            "location": "#/components/schemas/LocationSegmentRead"
+            "image": "#/components/schemas/ImageSegmentRead",
+            "location": "#/components/schemas/LocationSegmentRead",
+            "video": "#/components/schemas/VideoSegmentRead"
           }
         }
       },
@@ -7883,6 +10577,12 @@
           },
           {
             "$ref": "#/components/schemas/LocationPointEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ImageEvent"
+          },
+          {
+            "$ref": "#/components/schemas/VideoClipEvent"
           }
         ],
         "discriminator": {
@@ -7890,13 +10590,15 @@
           "mapping": {
             "audio-tag": "#/components/schemas/AudioTagEvent",
             "conversation": "#/components/schemas/ConversationEvent",
+            "image": "#/components/schemas/ImageEvent",
             "location-point": "#/components/schemas/LocationPointEvent",
             "session-end": "#/components/schemas/SessionEndEvent",
             "session-start": "#/components/schemas/SessionStartEvent",
             "sound-span": "#/components/schemas/SoundSpanEvent",
             "speech-end": "#/components/schemas/SpeechEndEvent",
             "speech-start": "#/components/schemas/SpeechStartEvent",
-            "transcript": "#/components/schemas/TranscriptEvent"
+            "transcript": "#/components/schemas/TranscriptEvent",
+            "video-clip": "#/components/schemas/VideoClipEvent"
           }
         }
       },
@@ -8218,6 +10920,10 @@
             ],
             "title": "Display Name"
           },
+          "read_only": {
+            "type": "boolean",
+            "title": "Read Only"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -8229,6 +10935,7 @@
           "id",
           "email",
           "display_name",
+          "read_only",
           "created_at"
         ],
         "title": "UserRead",
@@ -8273,6 +10980,321 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VideoAttrs": {
+        "properties": {
+          "codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codec"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "fps": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "VideoAttrs"
+      },
+      "VideoClipEvent": {
+        "properties": {
+          "at_ms": {
+            "type": "integer",
+            "title": "At Ms",
+            "description": "Position of this event on the session timeline, ms."
+          },
+          "segment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Segment Id",
+            "description": "The resource segment this event derives from."
+          },
+          "type": {
+            "type": "string",
+            "const": "video-clip",
+            "title": "Type",
+            "default": "video-clip"
+          },
+          "end_ms": {
+            "type": "integer",
+            "title": "End Ms",
+            "description": "End (exclusive) of the clip, ms."
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Captured At",
+            "description": "Wall-clock start of the clip."
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "proxy_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy Id",
+            "description": "Browser-playable H.264 MP4 artifact of the clip; null until the video-proxy pipeline has run. Prefer it over the original, whose codec (often HEVC) browsers may not decode."
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/VideoFrameRef"
+            },
+            "type": "array",
+            "title": "Frames",
+            "description": "Evenly spaced stills, in clip order; empty until thumbnailed.",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "at_ms",
+          "segment_id",
+          "end_ms",
+          "captured_at",
+          "content_type"
+        ],
+        "title": "VideoClipEvent",
+        "description": "One stored video clip over ``[at_ms, end_ms)``, positioned at its start.\n\nWall-clock-derived, as for ``location-point``."
+      },
+      "VideoFrameRef": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Artifact Id"
+          },
+          "offset_ms": {
+            "type": "integer",
+            "title": "Offset Ms",
+            "description": "Position of the still within the clip, ms."
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "offset_ms"
+        ],
+        "title": "VideoFrameRef",
+        "description": "One still of a clip, served by ``/v1/artifacts/{artifact_id}/media``."
+      },
+      "VideoSegmentRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "ingested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ingested At"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "offset_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset Ms"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "byte_size": {
+            "type": "integer",
+            "title": "Byte Size"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "checksum_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum Sha256",
+            "description": "Hex-encoded SHA-256 of the wire payload."
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "resource": {
+            "type": "string",
+            "const": "video",
+            "title": "Resource",
+            "default": "video"
+          },
+          "attrs": {
+            "$ref": "#/components/schemas/VideoAttrs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "session_id",
+          "sequence",
+          "ingested_at",
+          "captured_at",
+          "offset_ms",
+          "duration_ms",
+          "byte_size",
+          "content_type",
+          "checksum_sha256",
+          "metadata",
+          "attrs"
+        ],
+        "title": "VideoSegmentRead"
+      },
+      "WebSessionRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "title": "Password",
+            "writeOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "WebSessionRequest"
       }
     },
     "securitySchemes": {
@@ -8280,6 +11302,12 @@
         "type": "http",
         "description": "An API token from `tokens issue`.",
         "scheme": "bearer"
+      },
+      "APIKeyCookie": {
+        "type": "apiKey",
+        "description": "Web sign-in, set by POST /v1/auth/session.",
+        "in": "cookie",
+        "name": "context_session"
       }
     }
   }

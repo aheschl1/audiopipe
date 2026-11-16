@@ -4,9 +4,8 @@ import { usePlayhead } from "../hooks/usePlayhead"
 import { useSessionTrack, type TrackFix } from "../hooks/useSessionTrack"
 import { positionAtMs, splitAtGaps } from "../location"
 import { createTrackMap, type TrackMapHandle } from "../map/trackMap"
+import { token } from "../styles/tokens"
 
-// Matches the location lane's dot in the strip.
-const TRACK_COLOR = "hsl(200 62% 58%)"
 
 // The session's track, expandable under the strip. Owns its map instance;
 // the playhead marker lives in a child so per-frame ticks never re-render
@@ -60,10 +59,11 @@ export default function SessionMapPanel({
 
   useEffect(() => {
     if (!handle) return
+    const color = token("--data-location")
     handle.setTracks(
       splitAtGaps(points).map((segment, i) => ({
         id: `${sessionId}:${i}`,
-        color: TRACK_COLOR,
+        color,
         points: segment.map((p) => ({ atMs: p.at_ms, lat: p.lat, lon: p.lon })),
       })),
     )
@@ -80,16 +80,16 @@ export default function SessionMapPanel({
     <div className="session-map">
       <div ref={containerRef} className="session-map-canvas" />
       {handle && <MapPlayheadMarker handle={handle} points={points} audioEl={audioEl} />}
-      {mapFailed && <div className="session-map-note">couldn't load the map</div>}
-      {loading && <div className="session-map-note">loading track…</div>}
+      {mapFailed && <div className="session-map-note">Couldn't load the map.</div>}
+      {loading && <div className="session-map-note">Loading track…</div>}
       {failed && (
-        <div className="session-map-note">couldn't load the track — try reopening</div>
+        <div className="session-map-note">Couldn't load the track. Try reopening the map.</div>
       )}
       {!loading && !failed && points.length === 0 && (
-        <div className="session-map-note">no location data for this session</div>
+        <div className="session-map-note">No location data for this session.</div>
       )}
       {partial && (
-        <div className="session-map-note">long track — showing the first 5000 fixes</div>
+        <div className="session-map-note">Long track. Showing the first 5,000 points.</div>
       )}
     </div>
   )

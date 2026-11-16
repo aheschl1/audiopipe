@@ -1,6 +1,6 @@
 """Audio tagging + embedding server: CED (AudioSet 527) and LAION-CLAP.
 
-The owned serving layer for the audio-pipeline's audio-tag tier. One container
+The owned serving layer for the context's audio-tag tier. One container
 serves both models because they consume the same audio windows: CED scores 527
 sound-event classes per window, CLAP embeds each window into its joint
 audio-text space (the retrieval index for text->audio search).

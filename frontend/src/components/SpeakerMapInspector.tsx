@@ -1,6 +1,6 @@
 import type { ProjectionPointRead } from "../api/client"
 import { fmtClock, fmtDate, shortId } from "../format"
-import { hue, localLabelTail } from "../speakers"
+import { categoryColor, localLabelTail } from "../speakers"
 import ClipButton, { ClipProgress } from "./ClipButton"
 
 // Distances past this read as "probably a different voice" — the same
@@ -16,7 +16,7 @@ export default function SpeakerMapInspector({
   onOpen: (sessionId: string, seekMs?: number) => void
   onClose: () => void
 }) {
-  const tint = hue(point.speaker_id ?? point.speaker)
+  const tint = categoryColor(point.speaker_id ?? point.speaker)
   const clip =
     point.clip_start_ms !== null &&
     point.clip_start_ms !== undefined &&
@@ -33,38 +33,38 @@ export default function SpeakerMapInspector({
   return (
     <aside className="map-inspector">
       <div className="map-inspector-head">
-        <span className="map-swatch" style={{ background: `hsl(${tint} 55% 55%)` }} />
-        <strong>{point.name ?? (point.speaker_id ? shortId(point.speaker_id) : "unassigned")}</strong>
+        <span className="map-swatch" style={{ background: tint }} />
+        <strong>{point.name ?? (point.speaker_id ? shortId(point.speaker_id) : "Unassigned")}</strong>
         <button className="btn ghost slim" onClick={onClose}>
           ✕
         </button>
       </div>
 
       <dl className="map-facts">
-        <dt>session</dt>
+        <dt>Session</dt>
         <dd>{point.session_label ?? shortId(point.session_id)}</dd>
-        <dt>recorded</dt>
+        <dt>Recorded</dt>
         <dd>{fmtDate(point.started_at)}</dd>
         {point.start_ms !== null && point.start_ms !== undefined && (
           <>
-            <dt>block</dt>
+            <dt>Block</dt>
             <dd>
               {fmtClock(point.start_ms)}–{fmtClock(point.end_ms ?? point.start_ms)}
             </dd>
           </>
         )}
-        <dt>label</dt>
+        <dt>Label</dt>
         <dd className="mono">{localLabelTail(point.speaker)}</dd>
         {point.talk_ms !== null && point.talk_ms !== undefined && (
           <>
-            <dt>speech</dt>
+            <dt>Speech</dt>
             <dd>{fmtClock(point.talk_ms)}</dd>
           </>
         )}
-        <dt>distance</dt>
+        <dt>Distance</dt>
         <dd>
           {point.distance === null || point.distance === undefined ? (
-            <span className="row-dim">unassigned</span>
+            <span className="row-dim">Unassigned</span>
           ) : (
             <span className={`distance ${point.distance > FAR_DISTANCE ? "far" : ""}`}>
               {point.distance.toFixed(3)}
@@ -73,13 +73,13 @@ export default function SpeakerMapInspector({
         </dd>
         {point.split_of && (
           <>
-            <dt>split from</dt>
+            <dt>Split from</dt>
             <dd className="mono">{point.split_of}</dd>
           </>
         )}
       </dl>
 
-      {point.pinned && <span className="chip">📌 pinned</span>}
+      {point.pinned && <span className="chip">Pinned</span>}
 
       <div className="map-inspector-actions">
         {clip && (
@@ -92,7 +92,7 @@ export default function SpeakerMapInspector({
           className="btn slim"
           onClick={() => onOpen(point.session_id, point.start_ms ?? 0)}
         >
-          open in session
+          Open in session
         </button>
       </div>
 

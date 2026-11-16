@@ -1,4 +1,4 @@
-"""Stand-in audio model services for the e2e suite.
+"""Stand-in model services for the e2e suite.
 
 Speaks just enough of the transcription, diarization and classification
 contracts for the worker tiers, with deterministic canned answers; response
@@ -8,6 +8,7 @@ tests.e2e.stub_audio_services PORT`` next to the real worker process.
 """
 
 import json
+import re
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -87,6 +88,55 @@ STUB_TAGGER_MODEL = "stub-tagger"
 STUB_CLAP_MODEL = "stub-clap"
 # Nearest STUB_WINDOWS[0] by cosine distance, so search tests rank window one first.
 STUB_TEXT_EMBEDDING = [1.0, 0.0, 0.0, 0.0]
+# The vision sidecar, under {base}/vision: one identical vector per image, so a
+# short clip yields exactly its "first" keyframe and every frame matches the
+# text query at distance 0.
+STUB_VISION_MODEL = "stub-siglip"
+STUB_VISION_EMBEDDING = [0.0, 0.0, 0.0, 1.0]
+# The chat endpoint, under {base}/llm: describes a moment by echoing what it
+# was sent, and links every candidate pair as "depicts".
+STUB_LLM_MODEL = "stub-llm"
+
+
+def _moment_reply(request: dict) -> dict:
+    parts = request["messages"][1]["content"]
+    text = parts[0]["text"]
+    images = sum(1 for p in parts if p.get("type") == "image_url")
+    labels = re.findall(r"^([UKPS]\d+)  ", text, re.MULTILINE)
+    pairs = re.findall(r"^([KP]\d+) ~ ([US]\d+)$", text, re.MULTILINE)
+    content = {
+        "title": f"stub moment with {images} images",
+        "summary": f"Items: {' '.join(labels)}.",
+        "people": ["voice 1"],
+        "topics": ["test"],
+        "visible_text": [],
+        "links": [
+            {"from": a, "to": b, "relation": "depicts", "confidence": 0.9, "why": "overlap"}
+            for a, b in pairs
+        ]
+        + [{"from": "X1", "to": "U1", "relation": "depicts"}],  # must be dropped
+    }
+    return {
+        "model": STUB_LLM_MODEL,
+        "choices": [{"message": {"role": "assistant", "content": json.dumps(content)}}],
+        "usage": {"prompt_tokens": len(text), "completion_tokens": 10, "total_tokens": len(text) + 10},
+    }
+
+
+def _automation_reply(request: dict) -> dict:
+    """Applies when the moment mentions a deadline; fills each field with a stub value."""
+    text = request["messages"][1]["content"][0]["text"]
+    fields = re.findall(r'^- "([^"]+)"', text, re.MULTILINE)
+    content = {
+        "applies": "deadline" in text.split("MOMENT", 1)[1].lower(),
+        "reason": "stub verdict",
+        "fields": {name: f"stub {name}" for name in fields},
+    }
+    return {
+        "model": STUB_LLM_MODEL,
+        "choices": [{"message": {"role": "assistant", "content": json.dumps(content)}}],
+        "usage": {"total_tokens": 1},
+    }
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -94,7 +144,21 @@ class _Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("content-length", 0))
         body = self.rfile.read(length)
         url = urlparse(self.path)
-        if url.path.endswith("/audio/transcriptions"):
+        if url.path.endswith("/llm/chat/completions"):
+            request = json.loads(body)
+            automation = request["messages"][0]["content"].startswith("You check one moment")
+            payload = (_automation_reply if automation else _moment_reply)(request)
+        elif "/vision/" in url.path:
+            if url.path.endswith("/images/embeddings"):
+                count = body.count(b'name="files"')
+                vectors = [STUB_VISION_EMBEDDING] * count
+            elif url.path.endswith("/text/embeddings"):
+                vectors = [STUB_VISION_EMBEDDING] * len(json.loads(body)["texts"])
+            else:
+                self.send_error(404)
+                return
+            payload = {"embeddings": vectors, "model": STUB_VISION_MODEL}
+        elif url.path.endswith("/audio/transcriptions"):
             model = parse_qs(url.query).get("model", ["parakeet"])[0]
             whisper = model == "whisper"
             payload = {

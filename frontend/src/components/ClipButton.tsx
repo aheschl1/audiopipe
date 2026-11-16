@@ -9,7 +9,7 @@ export default function ClipButton({ clip }: { clip: Clip }) {
   return (
     <button
       className={`clip-btn ${active ? "active" : ""}`}
-      title={active ? "stop" : "play here"}
+      title={active ? "Stop" : "Play here"}
       onClick={(event) => {
         event.stopPropagation()
         void toggleClip(clip)

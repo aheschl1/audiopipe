@@ -4,6 +4,7 @@
     uv run python -m cli.main users create --email me@example.com
     uv run python -m cli.main tokens issue me@example.com --name laptop
     uv run python -m cli.main segments ingest SESSION_ID clip.wav
+    uv run python -m cli.main demo seed --api http://10.8.0.1:8098
 """
 
 import asyncio
@@ -189,6 +190,18 @@ async def users_deactivate(email: str) -> None:
         user = await _require_user(pipe, email)
         await pipe.users.set_active(user.id, False)
     click.echo(f"deactivated {user.email}")
+
+
+@users.command("read-only")
+@click.argument("email")
+@click.option("--off", is_flag=True, help="Allow writes again.")
+@async_command
+async def users_read_only(email: str, off: bool) -> None:
+    """Make a user read-only: they can sign in and look, but not change anything."""
+    async with DatabasePipe() as pipe:
+        user = await _require_user(pipe, email)
+        user = await pipe.users.set_read_only(user.id, not off)
+    click.echo(f"{user.email}: {'read-only' if user.read_only else 'read-write'}")
 
 
 @users.command("delete")
@@ -501,8 +514,7 @@ async def conversations_rebuild(session_id: UUID | None, every: bool, yes: bool)
     """Regroup conversations from the existing diarization — no GPU work.
 
     Deletes the tier's artifacts and job history so discovery re-runs it on
-    each session's current diarize-map. Manual exclusions are lost. Run
-    after clustering settles so the user's labels resolve by identity.
+    each session's current diarize-map. Manual exclusions are lost.
     """
     if (session_id is None) == (not every):
         raise click.UsageError("give a SESSION_ID or --all, not both")
@@ -732,6 +744,80 @@ async def segments_delete(segment_id: UUID, yes: bool) -> None:
         click.confirm(f"delete segment {segment_id} and its stored data?", abort=True)
     deleted = await segment_service.delete_segment(segment_id)
     click.echo("deleted" if deleted else "no such segment")
+
+
+#  demo
+
+
+@cli.group()
+def demo() -> None:
+    """The public demo account."""
+
+
+@demo.command("seed")
+@click.option("--email", default="demo@andrewheschl.ca", show_default=True)
+@click.option("--name", default="Demo", show_default=True, help="Display name.")
+@click.option("--password", default="demopassword", show_default=True)
+@click.option(
+    "--api",
+    default="http://10.8.0.1:8098",
+    show_default=True,
+    help="Base URL of the running API; the clips go through its real ingest path.",
+)
+@click.option(
+    "--data",
+    "data_dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=None,
+    help="Folder holding the scene clips (default: data/demo).",
+)
+@click.option("--keep-writable", is_flag=True, help="Skip making the account read-only.")
+@async_command
+async def demo_seed(
+    email: str, name: str, password: str, api: str, data_dir: Path | None, keep_writable: bool
+) -> None:
+    """Create the demo user and stream the demo scenes into its account."""
+    from cli import demo as demo_seeding
+
+    async with DatabasePipe() as pipe:
+        if await pipe.users.get_by_email(email) is not None:
+            raise click.ClickException(f"{email} already exists; delete it first to reseed")
+        user = await pipe.users.create(
+            UserCreate(email=email, password=password, display_name=name)
+        )
+        issued = await pipe.tokens.issue(user.id, name="demo-seed", ttl=timedelta(hours=1))
+    click.echo(f"created {user.email} ({user.id})")
+
+    token = issued.token.get_secret_value()
+    await demo_seeding.add_automation(user.id, user.created_at)
+    start = demo_seeding.default_start()
+    await demo_seeding.seed_scenes(api, token, data_dir or demo_seeding.DATA_DIR, start)
+
+    async with DatabasePipe() as pipe:
+        await pipe.tokens.revoke(issued.record.id)
+        if not keep_writable:
+            await pipe.users.set_read_only(user.id, True)
+    state = "read-write" if keep_writable else "read-only"
+    click.echo(f"done: {email} is {state}; the worker processes the sessions next")
+
+
+@demo.command("automation")
+@click.option("--email", default="demo@andrewheschl.ca", show_default=True)
+@async_command
+async def demo_automation(email: str) -> None:
+    """Add the example automation to an already-seeded demo account.
+
+    It covers the account's existing moments, as far back as the worker's
+    automation lookback (PROCESSING_AUTOMATION_LOOKBACK_HOURS) reaches.
+    """
+    from cli import demo as demo_seeding
+
+    async with DatabasePipe() as pipe:
+        user = await pipe.users.get_by_email(email)
+    if user is None:
+        raise click.ClickException(f"no user {email}")
+    added = await demo_seeding.add_automation(user.id, user.created_at)
+    click.echo(f"added “{demo_seeding.AUTOMATION.name}” to {email}" if added else "already there")
 
 
 if __name__ == "__main__":

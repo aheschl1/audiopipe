@@ -174,3 +174,22 @@ async def test_ingest_rejects_invalid_location_before_writing(account: Account) 
         await segment_service.ingest_segment(session.id, b"not json", resource="location")
     async with DatabasePipe() as pipe:
         assert await pipe.segments.list_for_session(session.id) == []
+
+
+async def test_upload_into_an_ended_session_is_refused(account: Account, s3: Any) -> None:
+    # The route checks is_open up front; this is the session ending mid-upload.
+    from datetime import UTC, datetime
+
+    from database.exceptions import SessionEndedError
+
+    session = await make_session(account)
+    async with DatabasePipe() as pipe:
+        await pipe.sessions.end(session.id)
+    jpeg = b"\xff\xd8\xff\xe0" + bytes(range(256)) * 4
+    with pytest.raises(SessionEndedError):
+        await segment_service.ingest_segment(
+            session.id, jpeg, resource="image", upload=True, captured_at=datetime.now(UTC)
+        )
+    async with DatabasePipe() as pipe:
+        assert await pipe.segments.list_for_session(session.id) == []
+    assert keys_under(s3, session_prefix(account.user.id, session.id)) == []

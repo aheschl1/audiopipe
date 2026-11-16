@@ -3,14 +3,15 @@ import { api, type SessionTrackRead } from "../api/client"
 import { fmtDate, shortId } from "../format"
 import { fmtCoords, splitAtGaps, TRACK_GAP_MS } from "../location"
 import { createTrackMap, type MapMode, type TrackMapHandle, type TrackPt } from "../map/trackMap"
-import { hue } from "../speakers"
+import { categoryHex } from "../speakers"
 import { useSearchParam } from "../useParam"
+import PageHead from "./PageHead"
 
 const MAX_POINTS = 500
 
 const MODES: { key: MapMode; label: string }[] = [
-  { key: "lines", label: "lines" },
-  { key: "arrows", label: "arrows" },
+  { key: "lines", label: "Lines" },
+  { key: "arrows", label: "Arrows" },
   { key: "heat", label: "heat" },
 ]
 
@@ -54,7 +55,7 @@ function trackName(track: SessionTrackRead): string {
 }
 
 function trackColor(track: SessionTrackRead): string {
-  return `hsl(${hue(track.session_id)} 60% 55%)`
+  return categoryHex(track.session_id)
 }
 
 // The global travel map: every session's track in a date window, one color
@@ -161,9 +162,10 @@ export default function GeoMap({
 
   return (
     <div className="geo-view">
+      <PageHead title="Places" meta="Where your sessions were recorded." />
       <div className="geo-toolbar">
         <label className="geo-range">
-          from
+          From
           <input
             type="date"
             className="input slim"
@@ -174,7 +176,7 @@ export default function GeoMap({
           />
         </label>
         <label className="geo-range">
-          to
+          To
           <input
             type="date"
             className="input slim"
@@ -197,7 +199,7 @@ export default function GeoMap({
         </div>
         {tracks && tracks.length > 0 && (
           <span className="row-dim">
-            {tracks.length} session{tracks.length === 1 ? "" : "s"} · {totalFixes} fixes
+            {tracks.length} session{tracks.length === 1 ? "" : "s"} · {totalFixes} points
           </span>
         )}
       </div>
@@ -205,13 +207,13 @@ export default function GeoMap({
         <div className="geo-map-wrap">
           <div ref={containerRef} className="geo-map" />
           {tracks && tracks.length === 0 && (
-            <div className="geo-empty">no location data between these dates</div>
+            <div className="geo-empty">No location data between these dates.</div>
           )}
-          {error && <div className="geo-empty">couldn't load tracks</div>}
-          {mapFailed && <div className="geo-empty">couldn't load the map</div>}
+          {error && <div className="geo-empty">Couldn't load tracks.</div>}
+          {mapFailed && <div className="geo-empty">Couldn't load the map.</div>}
         </div>
         <aside className="geo-legend">
-          {mode === "heat" && <div className="row-dim">brighter = more time spent</div>}
+          {mode === "heat" && <div className="row-dim">Brighter means more time spent</div>}
           {selected && selectedTrack && (
             <div className="geo-point-card">
               <div className="geo-point-head">
@@ -230,7 +232,7 @@ export default function GeoMap({
                 className="btn primary slim"
                 onClick={() => onOpen(selected.sessionId, Math.max(0, selected.pt.atMs))}
               >
-                open session here
+                Open session here
               </button>
             </div>
           )}
@@ -261,7 +263,7 @@ export default function GeoMap({
                   onOpen(track.session_id)
                 }}
               >
-                open
+                Open
               </button>
             </div>
           ))}

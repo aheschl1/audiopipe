@@ -23,10 +23,16 @@ from database.repos.ab_votes import AbVotesRepo
 from database.repos.artifacts import ArtifactsRepo
 from database.repos.cluster_params import ClusterParamsRepo
 from database.repos.conversations import ConversationsRepo
-from database.repos.embeddings import AudioEmbeddingsRepo, EmbeddingsRepo
+from database.repos.embeddings import (
+    AudioEmbeddingsRepo,
+    EmbeddingsRepo,
+    VisualEmbeddingsRepo,
+)
 from database.repos.jobs import JobsRepo
 from database.repos.label_carry import LabelCarryRepo
 from database.repos.locations import LocationsRepo
+from database.repos.automations import AutomationsRepo
+from database.repos.moments import MomentsRepo
 from database.repos.segments import SegmentsRepo
 from database.repos.sessions import SessionsRepo
 from database.repos.speakers import SpeakersRepo
@@ -144,6 +150,18 @@ class DatabasePipe:
     @cached_property
     def audio_embeddings(self) -> AudioEmbeddingsRepo:
         return AudioEmbeddingsRepo(self.connection)
+
+    @cached_property
+    def visual_embeddings(self) -> VisualEmbeddingsRepo:
+        return VisualEmbeddingsRepo(self.connection)
+
+    @cached_property
+    def moments(self) -> MomentsRepo:
+        return MomentsRepo(self.connection)
+
+    @cached_property
+    def automations(self) -> AutomationsRepo:
+        return AutomationsRepo(self.connection)
 
     @cached_property
     def speakers(self) -> SpeakersRepo:

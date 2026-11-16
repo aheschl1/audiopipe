@@ -13,3 +13,6 @@ wheels/
 .env
 .pytest-api.log
 .pytest-worker.log
+
+# Raw media (demo clips, stock footage)
+/data/

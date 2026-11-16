@@ -1,5 +1,5 @@
-"""Pydantic models for the ``speaker_embeddings`` and ``audio_embeddings``
-tables."""
+"""Pydantic models for the ``speaker_embeddings``, ``audio_embeddings`` and
+``visual_embeddings`` tables."""
 
 import json
 from datetime import datetime
@@ -67,6 +67,17 @@ class AudioEmbedding(BaseModel):
 
 class AudioEmbeddingCreate(BaseModel):
     """Input for recording a window embedding against an existing artifact."""
+
+    model_config = ConfigDict(frozen=True)
+
+    artifact_id: UUID
+    session_id: UUID
+    model: str
+    embedding: tuple[float, ...]
+
+
+class VisualEmbeddingCreate(BaseModel):
+    """Input for recording a keyframe's image embedding against its artifact."""
 
     model_config = ConfigDict(frozen=True)
 

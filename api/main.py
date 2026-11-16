@@ -22,9 +22,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.config import get_settings
 from api.routes import (
     ab,
+    artifacts,
     auth,
+    automations,
     conversations,
     health,
+    moments,
     resources,
     search,
     segments,
@@ -121,7 +124,7 @@ def _error(status_code: int, detail: str) -> JSONResponse:
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="audio-pipeline",
+        title="context",
         version="0.1.0",
         summary=(
             "Recording sessions and their audio segments. Audio is uploaded over "
@@ -131,9 +134,10 @@ def create_app() -> FastAPI:
         responses={401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
     )
 
-    # Auth is a bearer header, never a cookie, so a wildcard origin grants
-    # nothing beyond what any HTTP client already has — and the miniapp
-    # WebView's fetches arrive cross-origin.
+    # The miniapp WebView's fetches arrive cross-origin, hence the wildcard.
+    # It is safe only without allow_credentials: the cookie's CSRF defence is
+    # that no other origin can send X-Requested-With with credentials
+    # (tests/e2e/test_auth.py pins this). Never turn credentials on here.
     app.add_middleware(
         CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
     )
@@ -183,6 +187,9 @@ def create_app() -> FastAPI:
     app.include_router(stream.router, prefix=API_PREFIX)
     app.include_router(ab.router, prefix=API_PREFIX)
     app.include_router(conversations.router, prefix=API_PREFIX)
+    app.include_router(artifacts.router, prefix=API_PREFIX)
+    app.include_router(moments.router, prefix=API_PREFIX)
+    app.include_router(automations.router, prefix=API_PREFIX)
     return app
 
 
@@ -205,7 +212,7 @@ APP_PATH = "api.main:app"
     type=click.Choice(["critical", "error", "warning", "info", "debug", "trace"]),
 )
 def serve(host: str, port: int, reload: bool, workers: int, log_level: str) -> None:
-    """Run the audio-pipeline HTTP API."""
+    """Run the context HTTP API."""
     if reload and workers > 1:
         raise click.UsageError("--reload cannot be combined with --workers")
     uvicorn.run(

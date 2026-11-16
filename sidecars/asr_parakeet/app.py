@@ -35,7 +35,7 @@ from fastapi.responses import JSONResponse
 
 PARAKEET_ID = os.environ.get("ASR_MODEL", "nvidia/parakeet-tdt-0.6b-v3")
 # The A/B contender slot. Off by default since the 2026-08 experiment
-# concluded (parakeet won — audio-pipeline docs/asr-ab-results.md); flip on
+# concluded (parakeet won — context docs/asr-ab-results.md); flip on
 # to re-run an evaluation.
 WHISPER_ENABLED = os.environ.get("ASR_WHISPER_ENABLED", "0") == "1"
 WHISPER_ID = os.environ.get("ASR_WHISPER_MODEL", "large-v3")

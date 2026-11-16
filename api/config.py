@@ -1,7 +1,7 @@
 """API settings, loaded from the environment / .env file.
 
-Everything here tunes the streaming websocket (docs/streaming-protocol.md);
-the HTTP routes need no configuration of their own.
+Mostly the streaming websocket (docs/streaming-protocol.md), plus the REST
+upload size cap.
 """
 
 from datetime import time
@@ -37,6 +37,8 @@ class ApiSettings(BaseSettings):
     # its next chunk. Keep well under session_stale_seconds: a rotated client
     # must reconnect long before its successor session could be swept.
     stream_session_check_seconds: float = 5.0
+    # Matches the nginx client_max_body_size in front of the API.
+    upload_max_bytes: int = 64 * 1024 * 1024
 
     # Protocol v2: per-frame PCM cap and the pooling of frames into stored
     # segments (api/stream_pool.py). The ack `through` for a frame waits on
@@ -55,6 +57,12 @@ class ApiSettings(BaseSettings):
     # session can be swept out from under it. Chunk heartbeats are throttled to
     # roughly one write a minute (sessions.touch_if_stale), so keep this well
     # above that interval too.
+    # Web sign-in: an HttpOnly cookie holding a token that lives this long.
+    # Keep cookie_secure on behind TLS; turn it off only for plain-HTTP LAN dev
+    # (browsers already treat http://localhost as secure).
+    web_session_days: int = 30
+    cookie_secure: bool = True
+
     session_stale_seconds: float = 300.0
     session_sweep_interval_seconds: float = 60.0
 
@@ -77,6 +85,10 @@ class ApiSettings(BaseSettings):
     # contended GPU.
     classifier_base_url: str = "http://127.0.0.1:8035/v1"
     classifier_timeout_seconds: float = 180.0
+    # Text->frame search embeds its query with the vision sidecar's SigLIP
+    # text tower (the worker's keyframe embedder). A cold sidecar loads in ~10s.
+    vision_base_url: str = "http://127.0.0.1:8036/v1"
+    vision_timeout_seconds: float = 120.0
 
 
 @lru_cache(maxsize=1)

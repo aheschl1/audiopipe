@@ -91,6 +91,16 @@ class ArtifactsRepo(BaseRepo):
             (session_id, pipeline),
         )
 
+    async def delete_for_segment(self, session_id: UUID, pipeline: str, segment_id: UUID) -> int:
+        """Like :meth:`delete_for_pipeline`, for tiers whose jobs are per segment."""
+        return await self._execute(
+            """
+                DELETE FROM pipeline_artifacts
+                WHERE session_id = %s AND pipeline = %s AND links->>'segment' = %s
+            """,
+            (session_id, pipeline, str(segment_id)),
+        )
+
     async def get(self, artifact_id: UUID) -> PipelineArtifact | None:
         return await self._fetch_one(
             PipelineArtifact,

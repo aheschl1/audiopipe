@@ -14,7 +14,7 @@ from database.security import (
     waste_password_time,
 )
 
-COLUMNS = "id, email, display_name, is_active, created_at, updated_at"
+COLUMNS = "id, email, display_name, is_active, read_only, created_at, updated_at"
 EMAIL_INDEX = "users_email_lower_key"
 
 
@@ -94,6 +94,16 @@ class UsersRepo(BaseRepo):
             User,
             f"UPDATE users SET is_active = %s WHERE id = %s RETURNING {COLUMNS}",
             (is_active, user_id),
+        )
+        if user is None:
+            raise NotFoundError("user", user_id)
+        return user
+
+    async def set_read_only(self, user_id: UUID, read_only: bool) -> User:
+        user = await self._fetch_one(
+            User,
+            f"UPDATE users SET read_only = %s WHERE id = %s RETURNING {COLUMNS}",
+            (read_only, user_id),
         )
         if user is None:
             raise NotFoundError("user", user_id)

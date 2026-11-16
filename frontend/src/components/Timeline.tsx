@@ -1,15 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { cloneElement, useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react"
 import {
   api,
+  type ImageEvent,
   type LocationPointEvent,
   type TimelineEvent,
   type TranscriptEvent,
+  type VideoClipEvent,
 } from "../api/client"
 import { fmtClock } from "../format"
 import { describePoint, fmtCoords } from "../location"
+import { useReadOnly } from "../readOnly"
 import { describeSpan } from "../sounds"
+import { clipUrl, fmtWallTime, imageThumbUrl } from "../visual"
 import SpeakerChip from "./SpeakerChip"
 import TimelineFilter, { loadHidden, type EventKind } from "./TimelineFilter"
+import VideoGutter from "./VideoGutter"
+import VideoLightbox from "./VideoLightbox"
 
 const PAGE = 200
 // Deep links load the timeline from a little before the target moment, so
@@ -37,6 +43,7 @@ export default function Timeline({
   follow,
   refreshKey,
   onSpeakersChanged,
+  onOpenImage,
 }: {
   sessionId: string
   onSeek: (ms: number) => void
@@ -47,7 +54,9 @@ export default function Timeline({
   follow?: boolean
   refreshKey?: number
   onSpeakersChanged?: () => void
+  onOpenImage?: (segmentId: string) => void
 }) {
+  const readOnly = useReadOnly()
   const [events, setEvents] = useState<TimelineEvent[] | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -63,6 +72,23 @@ export default function Timeline({
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState("")
   const [editBusy, setEditBusy] = useState(false)
+  const wrapRef = useRef<HTMLDivElement | null>(null)
+  const [gutterW, setGutterW] = useState(0)
+  const [playing, setPlaying] = useState<{ clip: VideoClipEvent; offsetMs: number } | null>(null)
+  const clips = useMemo(
+    () =>
+      hidden.has("video-clip")
+        ? []
+        : (events ?? []).filter((e): e is VideoClipEvent => e.type === "video-clip"),
+    [events, hidden],
+  )
+  const openClip = useCallback(
+    (clip: VideoClipEvent, offsetMs: number) => setPlaying({ clip, offsetMs }),
+    [],
+  )
+  useEffect(() => {
+    if (clips.length === 0) setGutterW(0)
+  }, [clips.length])
 
   const load = useCallback(
     async (offset: number, windowStart: number | null) => {
@@ -201,7 +227,7 @@ export default function Timeline({
           >
             <button
               className="event-time"
-              title="listen from here"
+              title="Listen from here"
               onClick={() => onSeek(event.at_ms)}
             >
               {fmtClock(event.at_ms)}
@@ -210,9 +236,9 @@ export default function Timeline({
               {interjection && (
                 <span
                   className="badge interjection"
-                  title="spoken during another speaker's utterance; their transcript contains these words too"
+                  title="Spoken during another speaker's turn. Their transcript contains these words too."
                 >
-                  interjection
+                  Interjection
                 </span>
               )}
               {(event.speaker || event.speaker_id) && (
@@ -247,7 +273,7 @@ export default function Timeline({
                     }}
                   />
                   <button className="btn primary slim" disabled={editBusy}>
-                    {editBusy ? "saving…" : "save"}
+                    {editBusy ? "Saving…" : "Save"}
                   </button>
                   <button
                     type="button"
@@ -255,15 +281,16 @@ export default function Timeline({
                     disabled={editBusy}
                     onClick={() => setEditingKey(null)}
                   >
-                    cancel
+                    Cancel
                   </button>
                 </form>
               ) : (
                 <>
                   <span className="transcript-text">{event.text}</span>
+                  {!readOnly && (
                   <button
                     className="btn ghost slim event-edit"
-                    title="correct this transcript"
+                    title="Correct this transcript"
                     onClick={() => {
                       setEditDraft(event.text)
                       setEditingKey(key)
@@ -271,6 +298,7 @@ export default function Timeline({
                   >
                     ✎
                   </button>
+                  )}
                 </>
               )}
             </div>
@@ -287,7 +315,7 @@ export default function Timeline({
           >
             <button
               className="event-time"
-              title="listen from here"
+              title="Listen from here"
               onClick={() => onSeek(event.at_ms)}
             >
               {fmtClock(event.at_ms)}
@@ -313,7 +341,7 @@ export default function Timeline({
           >
             <button
               className="event-time"
-              title="listen from here"
+              title="Listen from here"
               onClick={() => onSeek(event.at_ms)}
             >
               {fmtClock(event.at_ms)}
@@ -340,7 +368,7 @@ export default function Timeline({
           >
             <button
               className="event-time"
-              title="listen from here"
+              title="Listen from here"
               onClick={() => onSeek(event.at_ms)}
             >
               {fmtClock(event.at_ms)}
@@ -373,7 +401,7 @@ export default function Timeline({
           <div key={key} ref={flash ? flashRef : undefined} className={`event tags ${flash ? "flash" : ""}`}>
             <button
               className="event-time"
-              title="listen from here"
+              title="Listen from here"
               onClick={() => onSeek(Math.max(0, first.at_ms))}
             >
               {fmtClock(Math.max(0, first.at_ms))}
@@ -381,7 +409,7 @@ export default function Timeline({
             <div className="event-body">
               <button
                 className="chip as-button"
-                title={expanded ? "collapse" : "show every point"}
+                title={expanded ? "Collapse" : "Show every point"}
                 onClick={() =>
                   setExpandedRuns((prev) => {
                     const next = new Set(prev)
@@ -408,7 +436,7 @@ export default function Timeline({
                     <div key={`${point.segment_id}-${point.at_ms}-${i}`} className="row-dim">
                       <button
                         className="event-time"
-                        title="listen from here"
+                        title="Listen from here"
                         onClick={() => onSeek(Math.max(0, point.at_ms))}
                       >
                         {fmtClock(Math.max(0, point.at_ms))}
@@ -422,11 +450,50 @@ export default function Timeline({
           </div>
         )
       }
+      case "image": {
+        if (hidden.has("image")) return null
+        // Consecutive images render as one gallery row, like location runs.
+        if (index > 0 && events[index - 1]?.type === "image") return null
+        let end = index
+        while (end + 1 < events.length && events[end + 1]?.type === "image") end++
+        const run = events.slice(index, end + 1) as ImageEvent[]
+        const at = Math.max(0, run[0]!.at_ms)
+        return (
+          <div key={key} ref={flash ? flashRef : undefined} className={`event visual ${flash ? "flash" : ""}`}>
+            <button className="event-time" title="Listen from here" onClick={() => onSeek(at)}>
+              {fmtClock(at)}
+            </button>
+            <div className="event-body gallery">
+              {run.map((image) => (
+                <button
+                  key={image.segment_id}
+                  className="thumb"
+                  title={`${fmtWallTime(image.captured_at)} · open`}
+                  onClick={() => onOpenImage?.(image.segment_id)}
+                >
+                  {imageThumbUrl(image) ? (
+                    <img
+                      src={imageThumbUrl(image)}
+                      alt={`Image at ${fmtClock(Math.max(0, image.at_ms))}`}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span className="thumb-placeholder" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      }
+      case "video-clip":
+        // Drawn in the gutter alongside the rows it spans, not as a row.
+        return null
       case "session-start":
         if (hidden.has("marker")) return null
         return (
           <div key={key} className="event marker">
-            session started
+            Session started
           </div>
         )
       case "session-end":
@@ -442,14 +509,33 @@ export default function Timeline({
     }
   })
 
+  // Rows carry their position so the video gutter can line clips up with them.
+  const tagged = rendered.map((node, index) =>
+    node ? cloneElement(node as ReactElement<{ "data-at"?: number }>, { "data-at": events[index]!.at_ms }) : null,
+  )
+
   const allFilteredOut =
     rendered.every((node) => node === null) && hidden.size > 0 && events.length > 0
 
   return (
     <>
       <div className="timeline-toolbar">
+        <h2 className="section-label">Timeline</h2>
         <TimelineFilter hidden={hidden} onChange={setHidden} />
       </div>
+      <div
+        className="timeline-wrap"
+        ref={wrapRef}
+        style={{ paddingLeft: gutterW ? gutterW + 4 : 0 }}
+      >
+        {clips.length > 0 && (
+          <VideoGutter
+            clips={clips}
+            wrapRef={wrapRef}
+            onOpen={openClip}
+            onWidth={setGutterW}
+          />
+        )}
       <div className="timeline">
         {fromMs !== null && fromMs > 0 && (
           <button
@@ -468,10 +554,10 @@ export default function Timeline({
           <div className="empty">
             {allFilteredOut
               ? "Everything here is hidden by the filter."
-              : "Nothing on the timeline yet — pipelines may still be running."}
+              : "Nothing on the timeline yet. Processing may still be running."}
           </div>
         ) : (
-          rendered
+          tagged
         )}
         {hasMore && (
           <button
@@ -479,10 +565,20 @@ export default function Timeline({
             onClick={() => load(events.length, fromMs)}
             disabled={busy}
           >
-            {busy ? "loading…" : "more"}
+            {busy ? "Loading…" : "More"}
           </button>
         )}
       </div>
+      </div>
+      {playing && (
+        <VideoLightbox
+          clip={playing.clip}
+          src={clipUrl(playing.clip)}
+          offsetMs={playing.offsetMs}
+          onClose={() => setPlaying(null)}
+          onSeek={onSeek}
+        />
+      )}
     </>
   )
 }

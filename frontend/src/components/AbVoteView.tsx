@@ -182,7 +182,7 @@ export default function AbVoteView({
         <button className="btn ghost slim" onClick={onBack}>
           ← back
         </button>
-        <span className="row-title">transcription A/B</span>
+        <span className="row-title">Transcription A/B</span>
         {ab && (
           <span className="chip strong">
             voted {ab.voted}/{votable.length || ab.total}
@@ -209,10 +209,10 @@ export default function AbVoteView({
               style={{ width: `${Math.min(100, (ab.candidates / Math.max(1, ab.expected)) * 100)}%` }}
             />
           </span>
-          <span className="row-dim">votable cards appear as they complete</span>
+          <span className="row-dim">Cards appear here as they finish.</span>
         </div>
       ) : ab.status === "dead" ? (
-        <div className="banner error">candidate generation failed — regenerate from the A/B tab</div>
+        <div className="banner error">Couldn't generate candidates. Regenerate them from the A/B overview.</div>
       ) : votable.length === 0 ? (
         <div className="empty">
           No candidates yet. Enroll this session from the A/B tab.
@@ -220,7 +220,7 @@ export default function AbVoteView({
       ) : null}
 
       {ab !== null && !generating && votable.length > 0 && unvoted.length === 0 && (
-        <div className="banner">all voted — nothing left in this session 🎉</div>
+        <div className="banner">All voted. Nothing left in this session.</div>
       )}
 
       <div className="list">{unvoted.map((utterance) => card(utterance))}</div>
