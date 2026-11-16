@@ -8,7 +8,7 @@ const CY = 118
 const CAPTIONS = [
   ["You do", "the work"],
   ["Your glasses", "take the notes"],
-  ["Context does", "the paperwork"],
+  ["The paperwork", "does itself"],
 ]
 const FIXED = 0
 
@@ -335,7 +335,7 @@ function Mechanic({ ms }: { ms: number }) {
   )
 }
 
-/** Bubble two: someone in glasses, eyes on the nut; later he reaches and calls it back to his hand. */
+/** Bubble two: someone in glasses, tracking the nut from when it enters his bubble until it's back in his hand. */
 function Watcher({ ms, nut, live }: { ms: number; nut: Pt | null; live: boolean }) {
   const cx = CENTERS[1]
   const { hand } = watcherAt(ms)
@@ -344,8 +344,7 @@ function Watcher({ ms, nut, live }: { ms: number; nut: Pt | null; live: boolean 
   const dy = target[1] - CY
   const look = Math.max(-3, Math.min(3, dx / 30))
   const lookUp = Math.max(-2.5, Math.min(2.5, dy / 30))
-  const seen = live && !!nut && inside(target[0], target[1], 1)
-  const caught = seen && Math.abs(dx) < 55
+  const seen = live && !!nut
   const rec = Math.floor(performance.now() / 250) % 2 === 0
   return (
     <g transform={`translate(${cx} ${CY})`}>
@@ -362,7 +361,7 @@ function Watcher({ ms, nut, live }: { ms: number; nut: Pt | null; live: boolean 
       <line className="hs-ink" x1={0} y1={34} x2={-10} y2={57} />
       <line className="hs-ink" x1={0} y1={34} x2={10} y2={57} />
       {seen && <line className="hs-sight" x1={look} y1={-4 + lookUp} x2={dx} y2={dy} />}
-      {caught && (
+      {seen && (
         <g className="hs-frame" transform={`translate(${dx} ${dy})`}>
           <path d="M -11 -5 V -11 H -5" />
           <path d="M 5 -11 H 11 V -5" />
@@ -406,6 +405,7 @@ export default function HomeStory() {
   const nut = still ? null : nutAt(ms)
   const resting = still || ms >= T_REST
   const phase = resting ? 3 : ms < T_SEEN ? 0 : ms < T_ARRIVES ? 1 : 2
+  const scanning = !still && ms >= T_SEEN && ms < T_REST + R_HOLD
   const wind = still ? 0 : windAt(ms)
   // Tumbling in the air; on the swoop it turns with the distance rolled.
   const spin = !nut
@@ -462,7 +462,7 @@ export default function HomeStory() {
             </g>
             {i === 1 && (
               <g>
-                <Watcher ms={ms} nut={nut} live={phase === 1} />
+                <Watcher ms={ms} nut={nut} live={scanning} />
               </g>
             )}
           </g>

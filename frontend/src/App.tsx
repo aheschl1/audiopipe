@@ -196,9 +196,10 @@ export default function App() {
       </div>
     )
   }
-  // Signed out: the landing page at /, the sign-in card anywhere else so deep links stay direct.
+  // Signed out: the landing page at /, the sign-in card at /login, everything else back to /.
   if (!authed) {
     if (location.pathname === "/") return <Home onAuthed={() => setAuthed(true)} />
+    if (location.pathname !== "/login") return <Navigate to="/" replace />
     return (
       <Gate
         onAuthed={() => {
