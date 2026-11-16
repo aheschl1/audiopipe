@@ -10,8 +10,6 @@ import { artifactUrl } from "../visual"
 import PageHead from "./PageHead"
 
 const POLL_MS = 30_000
-// A closed recording newer than every moment is still being written up.
-const PENDING_WINDOW_MS = 6 * 3600_000
 
 type Day = { key: string; iso: string; moments: MomentRead[] }
 
@@ -119,8 +117,8 @@ function DayHead({ day, story }: { day: Day; story?: string | null }) {
   )
 }
 
-/** Recording happening now, or finished but not yet written up as a moment. */
-function BuildingNote({ live, pending }: { live: SessionRead[]; pending: SessionRead[] }) {
+/** Recording happening now, or moments the tier is writing up right now. */
+function BuildingNote({ live, building }: { live: SessionRead[]; building: number }) {
   if (live.length) {
     const device = live[0]!.device
     return (
@@ -130,13 +128,13 @@ function BuildingNote({ live, pending }: { live: SessionRead[]; pending: Session
       </div>
     )
   }
-  if (pending.length) {
+  if (building) {
     return (
       <div className="building">
         <span className="spinner" aria-hidden="true" />
         <span className="row-dim">
-          Writing up your last {pending.length === 1 ? "recording" : `${pending.length} recordings`}
-          {" "} - it will appear here.
+          Writing up {building === 1 ? "a moment" : `${building} moments`} - {building === 1 ? "it" : "they"} will
+          appear here.
         </span>
       </div>
     )
@@ -158,6 +156,7 @@ function MomentFeed({ day, onJump }: { day: string; onJump: (day: string) => voi
   const [status, setStatus] = useState<number | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [sessions, setSessions] = useState<SessionRead[] | null>(null)
+  const [building, setBuilding] = useState(0)
   const pagedOlder = useRef(false)
 
   // The poll refreshes the newest page; older pages loaded via "earlier" stay.
@@ -175,6 +174,7 @@ function MomentFeed({ day, onJump }: { day: string; onJump: (day: string) => voi
     }
     const fresh = page.data
     setStatus(null)
+    setBuilding(fresh.building)
     if (!pagedOlder.current) {
       setNext(fresh.next_before)
       setMoments(fresh.items)
@@ -202,20 +202,11 @@ function MomentFeed({ day, onJump }: { day: string; onJump: (day: string) => voi
   }
 
   const live = sessions?.filter((s) => s.is_open) ?? []
-  const newestEnd = moments?.[0]?.end_at ?? ""
-  const pending =
-    sessions?.filter(
-      (s) =>
-        !s.is_open &&
-        s.ended_at &&
-        s.ended_at > newestEnd &&
-        Date.now() - Date.parse(s.ended_at) < PENDING_WINDOW_MS,
-    ) ?? []
 
   const days = groupByDay(moments ?? [])
   const todayKey = dayKey(new Date().toISOString())
   // Today always gets a heading while something is being recorded or written up.
-  if (!anchor && (live.length || pending.length) && days[0]?.key !== todayKey)
+  if (!anchor && (live.length || building) && days[0]?.key !== todayKey)
     days.unshift({ key: todayKey, iso: new Date().toISOString(), moments: [] })
 
   return (
@@ -284,7 +275,7 @@ function MomentFeed({ day, onJump }: { day: string; onJump: (day: string) => voi
         days.map((d) => (
           <section key={d.key} className="day">
             <DayHead day={d} />
-            {d.key === todayKey && !anchor && <BuildingNote live={live} pending={pending} />}
+            {d.key === todayKey && !anchor && <BuildingNote live={live} building={building} />}
             <div className="moment-list">
               {d.moments.map((m) => (
                 <MomentEntry key={m.id} moment={m} />

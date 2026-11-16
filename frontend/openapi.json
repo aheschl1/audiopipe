@@ -7554,12 +7554,18 @@
             ],
             "title": "Next Before",
             "description": "Pass as ``before`` for the next (older) page; null at the end."
+          },
+          "building": {
+            "type": "integer",
+            "title": "Building",
+            "description": "Moments being written up right now (queued or running)."
           }
         },
         "type": "object",
         "required": [
           "items",
-          "next_before"
+          "next_before",
+          "building"
         ],
         "title": "MomentListResponse"
       },

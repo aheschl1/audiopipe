@@ -35,6 +35,7 @@ async def list_moments(
     return MomentListResponse(
         items=[MomentRead.from_model(m) for m in moments],
         next_before=moments[-1].start_at if len(moments) == limit else None,
+        building=await pipe.moments.building(user.id),
     )
 
 

@@ -139,6 +139,18 @@ class MomentsRepo(BaseRepo):
             [*params, limit],
         )
 
+    async def building(self, user_id: UUID) -> int:
+        """Moment jobs queued or running for this user."""
+        count = await self._fetch_value(
+            """
+                SELECT count(*) FROM processing_jobs
+                WHERE pipeline = 'moment' AND status IN ('queued', 'running')
+                  AND payload->>'user_id' = %s
+            """,
+            (str(user_id),),
+        )
+        return int(count or 0)
+
     async def get(self, moment_id: UUID, user_id: UUID) -> Moment | None:
         return await self._fetch_one(
             Moment,

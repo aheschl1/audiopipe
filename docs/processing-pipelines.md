@@ -513,9 +513,11 @@ One dinner can be an audio session plus a dozen single-photo sessions. Moments
 live in their own `moments` table, per user. They are not artifacts, because a
 moment has no single session.
 
-- **Activity.** Each audio session is one span, placed from its start. Each
-  photo or clip is a span at its capture time. Location pings don't count;
-  they would chain a whole day together.
+- **Activity.** Everything is placed by timeline time: session start plus
+  offset. Each audio session is one span from its start. Photos and clips
+  count through their keyframes, so a frame the keyframe tier left unplaced
+  (captured before its session started) is not activity. Location pings
+  don't count; they would chain a whole day together.
 - **When a window becomes a job.** The gap must have passed since its last
   capture. No audio session in it may still be streaming. Its last upload and
   its newest transcript, keyframe or sound span must be

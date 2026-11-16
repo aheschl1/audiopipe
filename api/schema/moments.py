@@ -171,6 +171,7 @@ class MomentListResponse(BaseModel):
 
     items: list[MomentRead]
     next_before: datetime | None = Field(description="Pass as ``before`` for the next (older) page; null at the end.")
+    building: int = Field(description="Moments being written up right now (queued or running).")
 
 
 class ArtifactLinksResponse(BaseModel):

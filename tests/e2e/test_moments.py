@@ -88,7 +88,10 @@ async def test_a_conversation_and_a_photo_become_one_linked_moment(
     assert neighbours["moment_ids"] == [moment["id"]]
     assert len(neighbours["links"]) == len(detail["links"])
 
-    assert (await client.get("/v1/moments", headers=other_account.headers)).json()["items"] == []
+    mine = (await client.get("/v1/moments", headers=account.headers)).json()
+    assert isinstance(mine["building"], int)
+    theirs_list = (await client.get("/v1/moments", headers=other_account.headers)).json()
+    assert theirs_list["items"] == [] and theirs_list["building"] == 0
     theirs = await client.get(f"/v1/moments/{moment['id']}", headers=other_account.headers)
     assert theirs.status_code == 404
     assert (await client.get(f"/v1/moments/links/{photo}", headers=other_account.headers)).json()["links"] == []

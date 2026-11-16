@@ -9,9 +9,6 @@ from pydantic import BaseModel, ConfigDict
 from database.repos.base import BaseRepo
 
 # Only these resources make a moment; location pings would chain a whole day.
-_RESOURCES = ["audio", "image", "video"]
-
-
 class ActivityRow(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -66,9 +63,10 @@ class SpeakerNameRow(BaseModel):
 
 class MomentQueries(BaseRepo):
     async def activity(self, lookback_days: int) -> list[ActivityRow]:
-        """Wall-clock spans of recording: one per audio session, one per image or clip.
+        """Wall-clock spans of recording: one per audio session, one per keyframe.
 
-        Audio is placed from the session start; images and clips by capture time.
+        Everything is placed by timeline time (session start plus offset), so a
+        photo or clip goes where its keyframes sit; unplaced frames don't count.
         """
         return await self._fetch_all(
             ActivityRow,
@@ -88,15 +86,18 @@ class MomentQueries(BaseRepo):
                   AND s.started_at > now() - make_interval(days => %s)
                 GROUP BY s.id
                 UNION ALL
-                SELECT g.user_id, g.session_id, g.captured_at,
-                       g.captured_at + make_interval(secs => coalesce(g.duration_ms, 0) / 1000.0),
-                       false, g.ingested_at
-                FROM resource_segments g
-                WHERE g.resource = ANY(%s) AND g.resource <> 'audio'
-                  AND g.captured_at IS NOT NULL AND g.object_key IS NOT NULL
-                  AND g.captured_at > now() - make_interval(days => %s)
+                SELECT s.user_id, a.session_id,
+                       s.started_at + make_interval(secs => a.start_ms / 1000.0),
+                       s.started_at + make_interval(
+                           secs => coalesce(a.end_ms, a.start_ms) / 1000.0),
+                       s.ended_at IS NULL, a.created_at
+                FROM pipeline_artifacts a
+                JOIN recording_sessions s ON s.id = a.session_id
+                WHERE a.pipeline = 'keyframe' AND a.kind = 'keyframe'
+                  AND a.start_ms IS NOT NULL
+                  AND s.started_at > now() - make_interval(days => %s)
             """,
-            (lookback_days, _RESOURCES, lookback_days),
+            (lookback_days, lookback_days),
         )
 
     async def busy_sessions(self, session_ids: list[UUID], pipeline: str) -> set[UUID]:

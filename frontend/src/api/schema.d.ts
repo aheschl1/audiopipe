@@ -2426,6 +2426,11 @@ export interface components {
              * @description Pass as ``before`` for the next (older) page; null at the end.
              */
             next_before: string | null;
+            /**
+             * Building
+             * @description Moments being written up right now (queued or running).
+             */
+            building: number;
         };
         /** MomentRead */
         MomentRead: {
