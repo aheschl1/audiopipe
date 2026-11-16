@@ -39,7 +39,7 @@ const STEPS: Step[] = [
   {
     anchor: [".moment-automations"],
     select: ".fired-pill",
-    text: "The Service visit automation filled in the complaint, the finding and the $340 quote, straight from the conversation.",
+    text: "The Work order automation filled in the complaint, the finding and the $340 quote. This could call external software.",
   },
   {
     path: "/search?q=CV%20boot",
@@ -63,7 +63,7 @@ const STEPS: Step[] = [
   {
     path: "/automations",
     anchor: [".auto-table"],
-    text: "Automations kick off actions when anything you specify happens.",
+    text: "Automations kick off structured actions when anything you specify happens. They could call webhooks, other software.",
   },
   { text: "Replay the tour anytime from the menu. Feedback: ajheschl@gmail.com" },
 ]

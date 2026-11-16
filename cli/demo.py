@@ -41,7 +41,7 @@ SCENES = (
 
 # The account is read-only, so its example automation is seeded here.
 AUTOMATION = AutomationWrite.model_validate({
-    "name": "Service visit",
+    "name": "Work order",
     "conditions": {
         "ask": "Is this a vehicle service visit, such as a drop-off, an inspection or a repair quote?",
     },
