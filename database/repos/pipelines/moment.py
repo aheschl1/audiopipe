@@ -26,6 +26,12 @@ class SessionRow(BaseModel):
     session_id: UUID
 
 
+class KeyRow(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    dedup_key: str
+
+
 class SessionDigest(BaseModel):
     """What a moment was built from, per session; a change triggers a rebuild."""
 
@@ -99,6 +105,15 @@ class MomentQueries(BaseRepo):
             """,
             (lookback_days, lookback_days),
         )
+
+    async def existing_keys(self, pipeline: str, keys: list[str]) -> set[str]:
+        """The dedup keys among ``keys`` that already have a job."""
+        rows = await self._fetch_all(
+            KeyRow,
+            "SELECT dedup_key FROM processing_jobs WHERE pipeline = %s AND dedup_key = ANY(%s)",
+            (pipeline, keys),
+        )
+        return {row.dedup_key for row in rows}
 
     async def busy_sessions(self, session_ids: list[UUID], pipeline: str) -> set[UUID]:
         """Sessions with work still queued or running in any other pipeline."""

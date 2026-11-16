@@ -3,7 +3,9 @@ from uuid import UUID, uuid4
 
 from database.repos.pipelines.moment import ActivityRow
 from processing.config import ProcessingSettings
+from processing.llm import Llm, LlmError, LlmUnavailable
 from processing.moments import (
+    alias_speakers,
     Activity,
     Item,
     build_manifest,
@@ -191,3 +193,41 @@ def test_closed_windows_wait_for_the_gap_settling_and_open_sessions() -> None:
     assert closed_windows(live, now, settings) == []
     stale = [_row(S1, at(0), at(30), open=True, ingested=at(30))]
     assert len(closed_windows(stale, now, settings)) == 1
+
+
+def test_aliases_are_per_session() -> None:
+    # Phone and glasses each diarize; their SPEAKER_00s are different people.
+    a = item("utterance", 0, 1, text="hi", speaker="SPEAKER_00", session=S1)
+    b = item("utterance", 1, 2, text="hey", speaker="SPEAKER_00", session=S2)
+    c = item("utterance", 2, 3, text="so", speaker="SPEAKER_00", session=S1)
+    named = item("utterance", 3, 4, text="ok", speaker="Sam", session=S2)
+    assert [i.speaker for i in alias_speakers([a, b, c, named])] == ["voice 1", "voice 2", "voice 1", "Sam"]
+
+
+def test_render_names_the_zone() -> None:
+    manifest = build_manifest([item("utterance", 0, 1, text="hi")], max_images=0,
+                              max_utterances=10, max_sounds=0, slack_ms=0)
+    assert render(manifest, at(0), at(1), UTC).startswith("MOMENT  Saturday 2026-11-14 18:00:00 to 18:01:00 (1m 0s, UTC)")
+
+
+async def test_exhausted_quota_is_not_refunded(monkeypatch) -> None:
+    import httpx
+
+    def answer(status: int, body: str):
+        transport = httpx.MockTransport(lambda request: httpx.Response(status, text=body))
+        llm = Llm(ProcessingSettings(llm_api_key="k"))
+        llm._client = httpx.AsyncClient(base_url="http://llm", transport=transport)
+        return llm
+
+    quota = answer(429, '{"error": {"code": "insufficient_quota"}}')
+    try:
+        await quota.complete_json("s", "t")
+    except LlmUnavailable:
+        raise AssertionError("quota exhaustion must count the attempt")
+    except LlmError:
+        pass
+    busy = answer(429, '{"error": {"code": "rate_limit_exceeded"}}')
+    try:
+        await busy.complete_json("s", "t")
+    except LlmUnavailable:
+        pass

@@ -176,13 +176,16 @@ def span(group: Sequence[Item]) -> tuple[datetime, datetime]:
 
 
 def alias_speakers(utterances: Sequence[Item]) -> list[Item]:
-    """Unnamed diarizer labels become "voice 1", "voice 2"... in order of first speech."""
-    aliases: dict[str, str] = {}
+    """Unnamed diarizer labels become "voice 1", "voice 2"... in order of first speech.
+
+    Labels are per session: two recordings' SPEAKER_00 are different people.
+    """
+    aliases: dict[tuple[UUID, str], str] = {}
     out = []
     for item in utterances:
         speaker = item.speaker
         if speaker and "SPEAKER_" in speaker:
-            speaker = aliases.setdefault(speaker, f"voice {len(aliases) + 1}")
+            speaker = aliases.setdefault((item.session_id, speaker), f"voice {len(aliases) + 1}")
         out.append(replace(item, speaker=speaker))
     return out
 
@@ -241,7 +244,7 @@ You are building a memory of one person's day from what their phone and smart \
 glasses recorded. You get one "moment": a stretch of time bounded by a gap in \
 recording. Items are labelled: U = transcript utterance, K = video keyframe, \
 P = photo, S = sound span. Each K and P has its image attached, introduced by \
-its label. Times are local clock time.
+its label. Times are clock time in the zone named on the MOMENT line.
 
 Answer with a JSON object:
 - "title": up to 8 words.
@@ -278,7 +281,7 @@ def render(manifest: Manifest, start: datetime, end: datetime, tz: tzinfo | None
     local = start.astimezone(tz)
     lines = [
         f"MOMENT  {local:%A %Y-%m-%d} {_clock(start, tz)} to {_clock(end, tz)}"
-        f" ({_duration(end - start)})",
+        f" ({_duration(end - start)}, {local:%Z})",
         "",
     ]
     by_prefix: dict[str, list[tuple[str, Item]]] = {}

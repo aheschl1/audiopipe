@@ -97,6 +97,10 @@ class Llm:
             )
         except httpx.TransportError as exc:
             raise LlmUnavailable(f"llm unreachable: {exc}") from exc
+        # Out of credit is a 429 too, but waiting won't fix it: count the attempt
+        # so the job dies instead of being refunded forever.
+        if response.status_code == 429 and "insufficient_quota" in response.text:
+            raise LlmError(f"llm quota exhausted: {response.text[:300]}")
         if response.status_code == 429 or response.status_code >= 500:
             raise LlmUnavailable(f"llm answered {response.status_code}: {response.text[:300]}")
         if response.status_code != 200:

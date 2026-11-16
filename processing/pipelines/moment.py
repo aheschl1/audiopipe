@@ -184,7 +184,17 @@ class MomentPipeline(Pipeline):
                     dedup_key=f"{self.name}:{user_id}:{key}",
                 )
             )
-        return jobs[:limit]
+        if not jobs:
+            return ()
+        # Insert-time dedup is too late: settled windows would fill the batch
+        # forever and starve new ones. Drop them here, and do the newest first.
+        async with DatabasePipe() as pipe:
+            done = await MomentQueries(pipe.connection).existing_keys(
+                self.name, [j.dedup_key for j in jobs if j.dedup_key]
+            )
+        fresh = [j for j in jobs if j.dedup_key not in done]
+        fresh.sort(key=lambda j: j.payload["start_at"], reverse=True)
+        return fresh[:limit]
 
     async def process(self, job: Job) -> dict[str, Any]:
         s = self._settings

@@ -177,7 +177,8 @@ class ProcessingSettings(BaseSettings):
     # Links between items further apart than this are dropped.
     moment_link_max_ms: int = 600_000
     moment_lookback_days: int = 365
-    # IANA zone for the clock times the model sees; unset uses the host's.
+    # IANA zone for the clock times the model sees (e.g. America/Toronto);
+    # unset uses the host's, which in the containers is UTC.
     moment_timezone: str | None = None
     moment_discover_interval_seconds: float = 60.0
 
