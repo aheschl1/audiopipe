@@ -132,9 +132,10 @@ def create_app() -> FastAPI:
         responses={401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
     )
 
-    # Auth is a bearer header, never a cookie, so a wildcard origin grants
-    # nothing beyond what any HTTP client already has — and the miniapp
-    # WebView's fetches arrive cross-origin.
+    # The miniapp WebView's fetches arrive cross-origin, hence the wildcard.
+    # It is safe only without allow_credentials: the cookie's CSRF defence is
+    # that no other origin can send X-Requested-With with credentials
+    # (tests/e2e/test_auth.py pins this). Never turn credentials on here.
     app.add_middleware(
         CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
     )

@@ -131,6 +131,20 @@ async def test_cors_allows_the_webview_origin(client: httpx.AsyncClient) -> None
     assert preflight.headers.get("access-control-allow-origin") == "*"
 
 
+async def test_cors_never_allows_credentials(client: httpx.AsyncClient) -> None:
+    """The cookie's CSRF defence: no other origin may send a credentialed write."""
+    preflight = await client.options(
+        "/v1/sessions",
+        headers={
+            "Origin": "https://evil.example",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "x-requested-with,content-type",
+        },
+    )
+    assert preflight.headers.get("access-control-allow-origin") == "*"
+    assert "access-control-allow-credentials" not in preflight.headers
+
+
 async def test_use_stamps_last_used_at(client: httpx.AsyncClient, account: Account) -> None:
     """The stamp lands shortly after the response, not before it.
 

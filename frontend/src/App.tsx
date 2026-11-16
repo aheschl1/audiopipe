@@ -84,6 +84,9 @@ export default function App() {
   // Unknown until /v1/me answers: the cookie is invisible to script.
   const [authed, setAuthed] = useState<boolean | null>(null)
   const [me, setMe] = useState<MeRead | null>(null)
+  // The probe got neither a user nor a 401 (API restarting, network down).
+  const [unreachable, setUnreachable] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const location = useLocation()
   const { openSession, openAb } = useNav()
 
@@ -97,15 +100,22 @@ export default function App() {
       setMe(null)
       return
     }
-    void api.GET("/v1/me").then(({ data, response }) => {
-      if (data) {
-        setMe(data)
-        setAuthed(true)
-      } else if (response.status === 401) {
-        setAuthed(false)
-      }
-    })
-  }, [authed])
+    if (authed && me) return
+    setUnreachable(false)
+    api
+      .GET("/v1/me")
+      .then(({ data, response }) => {
+        if (data) {
+          setMe(data)
+          setAuthed(true)
+        } else if (response.status === 401) {
+          setAuthed(false)
+        } else {
+          setUnreachable(true)
+        }
+      })
+      .catch(() => setUnreachable(true))
+  }, [authed, me, attempt])
 
   // Warm the maplibre chunk (~1.5 MB with its worker) once the app is idle,
   // so the first map open doesn't stack the download on top of style, tiles,
@@ -116,7 +126,19 @@ export default function App() {
     return () => window.clearTimeout(timer)
   }, [authed])
 
-  if (authed === null) return null
+  if (authed === null) {
+    if (!unreachable) return null
+    return (
+      <div className="gate">
+        <div className="gate-card">
+          <div className="gate-subtitle">Can't reach the server.</div>
+          <button className="btn primary full" onClick={() => setAttempt((n) => n + 1)}>
+            Try again
+          </button>
+        </div>
+      </div>
+    )
+  }
   if (!authed) return <Gate onAuthed={() => setAuthed(true)} />
 
   const view = new URLSearchParams(location.search).get("view")
