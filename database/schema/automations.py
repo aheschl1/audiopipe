@@ -104,6 +104,16 @@ class RunListing(AutomationRun):
     moment_start_at: datetime
 
 
+class AutomationStats(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    automation_id: UUID
+    matches: int
+    skipped: int
+    failures: int
+    last_match_at: datetime | None
+
+
 class PendingRun(BaseModel):
     model_config = ConfigDict(frozen=True)
 

@@ -1,47 +1,327 @@
-/* App layer: the automations page. */
+/* App layer: automations, a list of rules as a table and one rule's page. */
 
-.automations-page {
-  max-width: 760px;
+.automations-page,
+.automation-view {
+  max-width: 1080px;
 }
 
-.auto-list,
-.auto-runs ul {
-  list-style: none;
-  margin: 0;
+/* A dense, bordered table for tool pages. */
+.tool-table-wrap {
+  overflow-x: auto;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface);
+}
+
+.tool-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.tool-table th {
+  text-align: left;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--sunken);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: var(--bw) solid var(--line);
+  white-space: nowrap;
+}
+
+.tool-table td {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: var(--bw) solid var(--line-faint);
+  vertical-align: top;
+}
+
+.tool-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tool-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tool-table .nowrap {
+  white-space: nowrap;
+}
+
+.auto-table tbody tr {
+  cursor: pointer;
+}
+
+.tool-table .auto-name {
+  min-width: 140px;
+}
+
+.auto-status .switch-text {
+  display: none;
+}
+
+.auto-table tbody tr:hover {
+  background: var(--sunken);
+}
+
+.auto-table tr.off td:not(:last-child) {
+  opacity: 0.5;
+}
+
+.auto-table td {
+  vertical-align: middle;
+}
+
+.auto-name a {
+  color: var(--ink);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+
+.auto-name a:hover {
+  text-decoration: underline;
+}
+
+/* A trigger or action kind. */
+.kind-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  padding: 1px var(--sp-1);
+  border: var(--bw) solid var(--line-strong);
+  border-radius: var(--r-1);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.auto-sub {
+  display: block;
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.auto-conds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  max-width: 240px;
+}
+
+.cond {
+  display: inline-flex;
+  max-width: 100%;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-1);
+  font-size: var(--fs-xs);
+  overflow: hidden;
+}
+
+.cond-kind {
+  padding: 1px var(--sp-1);
+  background: var(--sunken);
+  color: var(--muted);
+  border-right: var(--bw) solid var(--line);
+}
+
+.cond-value {
+  padding: 1px var(--sp-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.auto-failed {
+  color: var(--danger);
+}
+
+/* On/off switch. */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
   padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  cursor: pointer;
 }
 
-.auto-rule {
+.switch:disabled {
+  cursor: default;
+}
+
+.switch-knob {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: var(--r-round);
+  background: var(--line-strong);
+  transition: background 0.15s;
+}
+
+.switch-knob::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--r-round);
+  background: var(--paper);
+  transition: transform 0.15s;
+}
+
+.switch.on .switch-knob {
+  background: var(--red);
+}
+
+.switch.on .switch-knob::after {
+  transform: translateX(12px);
+}
+
+.switch.on .switch-text {
+  color: var(--ink);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* One rule's page. */
+.auto-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--sp-3);
-  padding: var(--sp-3) 0;
-  border-bottom: var(--bw) solid var(--line);
+  margin: var(--sp-2) 0 var(--sp-4);
 }
 
-.auto-rule.off .auto-rule-text {
-  opacity: 0.55;
+.auto-head .page-title {
+  margin: 0;
 }
 
-.auto-rule-text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  flex: 1;
+.auto-head .page-actions {
+  margin-left: auto;
+}
+
+/* Trigger → conditions → action, as three panels. */
+.auto-flow {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.4fr) minmax(260px, 1.6fr);
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface);
+}
+
+.auto-step {
+  padding: var(--sp-3) var(--sp-4);
   min-width: 0;
 }
 
-.auto-rule-name {
-  font-weight: var(--fw-semibold);
+.auto-step + .auto-step {
+  border-left: var(--bw) solid var(--line);
 }
 
-.auto-rule-actions {
+.step-label {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.step-label::after {
+  content: " →";
+  color: var(--faint);
+}
+
+.auto-step:last-child .step-label::after {
+  content: "";
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--sp-1) var(--sp-3);
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-sm);
+}
+
+.kv > div {
+  display: contents;
+}
+
+.kv dt {
+  color: var(--muted);
+}
+
+.kv dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.kv.compact {
+  margin: 0;
+  font-size: var(--fs-xs);
+}
+
+.auto-runs {
+  margin-top: var(--sp-6);
+}
+
+.auto-runs-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--sp-2);
-  flex-shrink: 0;
+  margin-bottom: var(--sp-2);
 }
 
+.auto-runs-head .section-label {
+  margin: 0;
+}
+
+.seg-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.result {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.result.matched {
+  color: var(--ok);
+}
+
+.result.failed {
+  color: var(--danger);
+}
+
+.run-skipped .auto-name a {
+  font-weight: var(--fw-regular);
+  color: var(--ink-2);
+}
+
+.auto-output {
+  min-width: 240px;
+}
+
+/* The rule editor. */
 .auto-check {
   display: inline-flex;
   align-items: center;
@@ -119,42 +399,14 @@
   margin-right: auto;
 }
 
-.auto-runs {
-  margin-top: var(--sp-6);
-}
+@media (max-width: 760px) {
+  .auto-flow {
+    grid-template-columns: 1fr;
+  }
 
-.auto-run {
-  display: flex;
-  gap: var(--sp-3);
-  padding: var(--sp-2) 0;
-  border-bottom: var(--bw) solid var(--line-faint);
-  font-size: var(--fs-sm);
-}
-
-.auto-run-when {
-  flex: 0 0 150px;
-  color: var(--muted);
-}
-
-.auto-run-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  min-width: 0;
-}
-
-.auto-run-rule {
-  font-weight: var(--fw-medium);
-}
-
-.auto-failed {
-  color: var(--danger);
-}
-
-@media (max-width: 640px) {
-  .auto-rule {
-    flex-direction: column;
-    align-items: stretch;
+  .auto-step + .auto-step {
+    border-left: none;
+    border-top: var(--bw) solid var(--line);
   }
 
   .auto-field {
@@ -164,31 +416,59 @@
   .auto-field .btn {
     justify-self: start;
   }
-
-  .auto-run {
-    flex-direction: column;
-    gap: 0;
-  }
-
-  .auto-run-when {
-    flex: none;
-  }
 }
 
-.auto-run .chip,
-.facts .chip {
-  overflow-wrap: anywhere;
-  max-width: 100%;
+/* Matched automations on a moment: apart from the moment's own facts. */
+.moment-automations {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
 }
 
-.auto-run a,
-.fact dt a {
-  color: inherit;
-  text-decoration-color: var(--line-strong);
-  text-underline-offset: 2px;
+.auto-card {
+  border: var(--bw) solid var(--line);
+  border-left: 3px solid var(--red);
+  border-radius: var(--r-2);
+  background: var(--sunken);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
 }
 
-.auto-run a:hover,
-.fact dt a:hover {
-  text-decoration-color: currentColor;
+.auto-card-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.auto-badge {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--red-ink);
+  border: var(--bw) solid var(--red-line);
+  background: var(--red-wash);
+  border-radius: var(--r-1);
+  padding: 1px var(--sp-1);
+  align-self: center;
+}
+
+.auto-card-name {
+  font-weight: var(--fw-semibold);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.auto-card-name:hover {
+  text-decoration: underline;
+}
+
+.auto-card-note {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.auto-card .kv {
+  margin-top: var(--sp-2);
 }

@@ -1261,7 +1261,7 @@ export interface paths {
         };
         /**
          * Recent automation runs
-         * @description Newest first. Without ``automation_id``, only runs that matched or failed.
+         * @description Newest first. Without ``automation_id`` or ``status``, only runs that matched or failed.
          */
         get: operations["list_runs_v1_automations_runs_get"];
         put?: never;
@@ -1691,6 +1691,26 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Matches
+             * @description Moments it has matched.
+             */
+            matches: number;
+            /**
+             * Skipped
+             * @description Moments it ran on that didn't match.
+             */
+            skipped: number;
+            /**
+             * Failures
+             * @description Runs that failed.
+             */
+            failures: number;
+            /**
+             * Last Match At
+             * @description When the last matched moment started.
+             */
+            last_match_at: string | null;
         };
         /** AutomationRunRead */
         AutomationRunRead: {
@@ -7380,6 +7400,8 @@ export interface operations {
             query?: {
                 /** @description One rule's runs, skipped ones included. */
                 automation_id?: string | null;
+                /** @description Only runs with this result. */
+                status?: ("matched" | "skipped" | "failed") | null;
                 limit?: number;
             };
             header?: never;

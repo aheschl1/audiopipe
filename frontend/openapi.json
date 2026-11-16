@@ -5235,7 +5235,7 @@
           "automations"
         ],
         "summary": "Recent automation runs",
-        "description": "Newest first. Without ``automation_id``, only runs that matched or failed.",
+        "description": "Newest first. Without ``automation_id`` or ``status``, only runs that matched or failed.",
         "operationId": "list_runs_v1_automations_runs_get",
         "security": [
           {
@@ -5264,6 +5264,29 @@
               "title": "Automation Id"
             },
             "description": "One rule's runs, skipped ones included."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "matched",
+                    "skipped",
+                    "failed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only runs with this result.",
+              "title": "Status"
+            },
+            "description": "Only runs with this result."
           },
           {
             "name": "limit",
@@ -6317,6 +6340,34 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "matches": {
+            "type": "integer",
+            "title": "Matches",
+            "description": "Moments it has matched."
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped",
+            "description": "Moments it ran on that didn't match."
+          },
+          "failures": {
+            "type": "integer",
+            "title": "Failures",
+            "description": "Runs that failed."
+          },
+          "last_match_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Match At",
+            "description": "When the last matched moment started."
           }
         },
         "additionalProperties": false,
@@ -6330,7 +6381,11 @@
           "id",
           "active_since",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "matches",
+          "skipped",
+          "failures",
+          "last_match_at"
         ],
         "title": "AutomationRead"
       },

@@ -310,6 +310,10 @@ input[type="range"] {
     color var(--dur) var(--ease);
 }
 
+a.btn {
+  text-decoration: none;
+}
+
 .btn:hover {
   background: var(--sunken);
 }

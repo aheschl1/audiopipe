@@ -789,6 +789,7 @@ async def demo_seed(
     click.echo(f"created {user.email} ({user.id})")
 
     token = issued.token.get_secret_value()
+    await demo_seeding.add_automation(user.id, user.created_at)
     start = demo_seeding.default_start()
     await demo_seeding.seed_scenes(api, token, data_dir or demo_seeding.DATA_DIR, start)
 
@@ -798,6 +799,25 @@ async def demo_seed(
             await pipe.users.set_read_only(user.id, True)
     state = "read-write" if keep_writable else "read-only"
     click.echo(f"done: {email} is {state}; the worker processes the sessions next")
+
+
+@demo.command("automation")
+@click.option("--email", default="demo@andrewheschl.ca", show_default=True)
+@async_command
+async def demo_automation(email: str) -> None:
+    """Add the example automation to an already-seeded demo account.
+
+    It covers the account's existing moments, as far back as the worker's
+    automation lookback (PROCESSING_AUTOMATION_LOOKBACK_HOURS) reaches.
+    """
+    from cli import demo as demo_seeding
+
+    async with DatabasePipe() as pipe:
+        user = await pipe.users.get_by_email(email)
+    if user is None:
+        raise click.ClickException(f"no user {email}")
+    added = await demo_seeding.add_automation(user.id, user.created_at)
+    click.echo(f"added “{demo_seeding.AUTOMATION.name}” to {email}" if added else "already there")
 
 
 if __name__ == "__main__":

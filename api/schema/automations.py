@@ -6,7 +6,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from database.schema.automations import Automation, AutomationWrite, RunListing, RunStatus
+from database.schema.automations import (
+    Automation,
+    AutomationStats,
+    AutomationWrite,
+    RunListing,
+    RunStatus,
+)
 
 
 class AutomationRead(AutomationWrite):
@@ -14,10 +20,20 @@ class AutomationRead(AutomationWrite):
     active_since: datetime = Field(description="Only moments created after this are considered.")
     created_at: datetime
     updated_at: datetime
+    matches: int = Field(description="Moments it has matched.")
+    skipped: int = Field(description="Moments it ran on that didn't match.")
+    failures: int = Field(description="Runs that failed.")
+    last_match_at: datetime | None = Field(description="When the last matched moment started.")
 
     @classmethod
-    def from_model(cls, automation: Automation) -> "AutomationRead":
-        return cls.model_validate(automation.model_dump(exclude={"user_id"}))
+    def from_model(cls, automation: Automation, stats: AutomationStats | None = None) -> "AutomationRead":
+        return cls.model_validate({
+            **automation.model_dump(exclude={"user_id"}),
+            "matches": stats.matches if stats else 0,
+            "skipped": stats.skipped if stats else 0,
+            "failures": stats.failures if stats else 0,
+            "last_match_at": stats.last_match_at if stats else None,
+        })
 
 
 class AutomationRunRead(BaseModel):

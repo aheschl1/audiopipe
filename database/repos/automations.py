@@ -1,5 +1,6 @@
 """Automation rules and their runs."""
 
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -9,6 +10,7 @@ from database.repos.base import BaseRepo
 from database.schema.automations import (
     Automation,
     AutomationRun,
+    AutomationStats,
     AutomationWrite,
     PendingRun,
     RunListing,
@@ -39,15 +41,18 @@ class AutomationsRepo(BaseRepo):
             await self._fetch_value("SELECT count(*) FROM automations WHERE user_id = %s", (user_id,)) or 0
         )
 
-    async def create(self, user_id: UUID, spec: AutomationWrite) -> Automation:
+    async def create(
+        self, user_id: UUID, spec: AutomationWrite, active_since: datetime | None = None
+    ) -> Automation:
+        """active_since defaults to now; an earlier one lets it see moments already made."""
         row = await self._fetch_one(
             Automation,
             f"""
-                INSERT INTO automations (user_id, name, enabled, trigger, conditions, actions)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO automations (user_id, name, enabled, trigger, conditions, actions, active_since)
+                VALUES (%s, %s, %s, %s, %s, %s, coalesce(%s, now()))
                 RETURNING {COLUMNS}
             """,
-            (user_id, *_params(spec)),
+            (user_id, *_params(spec), active_since),
         )
         assert row is not None
         return row
@@ -92,6 +97,29 @@ class AutomationsRepo(BaseRepo):
             f"SELECT {COLUMNS} FROM automations WHERE user_id = %s ORDER BY created_at, id",
             (user_id,),
         )
+
+    async def stats(
+        self, user_id: UUID, automation_id: UUID | None = None
+    ) -> dict[UUID, AutomationStats]:
+        """Run counts per result, and the start of the last matched moment, per
+        rule of the user's (or just the one asked for)."""
+        rows = await self._fetch_all(
+            AutomationStats,
+            """
+                SELECT a.id AS automation_id,
+                       count(r.id) FILTER (WHERE r.status = 'matched') AS matches,
+                       count(r.id) FILTER (WHERE r.status = 'skipped') AS skipped,
+                       count(r.id) FILTER (WHERE r.status = 'failed') AS failures,
+                       max(m.start_at) FILTER (WHERE r.status = 'matched') AS last_match_at
+                FROM automations a
+                LEFT JOIN automation_runs r ON r.automation_id = a.id
+                LEFT JOIN moments m ON m.id = r.moment_id
+                WHERE a.user_id = %s AND (%s::uuid IS NULL OR a.id = %s::uuid)
+                GROUP BY a.id
+            """,
+            (user_id, automation_id, automation_id),
+        )
+        return {row.automation_id: row for row in rows}
 
     async def pending(self, pipeline: str, limit: int, lookback_hours: float) -> list[PendingRun]:
         """Recent (rule, moment) pairs with neither a run nor a job yet, newest moments first."""
@@ -142,14 +170,23 @@ class AutomationsRepo(BaseRepo):
         )
 
     async def runs(
-        self, user_id: UUID, *, automation_id: UUID | None = None, limit: int = 50
+        self,
+        user_id: UUID,
+        *,
+        automation_id: UUID | None = None,
+        status: RunStatus | None = None,
+        limit: int = 50,
     ) -> list[RunListing]:
-        """The user's runs, newest first; matched and failed only unless asked for one rule."""
+        """The user's runs, newest first; matched and failed only unless asked
+        for one rule or one status."""
         conditions, params = ["a.user_id = %s"], [user_id]
         if automation_id is not None:
             conditions.append("a.id = %s")
             params.append(automation_id)
-        else:
+        if status is not None:
+            conditions.append("r.status = %s")
+            params.append(status)
+        elif automation_id is None:
             conditions.append("r.status <> 'skipped'")
         return await self._fetch_all(
             RunListing,

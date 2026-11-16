@@ -15,6 +15,7 @@ import { momentAt } from "./api/moments"
 import AbOverview from "./components/AbOverview"
 import AbVoteView from "./components/AbVoteView"
 import AutomationsPage from "./components/AutomationsPage"
+import AutomationView, { NewAutomation } from "./components/AutomationView"
 import Gate from "./components/Gate"
 import GeoMap from "./components/GeoMap"
 import Home from "./components/Home"
@@ -51,7 +52,7 @@ const NAV_TOOLS: NavItem[] = [
     label: "Voice map",
     match: (path, view) => path === "/speakers" && view === "map",
   },
-  { to: "/automations", label: "Automations", match: (path) => path === "/automations" },
+  { to: "/automations", label: "Automations", match: (path) => path.startsWith("/automations") },
 ]
 // A/B is off the nav (deprecation candidate); /ab stays reachable from a recording's header.
 
@@ -95,6 +96,11 @@ function SessionRoute() {
       onAb={openAb}
     />
   )
+}
+
+function AutomationRoute() {
+  const { id = "" } = useParams()
+  return <AutomationView key={id} id={id} />
 }
 
 function MomentRoute() {
@@ -262,6 +268,8 @@ export default function App() {
           <Route path="/speakers" element={<SpeakersPage />} />
           <Route path="/map" element={<GeoMap onOpen={openSession} />} />
           <Route path="/automations" element={<AutomationsPage />} />
+          <Route path="/automations/new" element={<NewAutomation />} />
+          <Route path="/automations/:id" element={<AutomationRoute />} />
           <Route path="/ab" element={<AbOverview onVote={openAb} />} />
           <Route path="/ab/:id" element={<AbVoteRoute />} />
           <Route path="*" element={<Navigate to="/" replace />} />

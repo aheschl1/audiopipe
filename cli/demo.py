@@ -12,12 +12,15 @@ import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from uuid import UUID
 
 import click
 import httpx
 import websockets
 
 from api.schema.stream import ChunkHeader, FRAME_ENVELOPE, encode_audio_frame, encode_chunk
+from database.pipe import DatabasePipe
+from database.schema.automations import AutomationWrite
 
 SAMPLE_RATE = 16_000
 FRAME_BYTES = 640  # 20 ms of 16 kHz mono s16le
@@ -35,6 +38,21 @@ SCENES = (
     Scene("clip1demo.mp4", "Drop-off, lane 1", timedelta(0)),
     Scene("clip2demo.mp4", "Inspection, lane 1", timedelta(minutes=9)),
 )
+
+# The account is read-only, so its example automation is seeded here.
+AUTOMATION = AutomationWrite.model_validate({
+    "name": "Service visit",
+    "conditions": {
+        "ask": "Is this a vehicle service visit, such as a drop-off, an inspection or a repair quote?",
+    },
+    "actions": [{"type": "extract", "fields": [
+        {"name": "Vehicle", "description": "The vehicle's make, model or description"},
+        {"name": "Complaint", "description": "What the customer said was wrong, close to their words"},
+        {"name": "Finding", "description": "What the inspection found, and where on the vehicle"},
+        {"name": "Quote", "description": "The price or estimate given for the repair"},
+        {"name": "Next step", "description": "What happens next, e.g. approval or pickup"},
+    ]}],
+})
 
 # A made-up point, not the location of any real shop.
 SHOP = {"lat": 51.0262, "lon": -114.0396, "accuracy_m": 6.0}
@@ -154,6 +172,18 @@ async def seed_scenes(api: str, token: str, data_dir: Path, first_start: datetim
                 )
                 created.append(session_id)
     return created
+
+
+async def add_automation(user_id: UUID, since: datetime) -> bool:
+    """Give the demo user the example automation, covering moments made since ``since``.
+
+    False when the user already has one by that name.
+    """
+    async with DatabasePipe() as pipe:
+        if any(a.name == AUTOMATION.name for a in await pipe.automations.list_for_user(user_id)):
+            return False
+        await pipe.automations.create(user_id, AUTOMATION, active_since=since)
+    return True
 
 
 def default_start() -> datetime:

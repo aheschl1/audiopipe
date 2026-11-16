@@ -95,7 +95,16 @@ async def test_runs_list_and_show_on_the_moment(
         await client.get("/v1/automations/runs", params={"automation_id": rule["id"]}, headers=account.headers)
     ).json()
     assert {r["status"] for r in every} == {"matched", "skipped"}
+    only = (
+        await client.get("/v1/automations/runs", params={"automation_id": rule["id"], "status": "skipped"}, headers=account.headers)
+    ).json()
+    assert [r["moment_title"] for r in only] == ["Lunch"]
+    one = (await client.get(f"/v1/automations/{rule['id']}", headers=account.headers)).json()
+    assert (one["matches"], one["skipped"], one["failures"]) == (1, 1, 0)
     assert (await client.get("/v1/automations/runs", headers=other_account.headers)).json() == []
+
+    (listed,) = (await client.get("/v1/automations", headers=account.headers)).json()
+    assert (listed["matches"], listed["failures"]) == (1, 0) and listed["last_match_at"]
 
     detail = (await client.get(f"/v1/moments/{matched.id}", headers=account.headers)).json()
     assert detail["automations"] == [
@@ -103,3 +112,14 @@ async def test_runs_list_and_show_on_the_moment(
     ]
     plain = (await client.get(f"/v1/moments/{skipped.id}", headers=account.headers)).json()
     assert plain["automations"] == []
+
+
+async def test_the_demo_automation_is_added_once_and_backdated(account: Account) -> None:
+    from cli.demo import AUTOMATION, add_automation
+
+    since = datetime(2026, 1, 1, tzinfo=UTC)
+    assert await add_automation(account.user.id, since)
+    assert not await add_automation(account.user.id, since)
+    async with DatabasePipe() as pipe:
+        (rule,) = await pipe.automations.list_for_user(account.user.id)
+    assert (rule.name, rule.active_since) == (AUTOMATION.name, since)

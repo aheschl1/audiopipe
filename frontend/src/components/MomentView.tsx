@@ -376,33 +376,37 @@ function Facts({ moment }: { moment: MomentDetail }) {
   )
 }
 
-/** What the user's automations filled in for this moment, one row per rule. */
+/** What the user's automations filled in for this moment: one panel per matching rule,
+ * set apart from what the moment tier itself wrote. */
 function AutomationFacts({ moment }: { moment: MomentDetail }) {
   if (!moment.automations.length) return null
   return (
-    <dl className="facts">
+    <section className="moment-automations" aria-label="Automations that matched">
       {moment.automations.map((a) => {
-        const filled = Object.entries(a.fields).filter(([, v]) => v)
+        const fields = Object.entries(a.fields)
         return (
-          <div key={a.automation_id} className="fact">
-            <dt className="section-label">
-              <Link to="/automations">{a.name}</Link>
-            </dt>
-            <dd className="chips">
-              {filled.length ? (
-                filled.map(([k, v]) => (
-                  <span key={k} className="chip">
-                    {k}: {v}
-                  </span>
-                ))
-              ) : (
-                <span className="chip">Matched</span>
-              )}
-            </dd>
+          <div key={a.automation_id} className="auto-card">
+            <div className="auto-card-head">
+              <span className="auto-badge">Automation</span>
+              <Link className="auto-card-name" to={`/automations/${a.automation_id}`}>
+                {a.name}
+              </Link>
+              <span className="auto-card-note">matched this moment</span>
+            </div>
+            {fields.length > 0 && (
+              <dl className="kv">
+                {fields.map(([k, v]) => (
+                  <div key={k}>
+                    <dt>{k}</dt>
+                    <dd className={v ? "" : "row-dim"}>{v || "—"}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </div>
         )
       })}
-    </dl>
+    </section>
   )
 }
 
