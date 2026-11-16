@@ -388,7 +388,7 @@
   padding: 5px var(--sp-2);
   border-radius: var(--r-2);
   cursor: pointer;
-  transition: background-color var(--dur) var(--ease), opacity var(--dur) var(--ease);
+  transition: background-color var(--dur) var(--ease), opacity calc(var(--dur) * 1.7) var(--ease);
 }
 
 .line:hover {
@@ -516,7 +516,7 @@
 /* focus dims everything outside the focused item's neighbourhood */
 
 .dim {
-  opacity: 0.3;
+  opacity: 0.55;
 }
 
 /* tiles: keyframes and photos */
@@ -535,7 +535,7 @@
   min-width: 0;
   cursor: pointer;
   border-radius: var(--r-2);
-  transition: opacity var(--dur) var(--ease);
+  transition: opacity calc(var(--dur) * 1.7) var(--ease);
 }
 
 .tile-img {
