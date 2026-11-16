@@ -39,7 +39,7 @@ export default function Home({ onAuthed }: { onAuthed: () => void }) {
       <main className="home-hero">
         <div>
           <h1 className="home-title">Context</h1>
-          <p className="home-tagline">Context for everyday, built for smart glasses</p>
+          <p className="home-tagline">Get actionable context from your smart glasses</p>
           <div className="home-actions">
             <button className="btn primary home-cta" disabled={busy} onClick={() => void tryDemo()}>
               {busy ? "Opening…" : "Take a tour"}
