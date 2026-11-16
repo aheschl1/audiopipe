@@ -5,6 +5,12 @@ import { DEMO_EMAIL, DEMO_PASSWORD } from "../demo"
 import { resetTour } from "./Tour"
 import HomeDemo from "./HomeDemo"
 
+const PILLARS = [
+  ["See", "Your glasses capture photos and video as the day goes."],
+  ["Hear", "Speech is transcribed, and voices are recognized across recordings."],
+  ["Act", "Automations pull out details and trigger effects on each new moment."],
+]
+
 /** Public landing page, shown at / to signed-out visitors. */
 export default function Home({ onAuthed }: { onAuthed: () => void }) {
   const [busy, setBusy] = useState(false)
@@ -46,6 +52,16 @@ export default function Home({ onAuthed }: { onAuthed: () => void }) {
         </div>
         <HomeDemo />
       </main>
+      <footer className="home-foot">
+        <div className="home-foot-inner">
+          {PILLARS.map(([title, text]) => (
+            <div key={title}>
+              <h2 className="home-foot-title">{title}</h2>
+              <p className="home-foot-text">{text}</p>
+            </div>
+          ))}
+        </div>
+      </footer>
     </div>
   )
 }
