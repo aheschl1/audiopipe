@@ -69,83 +69,6 @@
   text-decoration: none;
 }
 
-.home-foot {
-  flex: none;
-  border-top: var(--bw) solid var(--line);
-}
-
-.home-foot-inner {
-  width: min(1200px, 100% - 2 * var(--gutter));
-  margin: 0 auto;
-  padding: var(--sp-7) 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 220px));
-  gap: var(--sp-6);
-}
-
-.home-foot-title {
-  margin: 0 0 var(--sp-1);
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-}
-
-.home-foot-text {
-  margin: 0;
-  color: var(--muted);
-  font-size: var(--fs-md);
-  line-height: var(--lh-body);
-}
-
-/* the demo window */
-
-.demo {
-  border: var(--bw) solid var(--line);
-  border-radius: var(--r-3);
-  background: var(--surface);
-  overflow: hidden;
-}
-
-.demo-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: var(--bw) solid var(--line);
-  background: var(--sunken);
-}
-
-.demo-head .btn {
-  min-width: 4.5em;
-}
-
-.demo-title {
-  font-weight: var(--fw-medium);
-  margin-right: auto;
-}
-
-.demo-clock {
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  color: var(--muted);
-}
-
-.demo .strip {
-  border-top: none;
-  padding-inline: var(--sp-3);
-}
-
-.demo-list {
-  position: relative;
-  height: 104px;
-  overflow-y: auto;
-  padding: var(--sp-2) var(--sp-3);
-}
-
-.demo-rail {
-  position: relative;
-  border-left: var(--bw) solid var(--line);
-}
-
 @media (max-width: 899px) {
   .home-hero {
     grid-template-columns: minmax(0, 1fr);
@@ -161,14 +84,185 @@
   .home-tagline {
     font-size: var(--fs-lg);
   }
+}
 
-  .home-foot-inner {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-4);
-    padding: var(--sp-6) 0;
-  }
+/* the story: three linked bubbles, lit in turn */
 
-  .demo .strip-talk {
-    display: none;
+.home-story {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.home-story line,
+.home-story path,
+.home-story polyline,
+.home-story polygon,
+.home-story rect,
+.home-story circle {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hs-ring {
+  stroke: var(--line-strong);
+  stroke-width: 1.5;
+  fill: var(--surface) !important;
+}
+
+.hs-bubble.active .hs-ring {
+  stroke: var(--red);
+  stroke-width: 2.5;
+}
+
+.hs-bubble > g {
+  opacity: 0.35;
+  transition: opacity 600ms var(--ease);
+}
+
+.hs-bubble.active > g {
+  opacity: 1;
+}
+
+.home-story-wrap {
+  margin: 0;
+}
+
+/* One caption per bubble: equal thirds line up under the bubble centres. */
+.hs-captions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-2);
+  margin: calc(-1 * var(--sp-3)) 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+}
+
+.hs-captions li {
+  white-space: nowrap;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-snug);
+  color: var(--faint);
+  transition: color 600ms var(--ease);
+}
+
+.hs-captions li.active {
+  color: var(--ink);
+}
+
+@media (max-width: 599px) {
+  .hs-captions li {
+    font-size: var(--fs-sm);
   }
+}
+
+.hs-ink {
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+.hs-ground {
+  stroke: var(--line);
+  stroke-width: 2;
+}
+
+.hs-glass {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.home-story .hs-rec {
+  fill: var(--red);
+  stroke: none;
+}
+
+.hs-sight {
+  stroke: var(--red-line);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 4;
+}
+
+.hs-frame path {
+  stroke: var(--red);
+  stroke-width: 2;
+}
+
+.hs-link {
+  stroke: var(--line-strong);
+  stroke-width: 2;
+  stroke-dasharray: 3 6;
+}
+
+.hs-link.lit {
+  stroke: var(--red-line);
+}
+
+.home-story .hs-pulse {
+  fill: var(--red);
+  stroke: none;
+}
+
+.hs-counter {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  fill: var(--ink);
+}
+
+.hs-counter.landed {
+  fill: var(--red-ink);
+}
+
+.hs-counter-sub {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  fill: var(--muted);
+}
+
+.hs-wind line {
+  stroke: var(--line-strong);
+  stroke-width: 1.5;
+}
+
+.hs-wave {
+  stroke: var(--line);
+  stroke-width: 2.5;
+}
+
+.hs-car {
+  stroke: var(--ink-2);
+  stroke-width: 2;
+}
+
+.hs-car-thin {
+  stroke: var(--faint);
+  stroke-width: 1.5;
+}
+
+.home-story .hs-car-body {
+  fill: var(--surface);
+  stroke: var(--ink-2);
+  stroke-width: 2;
+}
+
+.home-story .hs-engine {
+  fill: var(--sunken-2);
+  stroke: var(--muted);
+  stroke-width: 1.5;
+}
+
+.home-story .hs-nut {
+  fill: var(--surface);
+  stroke: var(--ink);
+  stroke-width: 1.8;
+}
+
+.hs-nut-hole {
+  stroke: var(--ink);
+  stroke-width: 1.2;
 }
