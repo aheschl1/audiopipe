@@ -82,3 +82,31 @@ async def test_artifacts_without_a_servable_blob_are_404(
         )
     response = await client.get(f"/v1/artifacts/{artifact.id}/media", headers=account.headers)
     assert response.status_code == 404
+
+
+async def test_a_rerun_replaces_its_earlier_output(account: Account) -> None:
+    # A worker killed between writing artifacts and finishing the job runs it again.
+    from uuid import uuid4
+
+    from database.pipe import DatabasePipe
+    from database.schema.jobs import Job
+    from processing.pipelines.visual import ThumbnailPipeline
+    from services import segments as segment_service
+
+    session = await make_session(account)
+    segment = await segment_service.ingest_segment(
+        session.id, mp4_bytes(seconds=3), resource="video", upload=True,
+        captured_at=session.started_at, duration_ms=3000,
+    )
+    job = Job(
+        id=uuid4(), pipeline="thumbnail", session_id=session.id, priority=0,
+        status=JobStatus.RUNNING, attempts=1, max_attempts=5,
+        run_at=datetime.now(UTC), created_at=datetime.now(UTC), updated_at=datetime.now(UTC),
+        payload={"segment_id": str(segment.id)},
+    )
+    pipeline = ThumbnailPipeline()
+    first = await pipeline.process(job)
+    await pipeline.process(job)
+    async with DatabasePipe() as pipe:
+        stored = await pipe.artifacts.list_for_session(session.id, pipeline="thumbnail")
+    assert len(stored) == first["artifacts"] == 3

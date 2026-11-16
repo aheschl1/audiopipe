@@ -85,6 +85,9 @@ class VisualSegmentPipeline(Pipeline):
                     )
                 )
         async with DatabasePipe() as pipe:
+            # A rerun (worker killed before the job was marked done) replaces
+            # the earlier set; the blob keys are the same, so only rows repeat.
+            await pipe.artifacts.delete_for_segment(segment.session_id, self.name, segment.id)
             await pipe.artifacts.create_many(artifacts)
         return {"segment_id": str(segment.id), "artifacts": len(artifacts)}
 
