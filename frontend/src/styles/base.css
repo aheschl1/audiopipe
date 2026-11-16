@@ -835,3 +835,26 @@ button.row:hover,
     display: none;
   }
 }
+
+/* Read-only demo refusal: a quiet line above the bottom edge (and the session dock). */
+.ro-notice {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--dock-h) + var(--sp-4));
+  z-index: 50;
+  transform: translateX(-50%);
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  background: var(--surface);
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-round);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur) var(--ease);
+}
+
+.ro-notice.on {
+  opacity: 1;
+}

@@ -3,13 +3,12 @@ import { Link, useNavigate } from "react-router"
 import { api } from "../api/client"
 import { ACTION, type Automation, TRIGGER, conditions, fieldNames, setEnabled, when } from "../automations"
 import { dayLabel } from "../format"
-import { useReadOnly } from "../readOnly"
+import { isRefusal } from "../readOnly"
 import PageHead from "./PageHead"
 import Switch from "./Switch"
 
 /** Every automation as a row: what triggers it, what it checks, what it does. */
 export default function AutomationsPage() {
-  const readOnly = useReadOnly()
   const navigate = useNavigate()
   const [rules, setRules] = useState<Automation[] | null>(null)
   const [failed, setFailed] = useState(false)
@@ -25,19 +24,17 @@ export default function AutomationsPage() {
   }, [load])
 
   const toggle = async (a: Automation) => {
-    const updated = await setEnabled(a, !a.enabled)
-    setNotice(updated ? null : `Couldn't turn “${a.name}” ${a.enabled ? "off" : "on"}.`)
+    const { data: updated, error } = await setEnabled(a, !a.enabled)
+    setNotice(updated || isRefusal(error) ? null : `Couldn't turn “${a.name}” ${a.enabled ? "off" : "on"}.`)
     if (updated) setRules((prev) => (prev ?? []).map((r) => (r.id === a.id ? updated : r)))
   }
 
   return (
     <div className="automations-page">
       <PageHead title="Automations" meta="Trigger effects, with structured insights.">
-        {!readOnly && (
-          <Link className="btn primary slim" to="/automations/new">
-            New automation
-          </Link>
-        )}
+        <Link className="btn primary slim" to="/automations/new">
+          New automation
+        </Link>
       </PageHead>
 
       {notice && <div className="banner error">{notice}</div>}
@@ -126,7 +123,7 @@ export default function AutomationsPage() {
                       <Switch
                         on={a.enabled}
                         label={a.name}
-                        onToggle={readOnly ? undefined : () => void toggle(a)}
+                        onToggle={() => void toggle(a)}
                       />
                     </td>
                   </tr>

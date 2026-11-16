@@ -21,8 +21,8 @@ import GeoMap from "./components/GeoMap"
 import Home from "./components/Home"
 import MomentsPage from "./components/MomentsPage"
 import MomentView from "./components/MomentView"
+import ReadOnlyNotice from "./components/ReadOnlyNotice"
 import { preloadMapLibre } from "./map/trackMap"
-import { ReadOnlyContext } from "./readOnly"
 import SearchView from "./components/SearchView"
 import SessionList from "./components/SessionList"
 import SessionView from "./components/SessionView"
@@ -232,7 +232,6 @@ export default function App() {
     (location.pathname === "/speakers" && view === "map")
 
   return (
-    <ReadOnlyContext.Provider value={me?.user.read_only ?? false}>
     <div className="app">
       <nav className="sidebar" aria-label="Main">
         <Link to="/" className="brand">
@@ -245,7 +244,6 @@ export default function App() {
         </div>
         <div className="nav-foot">
           {me && <span className="whoami">{me.user.display_name ?? me.user.email}</span>}
-          {me?.user.read_only && <span className="chip">Read-only</span>}
           <button
             className="btn ghost slim"
             onClick={() => {
@@ -275,7 +273,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      <ReadOnlyNotice />
     </div>
-    </ReadOnlyContext.Provider>
   )
 }

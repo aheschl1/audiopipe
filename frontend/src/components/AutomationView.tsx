@@ -14,7 +14,7 @@ import {
   toDraft,
   when,
 } from "../automations"
-import { useReadOnly } from "../readOnly"
+import { isRefusal } from "../readOnly"
 import { useSearchParam } from "../useParam"
 import AutomationEditor from "./AutomationEditor"
 import Switch from "./Switch"
@@ -50,7 +50,6 @@ export function NewAutomation() {
 
 /** One automation: its definition, controls, and every run it has made. */
 export default function AutomationView({ id }: { id: string }) {
-  const readOnly = useReadOnly()
   const navigate = useNavigate()
   const [edit, setEdit] = useSearchParam("edit", "")
   const [rule, setRule] = useState<Automation | null>(null)
@@ -125,17 +124,17 @@ export default function AutomationView({ id }: { id: string }) {
   }
 
   const toggle = async () => {
-    const updated = await setEnabled(rule, !rule.enabled)
-    setNotice(updated ? null : `Couldn't turn it ${rule.enabled ? "off" : "on"}.`)
+    const { data: updated, error } = await setEnabled(rule, !rule.enabled)
+    setNotice(updated || isRefusal(error) ? null : `Couldn't turn it ${rule.enabled ? "off" : "on"}.`)
     if (updated) setRule(updated)
   }
 
   const remove = async () => {
     if (!window.confirm(`Delete “${rule.name}”? Its runs go with it.`)) return
-    const { response } = await api.DELETE("/v1/automations/{automation_id}", {
+    const { response, error } = await api.DELETE("/v1/automations/{automation_id}", {
       params: { path: { automation_id: id } },
     })
-    if (!response.ok) return setNotice("Couldn't delete it.")
+    if (!response.ok) return setNotice(isRefusal(error) ? null : "Couldn't delete it.")
     navigate("/automations", { replace: true })
   }
 
@@ -157,9 +156,9 @@ export default function AutomationView({ id }: { id: string }) {
       <header className="auto-head">
         <h1 className="page-title">{rule.name}</h1>
         {!edit && (
-          <Switch on={rule.enabled} label={rule.name} onToggle={readOnly ? undefined : () => void toggle()} />
+          <Switch on={rule.enabled} label={rule.name} onToggle={() => void toggle()} />
         )}
-        {!readOnly && !edit && (
+        {!edit && (
           <span className="page-actions">
             <button className="btn ghost slim" onClick={() => setEdit("1")}>
               Edit
@@ -172,7 +171,7 @@ export default function AutomationView({ id }: { id: string }) {
       </header>
       {notice && <div className="banner error">{notice}</div>}
 
-      {edit && !readOnly ? (
+      {edit ? (
         <AutomationEditor initial={toDraft(rule)} onSave={save} onCancel={() => setEdit("")} />
       ) : (
         <div className="auto-flow">

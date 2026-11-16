@@ -9,7 +9,6 @@ import {
 } from "../api/client"
 import { fmtClock } from "../format"
 import { describePoint, fmtCoords } from "../location"
-import { useReadOnly } from "../readOnly"
 import { describeSpan } from "../sounds"
 import { clipUrl, fmtWallTime, imageThumbUrl } from "../visual"
 import SpeakerChip from "./SpeakerChip"
@@ -56,7 +55,6 @@ export default function Timeline({
   onSpeakersChanged?: () => void
   onOpenImage?: (segmentId: string) => void
 }) {
-  const readOnly = useReadOnly()
   const [events, setEvents] = useState<TimelineEvent[] | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -287,7 +285,6 @@ export default function Timeline({
               ) : (
                 <>
                   <span className="transcript-text">{event.text}</span>
-                  {!readOnly && (
                   <button
                     className="btn ghost slim event-edit"
                     title="Correct this transcript"
@@ -298,7 +295,6 @@ export default function Timeline({
                   >
                     ✎
                   </button>
-                  )}
                 </>
               )}
             </div>
