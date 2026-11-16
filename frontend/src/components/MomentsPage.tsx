@@ -211,7 +211,7 @@ function MomentFeed({ day, onJump }: { day: string; onJump: (day: string) => voi
         meta={
           anchor
             ? `Showing ${fmtLongDay(new Date(Date.parse(anchor) - 1).toISOString())} and earlier`
-            : "Your days, as they happened."
+            : ""
         }
       >
         {anchor && (
