@@ -147,6 +147,29 @@ input[type="range"] {
   margin-left: calc(-1 * var(--sp-2));
 }
 
+.nav-foot .menu-trigger {
+  max-width: 100%;
+  gap: var(--sp-1);
+}
+
+.nav-foot .menu-pop {
+  top: auto;
+  bottom: calc(100% + var(--sp-1));
+  left: 0;
+  right: auto;
+}
+
+.nav-quiet {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.nav-quiet:hover,
+.nav-quiet.active {
+  color: var(--ink);
+}
+
 .main {
   width: min(var(--column), 100%);
   margin: 0 auto;
@@ -215,6 +238,21 @@ input[type="range"] {
 
   .whoami {
     display: none;
+  }
+
+  .nav-foot {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+
+  /* The top bar scrolls sideways and would clip it. */
+  .nav-foot .menu-pop {
+    position: fixed;
+    top: var(--topbar-h);
+    bottom: auto;
+    left: auto;
+    right: var(--gutter);
   }
 
   .main {
@@ -675,6 +713,29 @@ button.row:hover,
 
 .filter-option input[type="checkbox"] {
   margin: 0;
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  padding: 5px var(--sp-2);
+  border: 0;
+  border-radius: var(--r-2);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--sunken);
+}
+
+.menu-item.danger {
+  color: var(--danger);
 }
 
 /* ------------- states */

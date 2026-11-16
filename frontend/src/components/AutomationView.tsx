@@ -7,7 +7,6 @@ import {
   type AutomationRun,
   type AutomationWrite,
   EMPTY,
-  TRIGGER,
   conditions,
   problem,
   setEnabled,
@@ -169,17 +168,13 @@ export default function AutomationView({ id }: { id: string }) {
           </span>
         )}
       </header>
+      {!edit && <p className="auto-sub">Runs on new moments since {when(rule.active_since)}.</p>}
       {notice && <div className="banner error">{notice}</div>}
 
       {edit ? (
         <AutomationEditor initial={toDraft(rule)} onSave={save} onCancel={() => setEdit("")} />
       ) : (
         <div className="auto-flow">
-          <section className="auto-step">
-            <h2 className="step-label">Trigger</h2>
-            <span className="kind-tag">{TRIGGER[rule.trigger]}</span>
-            <p className="auto-sub">For moments created since {when(rule.active_since)}.</p>
-          </section>
           <section className="auto-step">
             <h2 className="step-label">Conditions</h2>
             {conds.length ? (
@@ -202,7 +197,7 @@ export default function AutomationView({ id }: { id: string }) {
               {fields.map((f) => (
                 <div key={f.name}>
                   <dt>{f.name}</dt>
-                  <dd className={f.description ? "" : "row-dim"}>{f.description || "No description"}</dd>
+                  <dd>{f.description}</dd>
                 </div>
               ))}
             </dl>

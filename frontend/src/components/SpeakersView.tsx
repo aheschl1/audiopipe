@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParam } from "../useParam"
 import {
   api,
@@ -11,6 +11,7 @@ import {
 import { fmtClock, fmtDate, shortId } from "../format"
 import { categoryColor, categoryTint, initials, speakerLabel } from "../speakers"
 import ClipButton, { ClipProgress } from "./ClipButton"
+import Menu from "./Menu"
 import PageHead from "./PageHead"
 
 // Centroids of one voice spread up to ~0.6; different voices sit near ~0.9.
@@ -149,29 +150,28 @@ function ClusterPanel({
   )
 }
 
-// The merge popover for one card: candidates ranked by centroid distance,
-// then an inline confirm (with a warning when the pair looks cross-voice).
+/** Merge candidates ranked by centroid distance, then an inline confirm. */
 function MergeMenu({
   speaker,
   busy,
   onMerge,
+  onClose,
 }: {
   speaker: SpeakerRead
   busy: boolean
   onMerge: (survivor: SpeakerRead) => void
+  onClose: () => void
 }) {
-  const [open, setOpen] = useState(false)
   const [candidates, setCandidates] = useState<SimilarSpeakerRead[] | null>(null)
   const [target, setTarget] = useState<SimilarSpeakerRead | null>(null)
   const root = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    if (!open) return
     const onOutside = (event: MouseEvent) => {
-      if (root.current && !root.current.contains(event.target as Node)) setOpen(false)
+      if (root.current && !root.current.contains(event.target as Node)) onClose()
     }
     const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false)
+      if (event.key === "Escape") onClose()
     }
     document.addEventListener("mousedown", onOutside)
     document.addEventListener("keydown", onEscape)
@@ -179,27 +179,16 @@ function MergeMenu({
       document.removeEventListener("mousedown", onOutside)
       document.removeEventListener("keydown", onEscape)
     }
-  }, [open])
+  }, [onClose])
 
-  const toggle = async () => {
-    const next = !open
-    setOpen(next)
-    setTarget(null)
-    if (next) {
-      setCandidates(null)
-      const { data } = await api.GET("/v1/speakers/{speaker_id}/similar", {
-        params: { path: { speaker_id: speaker.id } },
-      })
-      if (data) setCandidates(data.items)
-    }
-  }
+  useEffect(() => {
+    void api
+      .GET("/v1/speakers/{speaker_id}/similar", { params: { path: { speaker_id: speaker.id } } })
+      .then(({ data }) => data && setCandidates(data.items))
+  }, [speaker.id])
 
   return (
     <div className="filter-menu" ref={root}>
-      <button className="btn ghost slim" onClick={() => void toggle()}>
-        Merge
-      </button>
-      {open && (
         <div className="filter-pop merge-pop">
           {target ? (
             <div className="merge-confirm">
@@ -221,7 +210,7 @@ function MergeMenu({
                   disabled={busy}
                   onClick={() => {
                     onMerge(target)
-                    setOpen(false)
+                    onClose()
                   }}
                 >
                   {busy ? "Merging…" : "Merge"}
@@ -246,7 +235,9 @@ function MergeMenu({
                 <span className="merge-candidate-main">
                   <span>
                     {candidate.name ?? (
-                      <span className="row-dim">unlabeled · {shortId(candidate.id)}</span>
+                      <span className="row-dim" title={shortId(candidate.id)}>
+                        Unnamed voice
+                      </span>
                     )}
                   </span>
                   <span className="row-sub">
@@ -263,7 +254,6 @@ function MergeMenu({
             ))
           )}
         </div>
-      )}
     </div>
   )
 }
@@ -321,7 +311,7 @@ function MoveMenu({
               <span className="merge-candidate-main">
                 <span>
                   {candidate.name ?? (
-                    <span className="row-dim">unlabeled · {shortId(candidate.id)}</span>
+                    <span className="row-dim" title={shortId(candidate.id)}>Unnamed voice</span>
                   )}
                 </span>
               </span>
@@ -364,7 +354,7 @@ type MemberCache = { items: SpeakerMemberRead[]; hasMore: boolean }
 export default function SpeakersView({
   onOpen,
 }: {
-  onOpen: (id: string, seekMs?: number) => void
+  onOpen: (id: string, seekMs?: number, artifactId?: string) => void
 }) {
   const [speakers, setSpeakers] = useState<SpeakerRead[] | null>(null)
   // The expanded speaker and its tab live in the URL so a speaker is linkable.
@@ -374,6 +364,8 @@ export default function SpeakersView({
   const expandedTab: "transcripts" | "prints" = tabParam === "prints" ? "prints" : "transcripts"
   const setExpanded = (id: string | null) => setExpandedParam(id, { tab: null })
   const setExpandedTab = (tab: "transcripts" | "prints") => setTabParam(tab)
+  const [mergeFor, setMergeFor] = useState<string | null>(null)
+  const closeMerge = useCallback(() => setMergeFor(null), [])
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState("")
   const [transcripts, setTranscripts] = useState<Record<string, SpeakerTranscriptRead[]>>({})
@@ -584,20 +576,16 @@ export default function SpeakersView({
 
   return (
     <div className="speakers-view">
-      <PageHead
-        title="People"
-        meta={
-          speakers === null
-            ? "Loading…"
-            : `${speakers.length} voice${speakers.length === 1 ? "" : "s"}, named first`
-        }
-      >
-        <button
-          className={`btn ghost slim ${panelOpen ? "filtered" : ""}`}
-          onClick={() => setPanelOpen((o) => !o)}
-        >
-          clustering settings ▾
-        </button>
+      <PageHead title="People">
+        <Menu
+          items={[
+            {
+              label: panelOpen ? "Hide clustering settings" : "Clustering settings",
+              onSelect: () => setPanelOpen((o) => !o),
+            },
+            { label: "Voice map", to: "/speakers/map" },
+          ]}
+        />
       </PageHead>
       {panelOpen && params && (
         <ClusterPanel
@@ -612,7 +600,7 @@ export default function SpeakersView({
       {speakers === null ? (
         <div className="loading">Loading speakers…</div>
       ) : speakers.length === 0 ? (
-        <div className="empty">No speaker clusters yet — the clustering tier builds them.</div>
+        <div className="empty">No voices yet.</div>
       ) : (
         <div className="list">
           {speakers.map((speaker) => (
@@ -647,27 +635,40 @@ export default function SpeakersView({
                   <>
                     <button className="speaker-name" onClick={() => toggle(speaker)}>
                       {speaker.name ?? (
-                        <span className="row-dim">unlabeled · {shortId(speaker.id)}</span>
+                        <span className="row-dim" title={shortId(speaker.id)}>
+                          Unnamed voice
+                        </span>
                       )}
                     </button>
                     <span className="row-sub">
-                      {speaker.sessions} session{speaker.sessions === 1 ? "" : "s"} ·{" "}
-                      {speaker.embeddings} voice-print{speaker.embeddings === 1 ? "" : "s"}
+                      {speaker.sessions} recording{speaker.sessions === 1 ? "" : "s"}
                     </span>
-                    <button
-                      className="btn ghost slim"
-                      onClick={() => {
-                        setEditing(speaker.id)
-                        setDraft(speaker.name ?? "")
-                      }}
-                    >
-                      Rename
-                    </button>
-                    <MergeMenu
-                      speaker={speaker}
-                      busy={busy}
-                      onMerge={(survivor) => void merge(speaker.id, survivor)}
-                    />
+                    <div className="speaker-actions">
+                      <Menu
+                        items={[
+                          {
+                            label: "Rename",
+                            onSelect: () => {
+                              setEditing(speaker.id)
+                              setDraft(speaker.name ?? "")
+                            },
+                          },
+                          { label: "Merge…", onSelect: () => setMergeFor(speaker.id) },
+                          {
+                            label: "Manage voice-prints",
+                            onSelect: () => setExpandedParam(speaker.id, { tab: "prints" }),
+                          },
+                        ]}
+                      />
+                      {mergeFor === speaker.id && (
+                        <MergeMenu
+                          speaker={speaker}
+                          busy={busy}
+                          onMerge={(survivor) => void merge(speaker.id, survivor)}
+                          onClose={closeMerge}
+                        />
+                      )}
+                    </div>
                   </>
                 )}
               </div>
@@ -690,20 +691,11 @@ export default function SpeakersView({
               )}
               {expanded === speaker.id && (
                 <>
-                  <div className="mode-toggle slim-toggle">
-                    <button
-                      className={`mode ${expandedTab === "transcripts" ? "active" : ""}`}
-                      onClick={() => setExpandedTab("transcripts")}
-                    >
-                      Transcripts
+                  {expandedTab === "prints" && (
+                    <button className="crumb prints-back" onClick={() => setExpandedTab("transcripts")}>
+                      ← Transcripts
                     </button>
-                    <button
-                      className={`mode ${expandedTab === "prints" ? "active" : ""}`}
-                      onClick={() => setExpandedTab("prints")}
-                    >
-                      Voice-prints
-                    </button>
-                  </div>
+                  )}
                   {expandedTab === "transcripts" ? (
                     <div className="speaker-transcripts">
                       {(transcripts[speaker.id] ?? []).length === 0 ? (
@@ -720,8 +712,8 @@ export default function SpeakersView({
                             <div
                               key={t.artifact_id}
                               className="row clickable"
-                              onClick={() => onOpen(t.session_id, t.start_ms)}
-                              title="Open in recording"
+                              onClick={() => onOpen(t.session_id, t.start_ms, t.artifact_id)}
+                              title="Open moment"
                             >
                               <ClipButton clip={clip} />
                               <span className="event-time as-span">{fmtClock(t.start_ms)}</span>

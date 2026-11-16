@@ -5,7 +5,7 @@ import { listMoments, type MomentCover, type MomentRead } from "../api/moments"
 import { clock, dayKey, dayLabel, fmtLongDay, fmtSpan } from "../format"
 import { usePoll } from "../hooks/usePoll"
 import { useSearchParam } from "../useParam"
-import { heardWith, isUnnamed, joinNames } from "../moments"
+import { heardWith } from "../moments"
 import { artifactUrl } from "../visual"
 import PageHead from "./PageHead"
 
@@ -36,10 +36,6 @@ function todayInput(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
-function unique(lists: string[][]): string[] {
-  return [...new Set(lists.flat())]
-}
-
 function CoverMosaic({
   covers,
 }: {
@@ -58,68 +54,50 @@ function CoverMosaic({
   )
 }
 
-function MomentEntry({
+export function MomentEntry({
   moment,
 }: {
   moment: MomentRead
 }) {
-  const { utterances, photos, frames } = moment.counts
-  const context = [heardWith(moment.speakers), ...moment.topics.slice(0, 3)].filter(Boolean)
-  const tally = [
-    utterances ? `${utterances} lines` : null,
-    photos ? `${photos} photo${photos === 1 ? "" : "s"}` : null,
-    frames ? `${frames} frame${frames === 1 ? "" : "s"}` : null,
-  ].filter(Boolean)
+  const context = heardWith(moment.speakers)
 
   return (
     <Link to={`/moments/${moment.id}`} className={`moment ${moment.cover.length ? "has-cover" : ""}`}>
-      <span className="moment-when">
+      <span className="moment-when" title={fmtSpan(moment.start_at, moment.end_at)}>
         <span className="moment-start">{clock(moment.start_at)}</span>
-        <span className="moment-span">{fmtSpan(moment.start_at, moment.end_at)}</span>
       </span>
       <span className="moment-body">
         <span className="moment-title">{moment.title || "Untitled moment"}</span>
-        {context.length > 0 && <span className="moment-context">{context.join(" · ")}</span>}
+        {context && <span className="moment-context">{context}</span>}
         {moment.summary && <span className="moment-summary">{moment.summary}</span>}
-        {tally.length > 0 && <span className="moment-tally">{tally.join(" · ")}</span>}
       </span>
       <CoverMosaic covers={moment.cover} />
     </Link>
   )
 }
 
-/** A day's heading: the date, a one-line digest, and the slot the day's story will fill. */
+/** A day's heading: the date and the slot the day's story will fill. */
 function DayHead({ day, story }: { day: Day; story?: string | null }) {
   const label = dayLabel(day.iso)
   const long = fmtLongDay(day.iso)
-  const people = unique(
-    day.moments.map((m) => m.speakers.filter((sp) => !isUnnamed(sp)).map((sp) => sp.name)),
-  )
-  const n = day.moments.length
-  const digest = [
-    n ? `${n} moment${n === 1 ? "" : "s"}` : null,
-    people.length ? `with ${joinNames(people, 4)}` : null,
-  ].filter(Boolean)
   return (
     <header className="day-head">
       <h2 className="day-title">
         {label}
         {label !== long && <span className="day-date">{long}</span>}
       </h2>
-      {digest.length > 0 && <div className="day-digest">{digest.join(" · ")}</div>}
       {story && <p className="day-story">{story}</p>}
     </header>
   )
 }
 
 /** Recording happening now, or moments the tier is writing up right now. */
-function BuildingNote({ live, building }: { live: SessionRead[]; building: number }) {
+export function BuildingNote({ live, building }: { live: SessionRead[]; building: number }) {
   if (live.length) {
     const device = live[0]!.device
     return (
       <div className="building">
         <span className="badge live">recording now{device ? ` on ${device}` : ""}</span>
-        <span className="row-dim">It becomes a moment a few minutes after recording stops.</span>
       </div>
     )
   }
@@ -127,10 +105,7 @@ function BuildingNote({ live, building }: { live: SessionRead[]; building: numbe
     return (
       <div className="building">
         <span className="spinner" aria-hidden="true" />
-        <span className="row-dim">
-          Writing up {building === 1 ? "a moment" : `${building} moments`} - {building === 1 ? "it" : "they"} will
-          appear here.
-        </span>
+        <span className="row-dim">Writing up {building === 1 ? "a moment" : `${building} moments`}…</span>
       </div>
     )
   }
@@ -206,14 +181,7 @@ function MomentFeed({ day, onJump }: { day: string; onJump: (day: string) => voi
 
   return (
     <div className="moments-page">
-      <PageHead
-        title="Moments"
-        meta={
-          anchor
-            ? `Showing ${fmtLongDay(new Date(Date.parse(anchor) - 1).toISOString())} and earlier`
-            : ""
-        }
-      >
+      <PageHead title="Moments">
         {anchor && (
           <button className="btn ghost slim" onClick={() => onJump("")}>
             Back to today
@@ -256,14 +224,11 @@ function MomentFeed({ day, onJump }: { day: string; onJump: (day: string) => voi
       ) : days.length === 0 ? (
         <div className="empty">
           {anchor ? (
-            "Nothing was recorded on or before this day."
+            "Nothing on or before this day."
           ) : sessions && sessions.length === 0 ? (
-            "Nothing recorded yet. Record from your phone or glasses and your day shows up here."
+            "Nothing recorded yet."
           ) : (
-            <>
-              No moments yet. Recordings become moments a few minutes after they stop.{" "}
-              <Link to="/sessions">Browse recordings</Link>
-            </>
+            "No moments yet."
           )}
         </div>
       ) : (

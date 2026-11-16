@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { api, type SessionTrackRead } from "../api/client"
 import { fmtDate, shortId } from "../format"
 import { fmtCoords, splitAtGaps, TRACK_GAP_MS } from "../location"
@@ -11,8 +11,7 @@ const MAX_POINTS = 500
 
 const MODES: { key: MapMode; label: string }[] = [
   { key: "lines", label: "Lines" },
-  { key: "arrows", label: "Arrows" },
-  { key: "heat", label: "heat" },
+  { key: "heat", label: "Heat" },
 ]
 
 function asMode(v: string): MapMode {
@@ -152,17 +151,13 @@ export default function GeoMap({
     handle?.setMode(mode)
   }, [handle, mode])
 
-  const totalFixes = useMemo(
-    () => (tracks ?? []).reduce((sum, t) => sum + t.point_count, 0),
-    [tracks],
-  )
   const selectedTrack = selected
     ? (tracks ?? []).find((t) => t.session_id === selected.sessionId)
     : undefined
 
   return (
     <div className="geo-view">
-      <PageHead title="Places" meta="Where your sessions were recorded." />
+      <PageHead title="Places" />
       <div className="geo-toolbar">
         <label className="geo-range">
           From
@@ -197,11 +192,6 @@ export default function GeoMap({
             </button>
           ))}
         </div>
-        {tracks && tracks.length > 0 && (
-          <span className="row-dim">
-            {tracks.length} session{tracks.length === 1 ? "" : "s"} · {totalFixes} points
-          </span>
-        )}
       </div>
       <div className="geo-body">
         <div className="geo-map-wrap">

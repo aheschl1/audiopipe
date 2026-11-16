@@ -18,6 +18,41 @@
   background: var(--paper);
 }
 
+.search-modes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+.exact-class {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.search-help {
+  align-self: center;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: var(--bw) solid var(--line-strong);
+  border-radius: var(--r-round);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  cursor: help;
+}
+
+.row-alt.icon-only {
+  min-width: 28px;
+  justify-content: center;
+}
+
 .filter-extras {
   display: flex;
   flex-direction: column;
@@ -947,4 +982,23 @@
 
 .frame-meta {
   font-size: var(--fs-xs);
+}
+
+/* People: per-row overflow menu, with the merge popover anchored beside it. */
+.speaker-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.speaker-actions .merge-pop {
+  right: 0;
+}
+
+.prints-back {
+  margin: var(--sp-2) 0;
+}
+
+.speaker-actions > .filter-menu:not(.menu) {
+  position: static;
 }

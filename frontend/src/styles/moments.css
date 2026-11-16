@@ -26,29 +26,6 @@
   text-underline-offset: 3px;
 }
 
-.nav-group-label {
-  margin: var(--sp-5) 0 var(--sp-1);
-  padding: 0 var(--sp-2);
-  font-size: var(--fs-2xs);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--faint);
-}
-
-@media (max-width: 899px) {
-  .nav-group-label {
-    display: block;
-    margin: 0;
-    padding: 0;
-    align-self: center;
-    width: var(--bw);
-    height: 16px;
-    background: var(--line);
-    font-size: 0;
-  }
-}
-
 /* ------------- feed: days of moments */
 
 .day {
@@ -76,12 +53,6 @@
 .day-date {
   font-size: var(--fs-sm);
   font-weight: var(--fw-regular);
-  color: var(--muted);
-}
-
-.day-digest {
-  margin-top: var(--sp-0);
-  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
@@ -140,11 +111,6 @@
   color: var(--ink);
 }
 
-.moment-span {
-  font-size: var(--fs-2xs);
-  color: var(--muted);
-}
-
 .moment-body {
   display: flex;
   flex-direction: column;
@@ -166,16 +132,11 @@
 .moment-summary {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
   color: var(--ink-2);
   max-width: 62ch;
-}
-
-.moment-tally {
-  font-size: var(--fs-xs);
-  color: var(--muted);
 }
 
 .cover {
@@ -388,11 +349,6 @@
   padding: 5px var(--sp-2);
   border-radius: var(--r-2);
   cursor: pointer;
-  transition: background-color var(--dur) var(--ease), opacity calc(var(--dur) * 1.7) var(--ease);
-}
-
-.line:hover {
-  background: var(--sunken);
 }
 
 .line.selected {
@@ -501,8 +457,8 @@
   font-weight: var(--fw-medium);
   line-height: 16px;
   padding: 0 var(--sp-1);
-  color: var(--ink);
-  background: var(--sunken-2);
+  color: var(--red-ink);
+  background: var(--red-wash);
   border: var(--bw) solid transparent;
   border-radius: var(--r-1);
   white-space: nowrap;
@@ -510,7 +466,7 @@
 
 .rel-tag.weak {
   background: var(--surface);
-  border-color: var(--line-strong);
+  border-color: var(--red-line);
 }
 
 /* focus dims everything outside the focused item's neighbourhood */
@@ -535,7 +491,6 @@
   min-width: 0;
   cursor: pointer;
   border-radius: var(--r-2);
-  transition: opacity calc(var(--dur) * 1.7) var(--ease);
 }
 
 .tile-img {
@@ -546,11 +501,6 @@
   background: var(--sunken);
   outline: var(--bw-strong) solid transparent;
   outline-offset: var(--bw-strong);
-  transition: outline-color var(--dur) var(--ease);
-}
-
-.tile:hover .tile-img {
-  outline-color: var(--line-strong);
 }
 
 .tile.selected .tile-img {
@@ -563,12 +513,6 @@
   flex-wrap: wrap;
   gap: var(--sp-1);
   font-size: var(--fs-xs);
-}
-
-.tile-label {
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  color: var(--muted);
 }
 
 .tile-cap .row-dim {
@@ -691,11 +635,6 @@
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: background-color var(--dur) var(--ease);
-}
-
-.conn-hit:hover {
-  background: var(--sunken);
 }
 
 .conn-hit:focus-visible {
@@ -734,65 +673,14 @@
   background: var(--sunken);
 }
 
-.mention-label {
-  flex: none;
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  color: var(--muted);
-}
-
 .mention-who {
   font-weight: var(--fw-medium);
   color: var(--ink);
 }
 
-.conn-quote {
-  font-size: var(--fs-sm);
-  line-height: var(--lh-snug);
-  color: var(--ink-2);
-}
-
 .conn-why {
   font-size: var(--fs-xs);
   line-height: var(--lh-snug);
-  color: var(--muted);
-}
-
-.conn-conf {
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  color: var(--muted);
-}
-
-/* footer: provenance and the ingest detail */
-
-.moment-foot {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  padding-top: var(--sp-4);
-  border-top: var(--bw) solid var(--line);
-}
-
-.sources summary {
-  width: fit-content;
-  font-size: var(--fs-sm);
-  color: var(--muted);
-  cursor: pointer;
-  transition: color var(--dur) var(--ease);
-}
-
-.sources summary:hover {
-  color: var(--ink);
-}
-
-.sources[open] summary {
-  margin-bottom: var(--sp-2);
-}
-
-.provenance {
-  margin: 0;
-  font-size: var(--fs-xs);
   color: var(--muted);
 }
 

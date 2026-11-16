@@ -31,7 +31,6 @@ export default function Gate({ onAuthed }: { onAuthed: () => void }) {
             <img className="brand-lockup" src="/lockup.svg" alt="Context" />
           </Link>
         </h1>
-        <div className="gate-subtitle">Context for everyday, built for smart glasses</div>
         <input
           className="input"
           type="email"

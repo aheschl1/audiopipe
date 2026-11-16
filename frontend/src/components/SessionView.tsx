@@ -9,8 +9,9 @@ import AudioPlayer from "./AudioPlayer"
 import ImageLightbox from "./ImageLightbox"
 import SessionMapPanel from "./SessionMapPanel"
 import SessionPhotos from "./SessionPhotos"
-import TagSummary from "./TagSummary"
+import Menu, { type MenuItem } from "./Menu"
 import Timeline from "./Timeline"
+import { type EventKind, loadHidden } from "./TimelineFilter"
 import TimelineStrip from "./TimelineStrip"
 
 // Memoized so the coarse playhead ticking in this component only re-renders
@@ -40,6 +41,7 @@ export default function SessionView({
   const [pendingSeek, setPendingSeek] = useState<number | undefined>(seekMs)
   const [follow, setFollow] = useState(true)
   const [showMap, setShowMap] = useState(false)
+  const [hidden, setHidden] = useState<Set<EventKind>>(loadHidden)
   // Bumped after a speaker is labeled/merged anywhere on the page, so names
   // propagate to the strip, the transcript list, and the lane headers.
   const [refreshKey, setRefreshKey] = useState(0)
@@ -149,15 +151,26 @@ export default function SessionView({
     if (data) setSession(data)
   }
 
-  if (!session) return <div className="loading">Loading session…</div>
+  if (!session)
+    return (
+      <div className="session-view">
+        <div className="skeleton" style={{ height: 28, width: 240, marginBottom: 12 }} />
+        <div className="skeleton" style={{ height: 160 }} />
+      </div>
+    )
 
   const title = session.label ?? session.device ?? shortId(session.id)
+  const menu: MenuItem[] = [
+    { label: "Rename", onSelect: () => setDraft(session.label ?? "") },
+    ...(session.is_open && !splitting ? [{ label: "Split", onSelect: () => void splitSession() }] : []),
+    ...(onAb ? [{ label: "A/B", onSelect: () => onAb(session.id) }] : []),
+  ]
 
   return (
     <div className="session-view">
       <header className="session-header">
         <button className="crumb" onClick={onBack}>
-          ← Recordings
+          ← Back
         </button>
         <div className="session-head-row">
           {draft === null ? (
@@ -199,13 +212,6 @@ export default function SessionView({
           )}
           {draft === null && (
             <div className="page-actions">
-              <button
-                className="btn ghost slim"
-                title="Rename this session"
-                onClick={() => setDraft(session.label ?? "")}
-              >
-                Rename
-              </button>
               {session.is_open && (
                 <button
                   className="btn ghost slim"
@@ -216,15 +222,7 @@ export default function SessionView({
                   {splitting ? "Splitting…" : "Split"}
                 </button>
               )}
-              {onAb && (
-                <button
-                  className="btn ghost slim"
-                  title="Vote on transcript candidates"
-                  onClick={() => onAb(session.id)}
-                >
-                  A/B
-                </button>
-              )}
+              <Menu items={menu} />
             </div>
           )}
         </div>
@@ -262,8 +260,7 @@ export default function SessionView({
               onSeek={seekTo}
             />
           )}
-          <TagSummary sessionId={sessionId} />
-          {images.length > 0 && (
+          {images.length > 0 && hidden.has("image") && (
             <SessionPhotos images={images} onOpen={setLightboxIndex} />
           )}
         </aside>
@@ -277,6 +274,8 @@ export default function SessionView({
             refreshKey={refreshKey}
             onSpeakersChanged={onSpeakersChanged}
             onOpenImage={openImage}
+            hidden={hidden}
+            onHiddenChange={setHidden}
           />
         </div>
       </div>

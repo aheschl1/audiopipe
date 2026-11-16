@@ -1,0 +1,62 @@
+/* App layer: moment detail additions (references shown as the thing itself, the way out to the recording). */
+
+.ref.ref-img {
+  width: 24px;
+  height: 18px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.ref.ref-img img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ref:not(.ref-img) {
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+}
+
+.mention-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+
+.moment-head .page-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+}
+
+.moment-full-recording,
+.moment-full-recording .menu-trigger {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.moment-full-recording:hover,
+.moment-full-recording .menu-trigger:hover {
+  color: var(--red-ink);
+}
+
+.moment-full-recording .menu-trigger {
+  padding: 0;
+  border: 0;
+  background: none;
+  min-height: 0;
+  height: auto;
+}
+
+.moment-full-recording .menu-pop {
+  left: 0;
+  right: auto;
+}

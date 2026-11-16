@@ -308,6 +308,10 @@
   padding-left: 40px;
 }
 
+.event.transcript.interjection .event-body {
+  color: var(--muted);
+}
+
 .event.transcript.interjection::before {
   width: 5px;
   height: 5px;
@@ -367,14 +371,22 @@
   text-transform: uppercase;
 }
 
-.badge.interjection {
-  margin: 0 var(--sp-2) 0 0;
-  font-size: var(--fs-2xs);
-  font-weight: var(--fw-regular);
-  padding: 0 var(--sp-1);
-  color: var(--muted);
+.session-map-open {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  z-index: 5;
+  padding: var(--sp-0) var(--sp-2);
   border: var(--bw) solid var(--line);
   border-radius: var(--r-2);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  text-decoration: none;
+}
+
+.session-map-open:hover {
+  color: var(--red-ink);
 }
 
 .event-time {
@@ -470,10 +482,6 @@
 
 .event.marker:hover {
   background: transparent;
-}
-
-.tag-summary {
-  padding: var(--sp-0) 0 var(--sp-1);
 }
 
 /* ------------- timeline strip */

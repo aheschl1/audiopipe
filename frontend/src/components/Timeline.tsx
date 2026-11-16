@@ -12,7 +12,7 @@ import { describePoint, fmtCoords } from "../location"
 import { describeSpan } from "../sounds"
 import { clipUrl, fmtWallTime, imageThumbUrl } from "../visual"
 import SpeakerChip from "./SpeakerChip"
-import TimelineFilter, { loadHidden, type EventKind } from "./TimelineFilter"
+import TimelineFilter, { type EventKind } from "./TimelineFilter"
 import VideoGutter from "./VideoGutter"
 import VideoLightbox from "./VideoLightbox"
 
@@ -43,6 +43,8 @@ export default function Timeline({
   refreshKey,
   onSpeakersChanged,
   onOpenImage,
+  hidden,
+  onHiddenChange,
 }: {
   sessionId: string
   onSeek: (ms: number) => void
@@ -54,6 +56,8 @@ export default function Timeline({
   refreshKey?: number
   onSpeakersChanged?: () => void
   onOpenImage?: (segmentId: string) => void
+  hidden: Set<EventKind>
+  onHiddenChange: (hidden: Set<EventKind>) => void
 }) {
   const [events, setEvents] = useState<TimelineEvent[] | null>(null)
   const [hasMore, setHasMore] = useState(false)
@@ -63,7 +67,6 @@ export default function Timeline({
   )
   const [flashKey, setFlashKey] = useState<string | null>(null)
   const flashed = useRef(false)
-  const [hidden, setHidden] = useState<Set<EventKind>>(loadHidden)
   // Location runs render collapsed; a click on the head row expands one.
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set())
   // Inline transcript correction; keyed like the rows so only one is open.
@@ -231,14 +234,6 @@ export default function Timeline({
               {fmtClock(event.at_ms)}
             </button>
             <div className="event-body">
-              {interjection && (
-                <span
-                  className="badge interjection"
-                  title="Spoken during another speaker's turn. Their transcript contains these words too."
-                >
-                  Interjection
-                </span>
-              )}
               {(event.speaker || event.speaker_id) && (
                 <SpeakerChip
                   clusterId={event.speaker_id}
@@ -318,7 +313,7 @@ export default function Timeline({
             </button>
             <div className="event-body chips">
               {event.labels.slice(0, 5).map((tag) => (
-                <span key={tag.label} className="chip" title={`score ${tag.score.toFixed(2)}`}>
+                <span key={tag.label} className="chip">
                   {tag.label}
                 </span>
               ))}
@@ -516,8 +511,7 @@ export default function Timeline({
   return (
     <>
       <div className="timeline-toolbar">
-        <h2 className="section-label">Timeline</h2>
-        <TimelineFilter hidden={hidden} onChange={setHidden} />
+        <TimelineFilter hidden={hidden} onChange={onHiddenChange} />
       </div>
       <div
         className="timeline-wrap"

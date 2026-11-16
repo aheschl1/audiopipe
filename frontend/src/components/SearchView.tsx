@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { api, type AudioSearchRead, type Schemas } from "../api/client"
-import { fmtClock, shortId } from "../format"
+import { clock, dayLabel, fmtClock } from "../format"
 import ClipButton, { ClipProgress } from "./ClipButton"
 import { useSearchParam } from "../useParam"
 import FrameResults from "./FrameResults"
@@ -65,6 +65,44 @@ function fromTranscript(hit: TranscriptSearchRead): Hit {
   }
 }
 
+const starts = new Map<string, string | null>()
+
+/** Session start times for the given ids, fetched once each, so hits can show a wall-clock time. */
+function useSessionStarts(ids: string[]): (sessionId: string, ms: number | null | undefined) => string | null {
+  const [, bump] = useState(0)
+  const key = [...new Set(ids)].sort().join(",")
+  useEffect(() => {
+    const missing = key.split(",").filter((id) => id && !starts.has(id))
+    if (!missing.length) return
+    let live = true
+    for (const id of missing) starts.set(id, null)
+    void Promise.all(
+      missing.map((id) =>
+        api
+          .GET("/v1/sessions/{session_id}", { params: { path: { session_id: id } } })
+          .then(({ data }) => data && starts.set(id, data.started_at))
+          .catch(() => undefined),
+      ),
+    ).then(() => live && bump((n) => n + 1))
+    return () => {
+      live = false
+    }
+  }, [key])
+  return (sessionId, ms) => {
+    if (ms === null || ms === undefined) return null
+    const start = starts.get(sessionId)
+    if (!start) return fmtClock(ms)
+    const at = new Date(Date.parse(start) + ms).toISOString()
+    return `${dayLabel(at)} ${clock(at)}`
+  }
+}
+
+const TABS = [
+  ["transcripts", "Said"],
+  ["frames", "Seen"],
+  ["describe", "Sounds"],
+] as const
+
 // Ways to find a moment:
 // - describe (contrastive): free text through CLAP's text encoder, ranked by
 //   embedding distance. Open vocabulary; ranks are relative per query.
@@ -78,11 +116,11 @@ export default function SearchView({
   onOpen: (id: string, seekMs?: number, artifactId?: string) => void
   onOpenRecording: (id: string, seekMs?: number) => void
 }) {
-  const [modeParam, setMode] = useSearchParam("mode", "describe")
+  const [modeParam, setMode] = useSearchParam("mode", "transcripts")
   const mode: Mode =
-    modeParam === "classes" || modeParam === "transcripts" || modeParam === "frames"
+    modeParam === "classes" || modeParam === "describe" || modeParam === "frames"
       ? modeParam
-      : "describe"
+      : "transcripts"
   // The submitted query lives in the URL; the input box is local until submit.
   const [urlQ, setUrlQ] = useSearchParam("q", "")
   const [q, setQ] = useState(urlQ)
@@ -162,6 +200,19 @@ export default function SearchView({
     if (urlQ && ran.current !== `${mode}\0${urlQ}`) void run(urlQ)
   }, [mode, urlQ])
 
+  // The query survives a mode switch; stale results don't.
+  const switchMode = (value: Mode) => {
+    setMode(value, { q: null })
+    setResults(null)
+    setFrames(null)
+    setError(null)
+  }
+
+  const stamp = useSessionStarts([
+    ...(results ?? []).map((h) => h.sessionId),
+    ...(frames ?? []).map((h) => h.session_id),
+  ])
+
   const submit = (event: FormEvent) => {
     event.preventDefault()
     void run(q)
@@ -169,33 +220,33 @@ export default function SearchView({
 
   return (
     <div className="search-view">
-      <PageHead
-        title="Search"
-        meta="Find a moment by what was said, what it sounded like, or what was seen."
-      />
-      <div className="mode-toggle">
-        {(
-          [
-            ["describe", "Describe a sound"],
-            ["classes", "Filter by class"],
-            ["transcripts", "Transcripts"],
-            ["frames", "What was seen"],
-          ] as const
-        ).map(([value, title]) => (
-          <button
-            key={value}
-            className={`mode ${mode === value ? "active" : ""}`}
-            onClick={() => {
-              // The query survives a mode switch; stale results don't.
-              setMode(value, { q: null })
-              setResults(null)
-              setFrames(null)
-              setError(null)
-            }}
-          >
-            {title}
-          </button>
-        ))}
+      <PageHead title="Search" />
+      <div className="search-modes">
+        <div className="mode-toggle">
+          {TABS.map(([value, title]) => {
+            const active = mode === value || (value === "describe" && mode === "classes")
+            return (
+              <button
+                key={value}
+                className={`mode ${active ? "active" : ""}`}
+                aria-pressed={active}
+                onClick={() => !active && switchMode(value)}
+              >
+                {title}
+              </button>
+            )
+          })}
+        </div>
+        {(mode === "describe" || mode === "classes") && (
+          <label className="exact-class">
+            <input
+              type="checkbox"
+              checked={mode === "classes"}
+              onChange={(e) => switchMode(e.target.checked ? "classes" : "describe")}
+            />
+            Exact class
+          </label>
+        )}
       </div>
 
       <form className="search-bar" onSubmit={submit}>
@@ -203,18 +254,23 @@ export default function SearchView({
           className="input"
           placeholder={
             mode === "describe"
-              ? "Describe a sound: “keyboard typing”, “a dog barking”, “music”…"
+              ? "Describe a sound…"
               : mode === "classes"
-                ? "Class name: “speech” matches “Male speech, man speaking”…"
+                ? "Class name…"
                 : mode === "frames"
-                  ? "Describe a scene: “a whiteboard”, “someone holding a tissue”, “a street at night”…"
-                  : 'Words that were said. Supports "quoted phrases", -exclude, or'
+                  ? "Describe a scene…"
+                  : "What was said…"
           }
           value={q}
           onChange={(e) => setQ(e.target.value)}
           list={mode === "classes" ? "known-labels" : undefined}
           autoFocus
         />
+        {mode === "transcripts" && (
+          <span className="search-help" title={'Use "quoted phrases", -exclude, and OR between words.'} aria-label="Search syntax">
+            ?
+          </span>
+        )}
         {mode === "classes" && (
           <datalist id="known-labels">
             {known.map((row) => (
@@ -247,14 +303,12 @@ export default function SearchView({
                 <button
                   key={row.label}
                   className="chip as-button"
-                  title={`${row.windows} windows · best ${(row.best * 100).toFixed(0)}%`}
                   onClick={() => {
                     setQ(row.label)
                     void run(row.label)
                   }}
                 >
                   {row.label}
-                  <span className="chip-count">{row.windows}</span>
                 </button>
               ))}
             </div>
@@ -267,7 +321,7 @@ export default function SearchView({
         <div className="fuzzy-note">No exact matches. Showing close spellings.</div>
       )}
       {frames && frames.length === 0 && <div className="empty">No matching photos or video.</div>}
-      {frames && frames.length > 0 && <FrameResults hits={frames} onOpen={onOpen} />}
+      {frames && frames.length > 0 && <FrameResults hits={frames} onOpen={onOpen} stamp={stamp} />}
       {results && results.length === 0 && (
         <div className="empty">
           {mode === "transcripts" ? "Nothing like that was said." : "No matching audio."}
@@ -275,7 +329,7 @@ export default function SearchView({
       )}
       {results && results.length > 0 && (
         <div className="list">
-          {results.map((hit, rank) => {
+          {results.map((hit) => {
             const clip = {
               key: hit.artifactId,
               sessionId: hit.sessionId,
@@ -290,14 +344,10 @@ export default function SearchView({
                 title="Open the moment"
               >
                 <ClipButton clip={clip} />
-                {hit.headline === null && hit.segments === null && (
-                  <span className="rank">#{rank + 1}</span>
-                )}
                 <div className="row-main">
                   <span className="row-title">
                     {hit.headline && <span className="match-label">{hit.headline} · </span>}
-                    {fmtClock(hit.startMs)} – {fmtClock(hit.endMs)}
-                    <span className="row-dim"> in {shortId(hit.sessionId)}</span>
+                    {stamp(hit.sessionId, hit.startMs)}
                     {hit.speaker && <span className="row-dim"> · {hit.speaker}</span>}
                   </span>
                   {hit.segments && (
@@ -322,14 +372,15 @@ export default function SearchView({
                   )}
                 </div>
                 <button
-                  className="btn ghost slim row-alt"
-                  title="Open the full recording at this point"
+                  className="btn ghost slim row-alt icon-only"
+                  title="Open full recording"
+                  aria-label="Open full recording"
                   onClick={(e) => {
                     e.stopPropagation()
                     onOpenRecording(hit.sessionId, hit.startMs)
                   }}
                 >
-                  Recording
+                  ↗
                 </button>
                 <ClipProgress clip={clip} />
               </div>

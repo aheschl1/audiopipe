@@ -20,7 +20,9 @@ import Gate from "./components/Gate"
 import GeoMap from "./components/GeoMap"
 import Home from "./components/Home"
 import MomentsPage from "./components/MomentsPage"
+import Menu from "./components/Menu"
 import MomentView from "./components/MomentView"
+import Overview from "./components/Overview"
 import ReadOnlyNotice from "./components/ReadOnlyNotice"
 import Tour, { tourSeen } from "./components/Tour"
 import { DEMO_EMAIL } from "./demo"
@@ -32,31 +34,16 @@ import SpeakerMap from "./components/SpeakerMap"
 import SpeakersView from "./components/SpeakersView"
 import { useSearchParam } from "./useParam"
 
-type NavItem = { to: string; label: string; match: (path: string, view: string | null) => boolean }
+type NavItem = { to: string; label: string; match: (path: string) => boolean }
 
-// Primary destinations are about your life; the second group is raw recordings and
-// model tooling, kept reachable while the app moves off sessions.
+// Recordings, the voice map, Places and A/B are off the nav: reached from moments, People and recordings.
 const NAV: NavItem[] = [
-  { to: "/", label: "Moments", match: (path) => path === "/" || path.startsWith("/moments") },
-  { to: "/search", label: "Search", match: (path) => path === "/search" },
-  {
-    to: "/speakers",
-    label: "People",
-    match: (path, view) => path === "/speakers" && view !== "map",
-  },
-  { to: "/map", label: "Places", match: (path) => path === "/map" },
-]
-
-const NAV_TOOLS: NavItem[] = [
-  { to: "/sessions", label: "Recordings", match: (path) => path.startsWith("/sessions") },
-  {
-    to: "/speakers?view=map",
-    label: "Voice map",
-    match: (path, view) => path === "/speakers" && view === "map",
-  },
+  { to: "/", label: "Dashboard", match: (path) => path === "/" },
+  { to: "/moments", label: "Moments", match: (path) => path.startsWith("/moments") },
   { to: "/automations", label: "Automations", match: (path) => path.startsWith("/automations") },
+  { to: "/search", label: "Search", match: (path) => path === "/search" },
+  { to: "/speakers", label: "People", match: (path) => path.startsWith("/speakers") },
 ]
-// A/B is off the nav (deprecation candidate); /ab stays reachable from a recording's header.
 
 function useNav() {
   const navigate = useNavigate()
@@ -93,7 +80,7 @@ function SessionRoute() {
       key={id}
       sessionId={id}
       seekMs={params.has("t") && Number.isFinite(t) ? t : undefined}
-      onBack={() => back("/sessions")}
+      onBack={() => back("/")}
       onOpenSession={openSession}
       onAb={openAb}
     />
@@ -120,7 +107,7 @@ function MomentRoute() {
       key={id}
       momentId={id}
       target={target.item || target.sessionId ? target : undefined}
-      onBack={() => back("/")}
+      onBack={() => back("/moments")}
       // Stepping replaces history, so the breadcrumb still returns to the feed.
       onNeighbour={(next) => openMoment(next, true)}
       onOpenSession={openSession}
@@ -135,9 +122,15 @@ function AbVoteRoute() {
 }
 
 function SpeakersPage() {
-  const { openSession } = useNav()
+  const { openAt } = useNav()
   const [sub] = useSearchParam("view", "list")
-  return sub === "map" ? <SpeakerMap onOpen={openSession} /> : <SpeakersView onOpen={openSession} />
+  if (sub === "map") return <Navigate to="/speakers/map" replace />
+  return <SpeakersView onOpen={(id, ms, artifactId) => void openAt(id, ms, artifactId)} />
+}
+
+function VoiceMapPage() {
+  const { openSession } = useNav()
+  return <SpeakerMap onOpen={openSession} />
 }
 
 export default function App() {
@@ -216,9 +209,8 @@ export default function App() {
     )
   }
 
-  const view = new URLSearchParams(location.search).get("view")
   const navLink = (item: NavItem) => {
-    const active = item.match(location.pathname, view)
+    const active = item.match(location.pathname)
     return (
       <Link
         key={item.to}
@@ -231,10 +223,11 @@ export default function App() {
     )
   }
   const wide =
+    location.pathname === "/" ||
     location.pathname === "/map" ||
     location.pathname.startsWith("/sessions/") ||
     location.pathname.startsWith("/moments/") ||
-    (location.pathname === "/speakers" && view === "map")
+    location.pathname === "/speakers/map"
 
   return (
     <div className={`app ${touring ? "touring" : ""}`}>
@@ -249,36 +242,42 @@ export default function App() {
         </Link>
         <div className="nav-items">
           {NAV.map((item) => navLink(item))}
-          <span className="nav-group-label">Recordings &amp; tools</span>
-          {NAV_TOOLS.map((item) => navLink(item))}
         </div>
         <div className="nav-foot">
-          {me && <span className="whoami">{me.user.display_name ?? me.user.email}</span>}
-          {me?.user.email === DEMO_EMAIL && !touring && (
-            <button className="btn ghost slim" onClick={() => setTouring(true)}>
-              Take the tour
-            </button>
-          )}
-          <button
-            className="btn ghost slim"
-            onClick={() => {
-              void api.DELETE("/v1/auth/session").finally(() => setAuthed(false))
-            }}
-          >
-            Log out
-          </button>
+          <Link to="/map" className={`nav-quiet ${location.pathname === "/map" ? "active" : ""}`}>
+            Map
+          </Link>
+          <Menu
+            label="Account"
+            trigger={
+              <>
+                <span className="whoami">{me?.user.display_name ?? me?.user.email}</span>
+                <span aria-hidden="true">⋯</span>
+              </>
+            }
+            items={[
+              ...(me?.user.email === DEMO_EMAIL && !touring
+                ? [{ label: "Take the tour", onSelect: () => setTouring(true) }]
+                : []),
+              {
+                label: "Log out",
+                onSelect: () => void api.DELETE("/v1/auth/session").finally(() => setAuthed(false)),
+              },
+            ]}
+          />
         </div>
       </nav>
 
       <main className={`main ${wide ? "wide" : ""}`}>
         <Routes>
-          <Route path="/" element={<MomentsPage />} />
-          <Route path="/moments" element={<Navigate to="/" replace />} />
+          <Route path="/" element={<Overview />} />
+          <Route path="/moments" element={<MomentsPage />} />
           <Route path="/moments/:id" element={<MomentRoute />} />
           <Route path="/sessions" element={<SessionList onOpen={openSession} />} />
           <Route path="/sessions/:id" element={<SessionRoute />} />
           <Route path="/search" element={<SearchView onOpen={openAt} onOpenRecording={openSession} />} />
           <Route path="/speakers" element={<SpeakersPage />} />
+          <Route path="/speakers/map" element={<VoiceMapPage />} />
           <Route path="/map" element={<GeoMap onOpen={openSession} />} />
           <Route path="/automations" element={<AutomationsPage />} />
           <Route path="/automations/new" element={<NewAutomation />} />
