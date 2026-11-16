@@ -41,6 +41,37 @@
   color: var(--faint);
 }
 
+/* While touring: a full-width bar in the logo's light red, and the layout shifted below it. */
 .tour-note {
-  margin-bottom: var(--sp-4);
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 55;
+  height: var(--tour-note-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--gutter);
+  background: var(--red-line);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  text-align: center;
+}
+
+.app {
+  --tour-note-h: 36px;
+}
+
+.app.touring {
+  padding-top: var(--tour-note-h);
+}
+
+.app.touring .sidebar {
+  top: var(--tour-note-h);
+}
+
+@media (min-width: 900px) {
+  .app.touring .sidebar {
+    height: calc(100vh - var(--tour-note-h));
+  }
 }
