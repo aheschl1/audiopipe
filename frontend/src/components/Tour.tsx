@@ -23,18 +23,18 @@ const STEPS: Step[] = [
   {
     path: "/",
     anchor: ["a.moment"],
-    text: "A mechanic wore smart glasses through one customer visit. Context turned it into this moment. Open it to see what happened.",
+    text: "A mechanic wore smart glasses through one customer visit. Context (this platform) automatically built this moment. Let\u2019s look at the details.",
     done: (path) => path.startsWith("/moments/"),
   },
   {
     path: () => document.querySelector("a.moment")?.getAttribute("href"),
     anchor: [".moment-head-summary", ".moment-head-title"],
-    text: "Written from what the glasses heard and saw. Nobody typed anything.",
+    text: "This summary is written from what the glasses heard and saw. Nobody typed anything.",
   },
   {
     anchor: [".ev-aside"],
     select: CV_BOOT,
-    text: "Every line links to its proof. Here, \u201cCV boot is torn\u201d is tied to the frame where you can see the tear.",
+    text: "Things that were said are linked to their proof. Here, \u201cCV boot is torn\u201d is tied to the frame where you can see the tear.",
   },
   {
     anchor: [".moment-automations"],
@@ -63,7 +63,7 @@ const STEPS: Step[] = [
   {
     path: "/automations",
     anchor: [".auto-table"],
-    text: "Automations watch for the moments you care about and do the paperwork.",
+    text: "Automations kick off actions when anything you specify happens.",
   },
   { text: "Replay the tour anytime from the menu. Feedback: ajheschl@gmail.com" },
 ]
