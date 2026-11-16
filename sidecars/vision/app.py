@@ -63,6 +63,11 @@ def _run(fn):
             raise HTTPException(503, f"model unavailable: {exc}") from exc
         try:
             return fn(*loaded)
+        except Exception as exc:
+            # Inference faults (CUDA OOM on the shared GPU) are the service's,
+            # not the input's: 503 lets the worker refund the attempt.
+            logger.exception("inference failed")
+            raise HTTPException(503, f"inference failed: {exc}") from exc
         finally:
             _last_used = time.monotonic()
 
@@ -76,11 +81,14 @@ def _normalized(features) -> list[list[float]]:
     return features.cpu().tolist()
 
 
-def _embed_images(blobs: list[bytes]) -> list[list[float]]:
-    import torch
+def _decode(blobs: list[bytes]) -> list:
     from PIL import Image
 
-    images = [Image.open(io.BytesIO(b)).convert("RGB") for b in blobs]
+    return [Image.open(io.BytesIO(b)).convert("RGB") for b in blobs]
+
+
+def _embed_images(images: list) -> list[list[float]]:
+    import torch
 
     def run(processor, model, device, dtype):
         out: list[list[float]] = []
@@ -137,14 +145,11 @@ def models() -> dict:
 def images(files: list[UploadFile]) -> dict:
     if not files:
         raise HTTPException(422, "no files")
-    blobs = [f.file.read() for f in files]
     try:
-        embeddings = _embed_images(blobs)
-    except HTTPException:
-        raise
+        images = _decode([f.file.read() for f in files])
     except Exception as exc:
         raise HTTPException(422, f"undecodable image: {exc}") from exc
-    return {"embeddings": embeddings, "model": MODEL_ID}
+    return {"embeddings": _embed_images(images), "model": MODEL_ID}
 
 
 class TextRequest(BaseModel):
