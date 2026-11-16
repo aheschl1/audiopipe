@@ -14,7 +14,7 @@ export default function ReadOnlyNotice() {
 
   return (
     <div className={`ro-notice ${shown ? "on" : ""}`} role="status" aria-hidden={!shown}>
-      Read-only demo. That change wasn't saved.
+      Read-only
     </div>
   )
 }
