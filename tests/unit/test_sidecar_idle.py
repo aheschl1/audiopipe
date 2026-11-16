@@ -167,11 +167,31 @@ def test_exit_mode_starts_lazy_and_healthy(tagger, monkeypatch) -> None:
             pass
 
     monkeypatch.setattr(tagger, "IDLE_UNLOAD_EXIT", True)
+    monkeypatch.setattr(tagger, "IDLE_UNLOAD_SECONDS", 600)
     monkeypatch.setattr(tagger.threading, "Thread", FakeThread)
     tagger._startup()
     assert tagger._state == "idle"
     assert tagger._load_models_locked not in spawned
     assert tagger.health().status_code == 200
+
+
+def test_exit_mode_without_a_timeout_preloads(tagger, monkeypatch) -> None:
+    # Seconds 0 means "keep resident", so exit mode has nothing to be lazy for.
+    spawned = []
+
+    class FakeThread:
+        def __init__(self, *, target, daemon):
+            spawned.append(target)
+
+        def start(self) -> None:
+            pass
+
+    monkeypatch.setattr(tagger, "IDLE_UNLOAD_EXIT", True)
+    monkeypatch.setattr(tagger, "IDLE_UNLOAD_SECONDS", 0)
+    monkeypatch.setattr(tagger.threading, "Thread", FakeThread)
+    tagger._startup()
+    assert tagger._state == "loading"
+    assert spawned == [tagger._load_models_locked]
 
 
 def test_health_is_200_when_idle_unloaded(tagger, monkeypatch) -> None:

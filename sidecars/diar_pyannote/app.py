@@ -234,7 +234,7 @@ def _load_model_locked() -> None:
 @app.on_event("startup")
 def _startup() -> None:
     global _state
-    if IDLE_UNLOAD_EXIT:
+    if IDLE_UNLOAD_EXIT and IDLE_UNLOAD_SECONDS > 0:
         _state = "idle"  # lazy: zero GPU until the first request loads
     else:
         threading.Thread(target=_load_model_locked, daemon=True).start()
