@@ -1,9 +1,10 @@
 import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useLocation, useNavigate } from "react-router"
+import { api } from "../api/client"
 
 type Step = {
   // Where the step lives; a function runs on arrival, so it can read the page it leaves.
-  path?: string | (() => string | null | undefined)
+  path?: string | (() => string | null | undefined | Promise<string | null | undefined>)
   // First selector that matches is the anchor; none (or no match) centres the bubble.
   anchor?: string[]
   text: string
@@ -41,7 +42,15 @@ const STEPS: Step[] = [
   },
   { path: "/search", anchor: [".search-bar"], text: "Search everything by what was said or what was seen." },
   { path: "/speakers", anchor: [".speaker-row", ".list"], text: "People: every voice, recognized across recordings." },
-  { path: "/map", anchor: [".geo-map-wrap", ".geo-view"], text: "Places: where each recording happened." },
+  {
+    path: async () => {
+      const { data } = await api.GET("/v1/sessions", { params: { query: { limit: 1, offset: 0 } } })
+      const id = data?.items[0]?.id
+      return id ? `/sessions/${id}` : "/sessions"
+    },
+    anchor: [".timeline-wrap", ".session-main"],
+    text: "Recordings: the raw timeline, for detailed insight.",
+  },
   {
     path: "/automations",
     anchor: [".auto-table"],
@@ -103,8 +112,13 @@ export default function Tour({ onClose }: { onClose: () => void }) {
   const next = () => (last ? close() : setIndex((i) => i + 1))
 
   useEffect(() => {
-    const target = typeof step.path === "function" ? step.path() : step.path
-    if (target && target !== location.pathname) navigate(target)
+    let stale = false
+    void Promise.resolve(typeof step.path === "function" ? step.path() : step.path).then((target) => {
+      if (!stale && target && target !== location.pathname) navigate(target)
+    })
+    return () => {
+      stale = true
+    }
     // Only on arrival at a step; later navigation is the visitor's own.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index])
