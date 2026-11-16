@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react"
+import { Link } from "react-router"
 import { api } from "../api/client"
 
 // Full-screen login card; the app renders nothing else until authed.
@@ -26,9 +27,11 @@ export default function Gate({ onAuthed }: { onAuthed: () => void }) {
     <div className="gate">
       <form className="gate-card" onSubmit={submit}>
         <h1 className="gate-title">
-          <img className="brand-lockup" src="/lockup.svg" alt="Context" />
+          <Link to="/">
+            <img className="brand-lockup" src="/lockup.svg" alt="Context" />
+          </Link>
         </h1>
-        <div className="gate-subtitle">What you saw and heard, indexed</div>
+        <div className="gate-subtitle">Context for everyday, built for smart glasses</div>
         <input
           className="input"
           type="email"

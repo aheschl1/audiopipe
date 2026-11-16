@@ -346,6 +346,15 @@
   border-color: var(--line);
 }
 
+.speaker-chip.static {
+  cursor: default;
+}
+
+.speaker-chip.static:hover {
+  background: none;
+  border-color: transparent;
+}
+
 .speaker-chip.unresolved {
   color: var(--muted);
   font-weight: var(--fw-regular);

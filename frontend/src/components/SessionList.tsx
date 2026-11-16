@@ -2,6 +2,7 @@ import { useCallback, useState } from "react"
 import { api, type SessionRead } from "../api/client"
 import { dayKey, dayLabel, fmtDuration, shortId, timeOfDay } from "../format"
 import { usePoll } from "../hooks/usePoll"
+import { useReadOnly } from "../readOnly"
 import PageHead from "./PageHead"
 
 const PAGE = 50
@@ -23,6 +24,7 @@ export default function SessionList({ onOpen }: { onOpen: (id: string) => void }
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [splitting, setSplitting] = useState(false)
+  const readOnly = useReadOnly()
 
   // The poll refreshes the first page only; pages loaded via "more" stay as
   // they are (newest-first offsets shift as sessions arrive — good enough
@@ -76,7 +78,7 @@ export default function SessionList({ onOpen }: { onOpen: (id: string) => void }
           `${sessions.length}${hasMore ? "+" : ""} recorded${live ? ` · ${live} live` : ""}`
         }
       >
-        {live > 0 && (
+        {live > 0 && !readOnly && (
           <button
             className="btn slim"
             title="End every live session and start processing. Connected recorders reopen."

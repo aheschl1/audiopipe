@@ -553,6 +553,12 @@
   color: var(--muted);
 }
 
+.strip-head-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .strip-head-tags {
   font-size: var(--fs-2xs);
   color: var(--muted);

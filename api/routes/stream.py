@@ -210,6 +210,7 @@ _DENIALS = {
     "unauthorized": (401, "a valid bearer token is required"),
     "not_found": (404, "recording session not found"),
     "ended": (409, "recording session has ended"),
+    "read_only": (403, "this account is read-only"),
 }
 
 # In hello-token mode the socket is already accepted, so failures are close
@@ -218,6 +219,7 @@ _HELLO_CLOSE_CODES = {
     "unauthorized": 1008,
     "not_found": CLOSE_SESSION_NOT_FOUND,
     "ended": CLOSE_SESSION_ENDED,
+    "read_only": 1008,
 }
 
 
@@ -227,6 +229,8 @@ async def _attach(session_id: UUID, token: str | None) -> _Attachment:
         user = await authenticate_token(pipe, token)
         if user is None:
             return _Attachment(None, 0, "unauthorized")
+        if user.read_only:
+            return _Attachment(None, 0, "read_only")
         session = await pipe.sessions.get(session_id)
         if session is None or session.user_id != user.id:
             return _Attachment(None, 0, "not_found")

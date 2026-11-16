@@ -19,6 +19,8 @@ class User(BaseModel):
     email: EmailStr
     display_name: str | None = None
     is_active: bool
+    # Signs in and reads, but every write is refused (the public demo account).
+    read_only: bool = False
     created_at: datetime
     updated_at: datetime
 

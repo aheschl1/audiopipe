@@ -127,7 +127,7 @@ export default function TimelineStrip({
   follow: boolean
   onFollowChange: (follow: boolean) => void
   onSeek: (ms: number, play: boolean) => void
-  onSpeakersChanged: () => void
+  onSpeakersChanged?: () => void
   mapOpen?: boolean
   onMapToggle?: () => void
   onOpenImage?: (segmentId: string) => void
@@ -571,7 +571,7 @@ export default function TimelineStrip({
                   className="speaker-dot"
                   style={{ background: categoryColor(lane.label) }}
                 />
-                {lane.label}
+                <span className="strip-head-label">{lane.label}</span>
               </span>
               <span className="strip-talk">{lane.peak.toFixed(2)}</span>
             </div>

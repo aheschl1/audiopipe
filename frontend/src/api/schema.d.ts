@@ -3699,6 +3699,8 @@ export interface components {
             email: string;
             /** Display Name */
             display_name: string | null;
+            /** Read Only */
+            read_only: boolean;
             /**
              * Created At
              * Format: date-time

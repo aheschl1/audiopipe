@@ -16,9 +16,11 @@ import AbOverview from "./components/AbOverview"
 import AbVoteView from "./components/AbVoteView"
 import Gate from "./components/Gate"
 import GeoMap from "./components/GeoMap"
+import Home from "./components/Home"
 import MomentsPage from "./components/MomentsPage"
 import MomentView from "./components/MomentView"
 import { preloadMapLibre } from "./map/trackMap"
+import { ReadOnlyContext } from "./readOnly"
 import SearchView from "./components/SearchView"
 import SessionList from "./components/SessionList"
 import SessionView from "./components/SessionView"
@@ -136,6 +138,7 @@ export default function App() {
   const [unreachable, setUnreachable] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const location = useLocation()
+  const navigate = useNavigate()
   const { openSession, openAt, openAb } = useNav()
 
   useEffect(() => {
@@ -187,7 +190,18 @@ export default function App() {
       </div>
     )
   }
-  if (!authed) return <Gate onAuthed={() => setAuthed(true)} />
+  // Signed out: the landing page at /, the sign-in card anywhere else so deep links stay direct.
+  if (!authed) {
+    if (location.pathname === "/") return <Home onAuthed={() => setAuthed(true)} />
+    return (
+      <Gate
+        onAuthed={() => {
+          if (location.pathname === "/login") navigate("/", { replace: true })
+          setAuthed(true)
+        }}
+      />
+    )
+  }
 
   const view = new URLSearchParams(location.search).get("view")
   const navLink = (item: NavItem) => {
@@ -210,6 +224,7 @@ export default function App() {
     (location.pathname === "/speakers" && view === "map")
 
   return (
+    <ReadOnlyContext.Provider value={me?.user.read_only ?? false}>
     <div className="app">
       <nav className="sidebar" aria-label="Main">
         <Link to="/" className="brand">
@@ -222,6 +237,7 @@ export default function App() {
         </div>
         <div className="nav-foot">
           {me && <span className="whoami">{me.user.display_name ?? me.user.email}</span>}
+          {me?.user.read_only && <span className="chip">Read-only</span>}
           <button
             className="btn ghost slim"
             onClick={() => {
@@ -249,5 +265,6 @@ export default function App() {
         </Routes>
       </main>
     </div>
+    </ReadOnlyContext.Provider>
   )
 }

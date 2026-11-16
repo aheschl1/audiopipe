@@ -3,6 +3,7 @@ import { api, type SessionRead } from "../api/client"
 import { stopClip } from "../clipPlayer"
 import { fmtDate, fmtDuration, shortId } from "../format"
 import { usePlayhead } from "../hooks/usePlayhead"
+import { useReadOnly } from "../readOnly"
 import { useSessionEvents } from "../hooks/useSessionEvents"
 import { imageEvents } from "../visual"
 import AudioPlayer from "./AudioPlayer"
@@ -34,6 +35,7 @@ export default function SessionView({
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [splitting, setSplitting] = useState(false)
+  const readOnly = useReadOnly()
   // The audio element as state (not a ref): the strip and playhead hooks
   // need to re-subscribe when it mounts.
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null)
@@ -197,7 +199,7 @@ export default function SessionView({
               </button>
             </form>
           )}
-          {draft === null && (
+          {draft === null && !readOnly && (
             <div className="page-actions">
               <button
                 className="btn ghost slim"

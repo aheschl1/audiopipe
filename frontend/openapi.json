@@ -9948,6 +9948,10 @@
             ],
             "title": "Display Name"
           },
+          "read_only": {
+            "type": "boolean",
+            "title": "Read Only"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -9959,6 +9963,7 @@
           "id",
           "email",
           "display_name",
+          "read_only",
           "created_at"
         ],
         "title": "UserRead",

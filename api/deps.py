@@ -43,6 +43,10 @@ _CSRF = HTTPException(
     detail=f"cookie-authenticated writes need the {CSRF_HEADER} header",
 )
 
+_READ_ONLY = HTTPException(
+    status_code=status.HTTP_403_FORBIDDEN, detail="this account is read-only"
+)
+
 _Bearer = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]
 _Cookie = Annotated[str | None, Depends(_cookie)]
 
@@ -105,6 +109,8 @@ async def _authenticate(
     user = await authenticate_bearer(secret)
     if user is None:
         raise _UNAUTHENTICATED
+    if user.read_only and request.method not in _SAFE_METHODS:
+        raise _READ_ONLY
     return user
 
 

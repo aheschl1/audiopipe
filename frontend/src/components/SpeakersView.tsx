@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { useReadOnly } from "../readOnly"
 import { useSearchParam } from "../useParam"
 import {
   api,
@@ -160,6 +161,7 @@ function MergeMenu({
   busy: boolean
   onMerge: (survivor: SpeakerRead) => void
 }) {
+  const readOnly = useReadOnly()
   const [open, setOpen] = useState(false)
   const [candidates, setCandidates] = useState<SimilarSpeakerRead[] | null>(null)
   const [target, setTarget] = useState<SimilarSpeakerRead | null>(null)
@@ -194,6 +196,7 @@ function MergeMenu({
     }
   }
 
+  if (readOnly) return null
   return (
     <div className="filter-menu" ref={root}>
       <button className="btn ghost slim" onClick={() => void toggle()}>
@@ -280,6 +283,7 @@ function MoveMenu({
   busy: boolean
   onMove: (targetId: string | null, name: string | null) => void
 }) {
+  const readOnly = useReadOnly()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const root = useRef<HTMLDivElement | null>(null)
@@ -300,6 +304,7 @@ function MoveMenu({
     }
   }, [open])
 
+  if (readOnly) return null
   return (
     <div className="filter-menu" ref={root}>
       <button className="btn ghost slim" onClick={() => setOpen((o) => !o)}>
@@ -366,6 +371,7 @@ export default function SpeakersView({
 }: {
   onOpen: (id: string, seekMs?: number) => void
 }) {
+  const readOnly = useReadOnly()
   const [speakers, setSpeakers] = useState<SpeakerRead[] | null>(null)
   // The expanded speaker and its tab live in the URL so a speaker is linkable.
   const [expandedParam, setExpandedParam] = useSearchParam("speaker", "")
@@ -592,12 +598,14 @@ export default function SpeakersView({
             : `${speakers.length} voice${speakers.length === 1 ? "" : "s"}, named first`
         }
       >
-        <button
-          className={`btn ghost slim ${panelOpen ? "filtered" : ""}`}
-          onClick={() => setPanelOpen((o) => !o)}
-        >
-          clustering settings ▾
-        </button>
+        {!readOnly && (
+          <button
+            className={`btn ghost slim ${panelOpen ? "filtered" : ""}`}
+            onClick={() => setPanelOpen((o) => !o)}
+          >
+            clustering settings ▾
+          </button>
+        )}
       </PageHead>
       {panelOpen && params && (
         <ClusterPanel
@@ -654,15 +662,17 @@ export default function SpeakersView({
                       {speaker.sessions} session{speaker.sessions === 1 ? "" : "s"} ·{" "}
                       {speaker.embeddings} voice-print{speaker.embeddings === 1 ? "" : "s"}
                     </span>
-                    <button
-                      className="btn ghost slim"
-                      onClick={() => {
-                        setEditing(speaker.id)
-                        setDraft(speaker.name ?? "")
-                      }}
-                    >
-                      Rename
-                    </button>
+                    {!readOnly && (
+                      <button
+                        className="btn ghost slim"
+                        onClick={() => {
+                          setEditing(speaker.id)
+                          setDraft(speaker.name ?? "")
+                        }}
+                      >
+                        Rename
+                      </button>
+                    )}
                     <MergeMenu
                       speaker={speaker}
                       busy={busy}
