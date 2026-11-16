@@ -14,6 +14,7 @@ import { api, type MeRead } from "./api/client"
 import { momentAt } from "./api/moments"
 import AbOverview from "./components/AbOverview"
 import AbVoteView from "./components/AbVoteView"
+import AutomationsPage from "./components/AutomationsPage"
 import Gate from "./components/Gate"
 import GeoMap from "./components/GeoMap"
 import Home from "./components/Home"
@@ -50,6 +51,7 @@ const NAV_TOOLS: NavItem[] = [
     label: "Voice map",
     match: (path, view) => path === "/speakers" && view === "map",
   },
+  { to: "/automations", label: "Automations", match: (path) => path === "/automations" },
 ]
 // A/B is off the nav (deprecation candidate); /ab stays reachable from a recording's header.
 
@@ -259,6 +261,7 @@ export default function App() {
           <Route path="/search" element={<SearchView onOpen={openAt} onOpenRecording={openSession} />} />
           <Route path="/speakers" element={<SpeakersPage />} />
           <Route path="/map" element={<GeoMap onOpen={openSession} />} />
+          <Route path="/automations" element={<AutomationsPage />} />
           <Route path="/ab" element={<AbOverview onVote={openAb} />} />
           <Route path="/ab/:id" element={<AbVoteRoute />} />
           <Route path="*" element={<Navigate to="/" replace />} />

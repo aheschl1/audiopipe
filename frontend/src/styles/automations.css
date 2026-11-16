@@ -1,0 +1,194 @@
+/* App layer: the automations page. */
+
+.automations-page {
+  max-width: 760px;
+}
+
+.auto-list,
+.auto-runs ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.auto-rule {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+  border-bottom: var(--bw) solid var(--line);
+}
+
+.auto-rule.off .auto-rule-text {
+  opacity: 0.55;
+}
+
+.auto-rule-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.auto-rule-name {
+  font-weight: var(--fw-semibold);
+}
+
+.auto-rule-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-shrink: 0;
+}
+
+.auto-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.auto-check input {
+  accent-color: var(--red);
+}
+
+.auto-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  margin: var(--sp-3) 0;
+  border: var(--bw) solid var(--line-strong);
+  border-radius: var(--r-2);
+  background: var(--surface);
+}
+
+.auto-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.auto-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sp-2) var(--sp-3);
+}
+
+.auto-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.auto-row textarea {
+  resize: vertical;
+  font: inherit;
+}
+
+.auto-hint {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin: 0;
+}
+
+.auto-field {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 2fr auto;
+  gap: var(--sp-2);
+}
+
+.auto-add {
+  align-self: flex-start;
+}
+
+.auto-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+.auto-actions .auto-check {
+  margin-right: auto;
+}
+
+.auto-runs {
+  margin-top: var(--sp-6);
+}
+
+.auto-run {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  border-bottom: var(--bw) solid var(--line-faint);
+  font-size: var(--fs-sm);
+}
+
+.auto-run-when {
+  flex: 0 0 150px;
+  color: var(--muted);
+}
+
+.auto-run-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.auto-run-rule {
+  font-weight: var(--fw-medium);
+}
+
+.auto-failed {
+  color: var(--danger);
+}
+
+@media (max-width: 640px) {
+  .auto-rule {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .auto-field {
+    grid-template-columns: 1fr;
+  }
+
+  .auto-field .btn {
+    justify-self: start;
+  }
+
+  .auto-run {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .auto-run-when {
+    flex: none;
+  }
+}
+
+.auto-run .chip,
+.facts .chip {
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+.auto-run a,
+.fact dt a {
+  color: inherit;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 2px;
+}
+
+.auto-run a:hover,
+.fact dt a:hover {
+  text-decoration-color: currentColor;
+}

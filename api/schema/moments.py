@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from database.repos.moments import ArtifactLink, Moment
+from database.schema.automations import RunListing
 
 Relation = Literal["depicts", "mentions", "reads", "same_scene", "unrelated"]
 
@@ -143,9 +144,18 @@ class MomentRead(BaseModel):
         )
 
 
+class MomentAutomation(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    automation_id: UUID
+    name: str
+    fields: dict[str, str | None]
+
+
 class MomentDetail(MomentRead):
     items: list[MomentItem]
     links: list[MomentLink]
+    automations: list[MomentAutomation] = Field(description="Your automations that matched this moment.")
     previous_id: UUID | None = Field(description="Your moment just before this one.")
     next_id: UUID | None = Field(description="Your moment just after this one.")
 
@@ -156,11 +166,20 @@ class MomentDetail(MomentRead):
         links: list[ArtifactLink],
         previous_id: UUID | None,
         next_id: UUID | None,
+        automations: list[RunListing],
     ) -> "MomentDetail":
         return cls.from_model(
             moment,
             items=cls._items(moment),
             links=[MomentLink.from_model(link) for link in links],
+            automations=[
+                MomentAutomation(
+                    automation_id=run.automation_id,
+                    name=run.automation_name,
+                    fields=run.output.get("fields") or {},
+                )
+                for run in automations
+            ],
             previous_id=previous_id,
             next_id=next_id,
         )

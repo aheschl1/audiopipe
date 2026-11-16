@@ -13,6 +13,7 @@ from database.pipe import DatabasePipe
 from database.schema.jobs import Job, JobCreate
 from processing.base import Callback, Pipeline
 from processing.pipelines.audio_tag import AudioTagPipeline
+from processing.pipelines.automation import AutomationPipeline
 from processing.pipelines.conversation import ConversationPipeline
 from processing.pipelines.diarize import DiarizePipeline
 from processing.pipelines.moment import MomentPipeline
@@ -44,6 +45,7 @@ PIPELINES: tuple[type[Pipeline], ...] = (
     VideoProxyPipeline,
     KeyframePipeline,
     MomentPipeline,
+    AutomationPipeline,
 )
 
 

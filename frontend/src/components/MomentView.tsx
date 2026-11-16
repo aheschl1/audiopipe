@@ -376,6 +376,36 @@ function Facts({ moment }: { moment: MomentDetail }) {
   )
 }
 
+/** What the user's automations filled in for this moment, one row per rule. */
+function AutomationFacts({ moment }: { moment: MomentDetail }) {
+  if (!moment.automations.length) return null
+  return (
+    <dl className="facts">
+      {moment.automations.map((a) => {
+        const filled = Object.entries(a.fields).filter(([, v]) => v)
+        return (
+          <div key={a.automation_id} className="fact">
+            <dt className="section-label">
+              <Link to="/automations">{a.name}</Link>
+            </dt>
+            <dd className="chips">
+              {filled.length ? (
+                filled.map(([k, v]) => (
+                  <span key={k} className="chip">
+                    {k}: {v}
+                  </span>
+                ))
+              ) : (
+                <span className="chip">Matched</span>
+              )}
+            </dd>
+          </div>
+        )
+      })}
+    </dl>
+  )
+}
+
 /** The contributing recordings: an ingest detail, kept reachable but out of the way. */
 function Sources({ moment, onOpen }: { moment: MomentDetail; onOpen: Open }) {
   const per = new Map<string, { first: MomentItem; lines: number; images: number }>()
@@ -587,6 +617,7 @@ export default function MomentView({
         </div>
         {moment.summary && <p className="moment-head-summary">{moment.summary}</p>}
         <Facts moment={moment} />
+        <AutomationFacts moment={moment} />
       </header>
 
       <div className="evidence">

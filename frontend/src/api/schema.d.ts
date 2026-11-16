@@ -1231,6 +1231,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/automations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your automations, oldest first */
+        get: operations["list_automations_v1_automations_get"];
+        put?: never;
+        /**
+         * Create an automation
+         * @description It runs on moments created from now on, not on earlier ones.
+         */
+        post: operations["create_automation_v1_automations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/automations/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recent automation runs
+         * @description Newest first. Without ``automation_id``, only runs that matched or failed.
+         */
+        get: operations["list_runs_v1_automations_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/automations/{automation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One automation */
+        get: operations["get_automation_v1_automations__automation_id__get"];
+        /**
+         * Replace an automation
+         * @description Turning a rule back on doesn't catch it up on moments made while it was off.
+         */
+        put: operations["update_automation_v1_automations__automation_id__put"];
+        post?: never;
+        /** Delete an automation */
+        delete: operations["delete_automation_v1_automations__automation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1588,6 +1651,118 @@ export interface components {
              */
             score: number;
         };
+        /** AutomationRead */
+        AutomationRead: {
+            /** Name */
+            name: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Trigger
+             * @description Runs on each new moment.
+             * @default moment
+             * @constant
+             */
+            trigger: "moment";
+            conditions: components["schemas"]["Conditions-Output"];
+            /** Actions */
+            actions: components["schemas"]["ExtractAction-Output"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Active Since
+             * Format: date-time
+             * @description Only moments created after this are considered.
+             */
+            active_since: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** AutomationRunRead */
+        AutomationRunRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Automation Id
+             * Format: uuid
+             */
+            automation_id: string;
+            /** Automation Name */
+            automation_name: string;
+            /**
+             * Moment Id
+             * Format: uuid
+             */
+            moment_id: string;
+            /** Moment Title */
+            moment_title: string;
+            /**
+             * Moment Start At
+             * Format: date-time
+             */
+            moment_start_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "matched" | "skipped" | "failed";
+            /**
+             * Fields
+             * @description What an extract action filled in.
+             */
+            fields: {
+                [key: string]: string | null;
+            };
+            /**
+             * Reason
+             * @description Why the conditions did or didn't hold, when the model was asked.
+             */
+            reason: string | null;
+            /** Error */
+            error: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** AutomationWrite */
+        AutomationWrite: {
+            /** Name */
+            name: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Trigger
+             * @description Runs on each new moment.
+             * @default moment
+             * @constant
+             */
+            trigger: "moment";
+            conditions?: components["schemas"]["Conditions-Input"];
+            /** Actions */
+            actions: components["schemas"]["ExtractAction-Input"][];
+        };
         /** Body_upload_segment_v1_sessions__session_id__segments_post */
         Body_upload_segment_v1_sessions__session_id__segments_post: {
             /**
@@ -1665,6 +1840,50 @@ export interface components {
              * @description Voice-prints from less speech than this are not clustered.
              */
             min_talk_ms: number;
+        };
+        /**
+         * Conditions
+         * @description All set conditions must hold; the lists match when any entry does (case-insensitive).
+         */
+        "Conditions-Input": {
+            /** People */
+            people?: string[];
+            /** Topics */
+            topics?: string[];
+            /**
+             * Keywords
+             * @description Matched against the title, summary and transcript.
+             */
+            keywords?: string[];
+            /** Min Minutes */
+            min_minutes?: number | null;
+            /**
+             * Ask
+             * @description A yes/no question the model answers about the moment, e.g. 'is a deadline agreed?'.
+             */
+            ask?: string | null;
+        };
+        /**
+         * Conditions
+         * @description All set conditions must hold; the lists match when any entry does (case-insensitive).
+         */
+        "Conditions-Output": {
+            /** People */
+            people: string[];
+            /** Topics */
+            topics: string[];
+            /**
+             * Keywords
+             * @description Matched against the title, summary and transcript.
+             */
+            keywords: string[];
+            /** Min Minutes */
+            min_minutes: number | null;
+            /**
+             * Ask
+             * @description A yes/no question the model answers about the moment, e.g. 'is a deadline agreed?'.
+             */
+            ask: string | null;
         };
         /**
          * ConversationDetail
@@ -1925,6 +2144,52 @@ export interface components {
              * @description Who excluded it: ``manual`` or a filter name.
              */
             source: string;
+        };
+        /**
+         * ExtractAction
+         * @description Have the model fill these fields from the moment; they show on the moment page.
+         */
+        "ExtractAction-Input": {
+            /**
+             * Type
+             * @constant
+             */
+            type: "extract";
+            /** Fields */
+            fields: components["schemas"]["FieldSpec-Input"][];
+        };
+        /**
+         * ExtractAction
+         * @description Have the model fill these fields from the moment; they show on the moment page.
+         */
+        "ExtractAction-Output": {
+            /**
+             * Type
+             * @constant
+             */
+            type: "extract";
+            /** Fields */
+            fields: components["schemas"]["FieldSpec-Output"][];
+        };
+        /** FieldSpec */
+        "FieldSpec-Input": {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+        };
+        /** FieldSpec */
+        "FieldSpec-Output": {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
         };
         /**
          * FrameSearchRead
@@ -2246,6 +2511,20 @@ export interface components {
             /** Usage */
             usage: components["schemas"]["ResourceUsageRead"][];
         };
+        /** MomentAutomation */
+        MomentAutomation: {
+            /**
+             * Automation Id
+             * Format: uuid
+             */
+            automation_id: string;
+            /** Name */
+            name: string;
+            /** Fields */
+            fields: {
+                [key: string]: string | null;
+            };
+        };
         /** MomentCounts */
         MomentCounts: {
             /** Utterances */
@@ -2326,6 +2605,11 @@ export interface components {
             items: components["schemas"]["MomentItem"][];
             /** Links */
             links: components["schemas"]["MomentLink"][];
+            /**
+             * Automations
+             * @description Your automations that matched this moment.
+             */
+            automations: components["schemas"]["MomentAutomation"][];
             /**
              * Previous Id
              * @description Your moment just before this one.
@@ -6972,6 +7256,295 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MomentDetail"];
                 };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_automations_v1_automations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRead"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_automation_v1_automations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_runs_v1_automations_runs_get: {
+        parameters: {
+            query?: {
+                /** @description One rule's runs, skipped ones included. */
+                automation_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRunRead"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_automation_v1_automations__automation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_automation_v1_automations__automation_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_automation_v1_automations__automation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Unauthorized */
             401: {

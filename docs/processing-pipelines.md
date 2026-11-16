@@ -550,6 +550,28 @@ moment has no single session.
 With the default OpenAI base URL and no key the tier stays idle. To use a
 local server, set `PROCESSING_LLM_BASE_URL`; no key is needed.
 
+## The automation tier
+
+`automation` runs the user's rules (`/v1/automations`) on new moments. A rule
+has a trigger (only `moment` today), conditions that must all hold, and
+actions. The only action today, `extract`, has the model fill named fields,
+which show on the moment page.
+
+- **Conditions:** any of `people`, any of `topics`, any of `keywords` (whole
+  words in the title, summary or transcript), `min_minutes`, and `ask`, a
+  yes/no question for the model. The cheap ones run first; the model is asked
+  only when they pass, and one call answers `ask` and fills every field.
+
+Discovery pairs each enabled rule with moments created since it was turned on
+(`active_since`) and within `automation_lookback_hours`, so a new or
+re-enabled rule never sweeps the history. Each pair runs once and leaves a
+run: `matched`, `skipped` (with why) or `failed` (with the error; the job
+fails too, so the worker retries it). A rebuilt moment is a new row, so its
+rules run again and its fields are filled from the new version.
+
+Anyone talking near the recorder can steer the model's verdict and field
+values; treat them as untrusted text.
+
 ## Callbacks and chaining
 
 `Pipeline.__init__` takes an optional callback; `maybe_callback(job, result)`

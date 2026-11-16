@@ -5107,6 +5107,437 @@
           }
         }
       }
+    },
+    "/v1/automations": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Your automations, oldest first",
+        "operationId": "list_automations_v1_automations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AutomationRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Automations V1 Automations Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Create an automation",
+        "description": "It runs on moments created from now on, not on earlier ones.",
+        "operationId": "create_automation_v1_automations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/v1/automations/runs": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Recent automation runs",
+        "description": "Newest first. Without ``automation_id``, only runs that matched or failed.",
+        "operationId": "list_runs_v1_automations_runs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "One rule's runs, skipped ones included.",
+              "title": "Automation Id"
+            },
+            "description": "One rule's runs, skipped ones included."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AutomationRunRead"
+                  },
+                  "title": "Response List Runs V1 Automations Runs Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/automations/{automation_id}": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "One automation",
+        "operationId": "get_automation_v1_automations__automation_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Replace an automation",
+        "description": "Turning a rule back on doesn't catch it up on moments made while it was off.",
+        "operationId": "update_automation_v1_automations__automation_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Delete an automation",
+        "operationId": "delete_automation_v1_automations__automation_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "automation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Automation Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5834,6 +6265,215 @@
         "title": "AudioTagLabel",
         "description": "One scored sound-event class on a window."
       },
+      "AutomationRead": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "trigger": {
+            "type": "string",
+            "const": "moment",
+            "title": "Trigger",
+            "description": "Runs on each new moment.",
+            "default": "moment"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/Conditions-Output"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/ExtractAction-Output"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Actions"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "active_since": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Active Since",
+            "description": "Only moments created after this are considered."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "enabled",
+          "trigger",
+          "conditions",
+          "actions",
+          "id",
+          "active_since",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AutomationRead"
+      },
+      "AutomationRunRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "automation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Automation Id"
+          },
+          "automation_name": {
+            "type": "string",
+            "title": "Automation Name"
+          },
+          "moment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Moment Id"
+          },
+          "moment_title": {
+            "type": "string",
+            "title": "Moment Title"
+          },
+          "moment_start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Moment Start At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "matched",
+              "skipped",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "fields": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Fields",
+            "description": "What an extract action filled in."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the conditions did or didn't hold, when the model was asked."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "automation_id",
+          "automation_name",
+          "moment_id",
+          "moment_title",
+          "moment_start_at",
+          "status",
+          "fields",
+          "reason",
+          "error",
+          "created_at"
+        ],
+        "title": "AutomationRunRead"
+      },
+      "AutomationWrite": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "trigger": {
+            "type": "string",
+            "const": "moment",
+            "title": "Trigger",
+            "description": "Runs on each new moment.",
+            "default": "moment"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/Conditions-Input"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/ExtractAction-Input"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Actions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "actions"
+        ],
+        "title": "AutomationWrite"
+      },
       "Body_upload_segment_v1_sessions__session_id__segments_post": {
         "properties": {
           "file": {
@@ -5983,6 +6623,143 @@
         ],
         "title": "ClusterParamsValues",
         "description": "A complete, resolved set of clustering knobs."
+      },
+      "Conditions-Input": {
+        "properties": {
+          "people": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "People"
+          },
+          "topics": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Topics"
+          },
+          "keywords": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Keywords",
+            "description": "Matched against the title, summary and transcript."
+          },
+          "min_minutes": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1440.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Minutes"
+          },
+          "ask": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ask",
+            "description": "A yes/no question the model answers about the moment, e.g. 'is a deadline agreed?'."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Conditions",
+        "description": "All set conditions must hold; the lists match when any entry does (case-insensitive)."
+      },
+      "Conditions-Output": {
+        "properties": {
+          "people": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "People"
+          },
+          "topics": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Topics"
+          },
+          "keywords": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Keywords",
+            "description": "Matched against the title, summary and transcript."
+          },
+          "min_minutes": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1440.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Minutes"
+          },
+          "ask": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ask",
+            "description": "A yes/no question the model answers about the moment, e.g. 'is a deadline agreed?'."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "people",
+          "topics",
+          "keywords",
+          "min_minutes",
+          "ask"
+        ],
+        "title": "Conditions",
+        "description": "All set conditions must hold; the lists match when any entry does (case-insensitive)."
       },
       "ConversationDetail": {
         "properties": {
@@ -6483,6 +7260,103 @@
           "source"
         ],
         "title": "ExcludedUtterance"
+      },
+      "ExtractAction-Input": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "extract",
+            "title": "Type"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldSpec-Input"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Fields"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "fields"
+        ],
+        "title": "ExtractAction",
+        "description": "Have the model fill these fields from the moment; they show on the moment page."
+      },
+      "ExtractAction-Output": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "extract",
+            "title": "Type"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldSpec-Output"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Fields"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "fields"
+        ],
+        "title": "ExtractAction",
+        "description": "Have the model fill these fields from the moment; they show on the moment page."
+      },
+      "FieldSpec-Input": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "FieldSpec"
+      },
+      "FieldSpec-Output": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "FieldSpec"
       },
       "FrameSearchRead": {
         "properties": {
@@ -7129,6 +8003,40 @@
         "title": "MeRead",
         "description": "`GET /v1/me`: who the token belongs to, and what they have stored.\n\n``usage`` holds one entry per resource the caller has captured, ordered by\nresource name; a resource never captured has no entry."
       },
+      "MomentAutomation": {
+        "properties": {
+          "automation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Automation Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "fields": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "automation_id",
+          "name",
+          "fields"
+        ],
+        "title": "MomentAutomation"
+      },
       "MomentCounts": {
         "properties": {
           "utterances": {
@@ -7284,6 +8192,14 @@
             "type": "array",
             "title": "Links"
           },
+          "automations": {
+            "items": {
+              "$ref": "#/components/schemas/MomentAutomation"
+            },
+            "type": "array",
+            "title": "Automations",
+            "description": "Your automations that matched this moment."
+          },
           "previous_id": {
             "anyOf": [
               {
@@ -7329,6 +8245,7 @@
           "created_at",
           "items",
           "links",
+          "automations",
           "previous_id",
           "next_id"
         ],

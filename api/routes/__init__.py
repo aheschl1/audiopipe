@@ -2,6 +2,7 @@
 
 from api.routes import (
     auth,
+    automations,
     health,
     moments,
     resources,
@@ -15,6 +16,7 @@ from api.routes import (
 
 __all__ = [
     "auth",
+    "automations",
     "health",
     "moments",
     "resources",

@@ -123,13 +123,31 @@ def _moment_reply(request: dict) -> dict:
     }
 
 
+def _automation_reply(request: dict) -> dict:
+    """Applies when the moment mentions a deadline; fills each field with a stub value."""
+    text = request["messages"][1]["content"][0]["text"]
+    fields = re.findall(r'^- "([^"]+)"', text, re.MULTILINE)
+    content = {
+        "applies": "deadline" in text.split("MOMENT", 1)[1].lower(),
+        "reason": "stub verdict",
+        "fields": {name: f"stub {name}" for name in fields},
+    }
+    return {
+        "model": STUB_LLM_MODEL,
+        "choices": [{"message": {"role": "assistant", "content": json.dumps(content)}}],
+        "usage": {"total_tokens": 1},
+    }
+
+
 class _Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 (http.server's naming)
         length = int(self.headers.get("content-length", 0))
         body = self.rfile.read(length)
         url = urlparse(self.path)
         if url.path.endswith("/llm/chat/completions"):
-            payload = _moment_reply(json.loads(body))
+            request = json.loads(body)
+            automation = request["messages"][0]["content"].startswith("You check one moment")
+            payload = (_automation_reply if automation else _moment_reply)(request)
         elif "/vision/" in url.path:
             if url.path.endswith("/images/embeddings"):
                 count = body.count(b'name="files"')

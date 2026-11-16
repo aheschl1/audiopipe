@@ -71,4 +71,10 @@ async def get_moment(user: CurrentUser, pipe: Pipe, moment_id: UUID) -> MomentDe
     if moment is None:
         raise _NOT_FOUND
     previous_id, next_id = await pipe.moments.neighbours(moment)
-    return MomentDetail.build(moment, await pipe.moments.links(moment.id), previous_id, next_id)
+    return MomentDetail.build(
+        moment,
+        await pipe.moments.links(moment.id),
+        previous_id,
+        next_id,
+        await pipe.automations.matched_for_moment(moment.id),
+    )

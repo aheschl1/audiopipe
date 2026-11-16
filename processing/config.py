@@ -182,6 +182,10 @@ class ProcessingSettings(BaseSettings):
     moment_timezone: str | None = None
     moment_discover_interval_seconds: float = 60.0
 
+    # Automation tier: only moments created this recently are matched, which
+    # keeps discovery cheap.
+    automation_lookback_hours: float = 48.0
+
     @property
     def llm_enabled(self) -> bool:
         return bool(self.llm_api_key) or "api.openai.com" not in self.llm_base_url
