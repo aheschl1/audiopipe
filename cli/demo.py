@@ -41,7 +41,7 @@ SCENES = (
 
 # The account is read-only, so its example automation is seeded here.
 AUTOMATION = AutomationWrite.model_validate({
-    "name": "Service visit",
+    "name": "Work order",
     "conditions": {
         "ask": "Is this a vehicle service visit, such as a drop-off, an inspection or a repair quote?",
     },
@@ -114,7 +114,8 @@ async def _stream(ws_url: str, token: str, pcm: bytes, start: datetime, duration
             await ws.send(encode_audio_frame(sequence, chunk, at))
             sequence += 1
 
-        await ws.send(json.dumps({"type": "finish"}))
+        ended_at = start + timedelta(milliseconds=duration_ms)
+        await ws.send(json.dumps({"type": "finish", "ended_at": ended_at.isoformat()}))
         through = -1
         async for message in ws:
             if isinstance(message, bytes):

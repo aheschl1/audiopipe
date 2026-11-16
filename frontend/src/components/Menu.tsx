@@ -20,16 +20,16 @@ export default function Menu({
 
   useEffect(() => {
     if (!open) return
-    const onOutside = (event: MouseEvent) => {
+    const onOutside = (event: PointerEvent) => {
       if (root.current && !root.current.contains(event.target as Node)) setOpen(false)
     }
     const onEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false)
     }
-    document.addEventListener("mousedown", onOutside)
+    document.addEventListener("pointerdown", onOutside)
     document.addEventListener("keydown", onEscape)
     return () => {
-      document.removeEventListener("mousedown", onOutside)
+      document.removeEventListener("pointerdown", onOutside)
       document.removeEventListener("keydown", onEscape)
     }
   }, [open])

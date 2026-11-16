@@ -206,22 +206,31 @@
   stroke: none;
 }
 
-.hs-counter {
-  font-family: var(--font-mono);
-  font-size: 26px;
+.hs-card {
+  stroke: var(--line);
+  stroke-width: 1;
+  fill: var(--surface) !important;
+}
+
+.hs-card-rule {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.hs-card-title {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
   font-weight: var(--fw-semibold);
-  font-variant-numeric: tabular-nums;
   fill: var(--ink);
 }
 
-.hs-counter.landed {
-  fill: var(--red-ink);
+.hs-report-line {
+  stroke: var(--line-strong);
+  stroke-width: 3;
 }
 
-.hs-counter-sub {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  fill: var(--muted);
+.hs-report-line.writing {
+  stroke: var(--red);
 }
 
 .hs-wind line {

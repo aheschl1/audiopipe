@@ -9,7 +9,7 @@ import {
 } from "../api/client"
 import { fmtClock } from "../format"
 import { describePoint, fmtCoords } from "../location"
-import { describeSpan } from "../sounds"
+import { audible, describeSpan } from "../sounds"
 import { clipUrl, fmtWallTime, imageThumbUrl } from "../visual"
 import SpeakerChip from "./SpeakerChip"
 import TimelineFilter, { type EventKind } from "./TimelineFilter"
@@ -297,7 +297,8 @@ export default function Timeline({
         )
       }
       case "audio-tag": {
-        if (hidden.has("audio-tag") || event.labels.length === 0) return null
+        const tags = event.labels.filter((tag) => audible(tag.score))
+        if (hidden.has("audio-tag") || tags.length === 0) return null
         return (
           <div
             key={key}
@@ -312,7 +313,7 @@ export default function Timeline({
               {fmtClock(event.at_ms)}
             </button>
             <div className="event-body chips">
-              {event.labels.slice(0, 5).map((tag) => (
+              {tags.slice(0, 5).map((tag) => (
                 <span key={tag.label} className="chip">
                   {tag.label}
                 </span>
@@ -350,7 +351,7 @@ export default function Timeline({
         )
       }
       case "sound-span": {
-        if (hidden.has("sound-span")) return null
+        if (hidden.has("sound-span") || !audible(event.peak)) return null
         return (
           <div
             key={key}

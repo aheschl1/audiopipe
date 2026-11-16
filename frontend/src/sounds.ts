@@ -9,6 +9,11 @@ import { fmtClock } from "./format"
 export const SOUND_LANES_SHOWN = 5
 const MAX_SOUND_LANES = 24
 
+// Sound classes scoring below this are noise (a microwave in a service bay): hidden everywhere.
+export const MIN_SOUND_SCORE = 0.53
+
+export const audible = (score: number | null | undefined) => (score ?? 1) >= MIN_SOUND_SCORE
+
 export type SoundLane = {
   label: string
   coveredMs: number
@@ -22,7 +27,7 @@ export type SoundLane = {
 export function buildSoundLanes(events: TimelineEvent[]): SoundLane[] {
   const lanes = new Map<string, SoundLane>()
   for (const event of events) {
-    if (event.type !== "sound-span") continue
+    if (event.type !== "sound-span" || !audible(event.peak)) continue
     let lane = lanes.get(event.label)
     if (!lane) {
       lane = { label: event.label, coveredMs: 0, peak: 0, spans: [] }

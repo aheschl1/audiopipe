@@ -82,7 +82,7 @@ export default function Overview() {
       <div className="overview-grid">
         <section className="overview-section home-insights">
           <div className="overview-head">
-            <h2 className="section-label">Actions Triggered</h2>
+            <h2 className="section-label">Actions triggered</h2>
             <Link to="/automations" className="overview-more">
               All
             </Link>

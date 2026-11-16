@@ -1,5 +1,10 @@
 // The public demo account is read-only: the UI stays whole, the API refuses its writes,
 // and each refusal raises a small notice instead of an error.
+import { createContext } from "react"
+
+/** Whether the signed-in account is read-only, so pages can hide controls it can't use. */
+export const ReadOnlyContext = createContext(false)
+
 export const READ_ONLY_DETAIL = "this account is read-only"
 
 const listeners = new Set<() => void>()
