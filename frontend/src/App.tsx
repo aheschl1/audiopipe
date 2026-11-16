@@ -22,6 +22,8 @@ import Home from "./components/Home"
 import MomentsPage from "./components/MomentsPage"
 import MomentView from "./components/MomentView"
 import ReadOnlyNotice from "./components/ReadOnlyNotice"
+import Tour, { tourSeen } from "./components/Tour"
+import { DEMO_EMAIL } from "./demo"
 import { preloadMapLibre } from "./map/trackMap"
 import SearchView from "./components/SearchView"
 import SessionList from "./components/SessionList"
@@ -145,6 +147,7 @@ export default function App() {
   // The probe got neither a user nor a 401 (API restarting, network down).
   const [unreachable, setUnreachable] = useState(false)
   const [attempt, setAttempt] = useState(0)
+  const [touring, setTouring] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const { openSession, openAt, openAb } = useNav()
@@ -157,6 +160,7 @@ export default function App() {
   useEffect(() => {
     if (authed === false) {
       setMe(null)
+      setTouring(false)
       return
     }
     if (authed && me) return
@@ -167,6 +171,7 @@ export default function App() {
         if (data) {
           setMe(data)
           setAuthed(true)
+          if (data.user.email === DEMO_EMAIL && !tourSeen()) setTouring(true)
         } else if (response.status === 401) {
           setAuthed(false)
         } else {
@@ -244,6 +249,11 @@ export default function App() {
         </div>
         <div className="nav-foot">
           {me && <span className="whoami">{me.user.display_name ?? me.user.email}</span>}
+          {me?.user.email === DEMO_EMAIL && !touring && (
+            <button className="btn ghost slim" onClick={() => setTouring(true)}>
+              Take the tour
+            </button>
+          )}
           <button
             className="btn ghost slim"
             onClick={() => {
@@ -274,6 +284,7 @@ export default function App() {
         </Routes>
       </main>
       <ReadOnlyNotice />
+      {touring && <Tour onClose={() => setTouring(false)} />}
     </div>
   )
 }

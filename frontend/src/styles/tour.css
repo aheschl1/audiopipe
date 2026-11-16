@@ -1,0 +1,42 @@
+/* Demo tour: a ring around the current element and a small bubble beside it. */
+.tour-ring {
+  position: fixed;
+  z-index: 60;
+  border: var(--bw-strong) solid var(--red);
+  border-radius: var(--r-3);
+  pointer-events: none;
+  transition:
+    top var(--dur) var(--ease),
+    left var(--dur) var(--ease),
+    width var(--dur) var(--ease),
+    height var(--dur) var(--ease);
+}
+
+.tour-bubble {
+  position: fixed;
+  z-index: 61;
+  width: min(320px, calc(100vw - 2 * var(--sp-4)));
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
+  border: var(--bw) solid var(--line-strong);
+  border-radius: var(--r-3);
+}
+
+.tour-text {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-md);
+  line-height: var(--lh-snug);
+  color: var(--ink);
+}
+
+.tour-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.tour-count {
+  margin-right: auto;
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
