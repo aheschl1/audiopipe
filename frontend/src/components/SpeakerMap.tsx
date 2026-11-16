@@ -6,6 +6,7 @@ import { categoryHex } from "../speakers"
 import { token } from "../styles/tokens"
 import SpeakerMapInspector from "./SpeakerMapInspector"
 import { useSearchParam } from "../useParam"
+import { Link } from "react-router"
 import PageHead from "./PageHead"
 
 // Each view names the components it shows, so the explained-variance figure
@@ -260,10 +261,10 @@ export default function SpeakerMap({
 
   return (
     <div className="map-view">
-      <PageHead
-        title="Voice map"
-        meta="Every voice-print, placed by similarity. Close points sound alike."
-      />
+      <Link className="crumb" to="/speakers">
+        ← People
+      </Link>
+      <PageHead title="Voice map" />
       <div className="map-toolbar">
         <div className="mode-toggle">
           {VIEWS.map((option) => (

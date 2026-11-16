@@ -480,14 +480,7 @@ export default function TimelineStrip({
   return (
     <div className="strip">
       <div className="strip-toolbar">
-        <span className="strip-title">
-          {lanes.length} voice{lanes.length === 1 ? "" : "s"}
-          {soundLanes.length > 0 &&
-            ` · ${soundLanes.length} sound${soundLanes.length === 1 ? "" : "s"}`}
-          {truncated && (
-            <span className="row-dim"> · long session — strip shows the first part</span>
-          )}
-        </span>
+        <span className="strip-title">{truncated && "Showing the first part"}</span>
         {soundLanes.length > SOUND_LANES_SHOWN && (
           <button
             className="chip as-button"

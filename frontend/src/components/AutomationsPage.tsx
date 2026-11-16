@@ -1,13 +1,13 @@
 import { type MouseEvent, useCallback, useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router"
 import { api } from "../api/client"
-import { ACTION, type Automation, TRIGGER, conditions, fieldNames, setEnabled, when } from "../automations"
+import { type Automation, conditions, fieldNames, setEnabled, when } from "../automations"
 import { dayLabel } from "../format"
 import { isRefusal } from "../readOnly"
 import PageHead from "./PageHead"
 import Switch from "./Switch"
 
-/** Every automation as a row: what triggers it, what it checks, what it does. */
+/** Every automation as a row: what it checks, what it fills in, how often it matched. */
 export default function AutomationsPage() {
   const navigate = useNavigate()
   const [rules, setRules] = useState<Automation[] | null>(null)
@@ -31,7 +31,7 @@ export default function AutomationsPage() {
 
   return (
     <div className="automations-page">
-      <PageHead title="Automations" meta="Trigger effects, with structured insights.">
+      <PageHead title="Automations">
         <Link className="btn primary slim" to="/automations/new">
           New automation
         </Link>
@@ -48,19 +48,14 @@ export default function AutomationsPage() {
       ) : !rules ? (
         <div className="skeleton" style={{ height: 160 }} />
       ) : rules.length === 0 ? (
-        <div className="empty">
-          No automations yet. An automation checks each new moment and, when it matches, fills in fields you
-          choose. It only runs on moments made after you create it.
-        </div>
+        <div className="empty">No automations yet.</div>
       ) : (
         <div className="tool-table-wrap">
           <table className="tool-table auto-table">
             <thead>
               <tr>
                 <th>Name</th>
-                <th>Trigger</th>
                 <th>Conditions</th>
-                <th>Action</th>
                 <th className="num">Matches</th>
                 <th>Last match</th>
                 <th>Status</th>
@@ -85,9 +80,9 @@ export default function AutomationsPage() {
                       <Link to={`/automations/${a.id}`} onClick={(e) => e.stopPropagation()}>
                         {a.name}
                       </Link>
-                    </td>
-                    <td>
-                      <span className="kind-tag">{TRIGGER[a.trigger]}</span>
+                      <span className="auto-sub" title={fields.join(", ")}>
+                        {fields.length} field{fields.length === 1 ? "" : "s"}
+                      </span>
                     </td>
                     <td>
                       {conds.length ? (
@@ -102,12 +97,6 @@ export default function AutomationsPage() {
                       ) : (
                         <span className="row-dim">Every moment</span>
                       )}
-                    </td>
-                    <td>
-                      <span className="kind-tag">{ACTION.extract}</span>
-                      <span className="auto-sub" title={fields.join(", ")}>
-                        {fields.length} field{fields.length === 1 ? "" : "s"}
-                      </span>
                     </td>
                     <td className="num">
                       {a.matches}

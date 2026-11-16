@@ -86,7 +86,6 @@ export default function Editor({
 
       <fieldset className="auto-group">
         <legend className="section-label">Then fill in these fields</legend>
-        <p className="auto-hint">The model fills each from the moment, or leaves it blank. They show on the moment.</p>
         {d.fields.map((f, i) => (
           <div key={i} className="auto-field">
             <input

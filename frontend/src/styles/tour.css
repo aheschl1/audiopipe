@@ -1,4 +1,13 @@
-/* Demo tour: a ring around the current element and a small bubble beside it. */
+/* Demo tour: a blurred backdrop, a ring around the current element and a small bubble beside it. */
+.tour-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 54;
+  pointer-events: none;
+  backdrop-filter: blur(1px);
+  -webkit-backdrop-filter: blur(1px);
+}
+
 .tour-ring {
   position: fixed;
   z-index: 60;

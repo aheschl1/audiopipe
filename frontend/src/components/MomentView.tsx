@@ -6,11 +6,12 @@ import {
   type MomentLink,
   type MomentRelation,
 } from "../api/moments"
-import { clock, fmtLongDay, fmtSpan, shortId } from "../format"
+import { clock, fmtLongDay, fmtSpan } from "../format"
 import { Link } from "react-router"
 import { isUnnamed, personHref } from "../moments"
 import { categoryColor } from "../speakers"
 import { artifactUrl } from "../visual"
+import Menu from "./Menu"
 
 type Open = (sessionId: string, seekMs?: number) => void
 
@@ -46,6 +47,19 @@ function speakerName(speaker: string | null): string {
   return speaker ?? "Unknown"
 }
 
+const KIND: Record<MomentItem["kind"], string> = {
+  utterance: "Line",
+  sound: "Sound",
+  keyframe: "Video frame",
+  photo: "Photo",
+}
+
+/** The item itself, short: a line's speaker and opening words, or a sound's name. */
+function gist(item: MomentItem, max = 28): string {
+  if (item.kind === "utterance") return `${speakerName(item.speaker)}: ${excerpt(item.text, max)}`
+  return excerpt(item.text, max) || KIND[item.kind]
+}
+
 function excerpt(text: string | null, max = 72): string {
   if (!text) return ""
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text
@@ -62,15 +76,10 @@ function useNarrow(query: string): boolean {
   return match
 }
 
-/** Focus is one item (its neighbourhood lights up) or one link (its two ends do). */
-type Focus = { item: string } | { link: MomentLink } | null
-
 type Ctx = {
   byId: Map<string, MomentItem>
   neighbours: Map<string, MomentLink[]>
-  focus: Focus
   selected: string | null
-  hover: (focus: Focus) => void
   select: (id: string | null, scroll?: boolean) => void
 }
 
@@ -78,16 +87,12 @@ function other(link: MomentLink, id: string): string {
   return link.from_artifact_id === id ? link.to_artifact_id : link.from_artifact_id
 }
 
-/** Lit state of one item under the current focus, and the relation word to show on it. */
+/** Lit state of one item under the current selection, and the relation word to show on it. */
 function lit(ctx: Ctx, id: string): { dim: boolean; primary: boolean; tag: MomentLink | null; word: string | null } {
-  const focus = ctx.focus
+  const focus = ctx.selected
   if (!focus) return { dim: false, primary: false, tag: null, word: null }
-  if ("link" in focus) {
-    const on = focus.link.from_artifact_id === id || focus.link.to_artifact_id === id
-    return { dim: !on, primary: false, tag: null, word: null }
-  }
-  if (focus.item === id) return { dim: false, primary: true, tag: null, word: null }
-  const link = (ctx.neighbours.get(focus.item) ?? []).find((l) => other(l, focus.item) === id) ?? null
+  if (focus === id) return { dim: false, primary: true, tag: null, word: null }
+  const link = (ctx.neighbours.get(focus) ?? []).find((l) => other(l, focus) === id) ?? null
   if (!link) return { dim: true, primary: false, tag: null, word: null }
   const word = link.from_artifact_id === id ? ACTIVE[link.relation] : PASSIVE[link.relation]
   return { dim: false, primary: false, tag: link, word }
@@ -112,14 +117,15 @@ function Refs({ ctx, id }: { ctx: Ctx; id: string }) {
         return (
           <button
             key={targetId}
-            className={`ref ${weak ? "weak" : ""}`}
+            className={`ref ${weak ? "weak" : ""} ${isImage(target) ? "ref-img" : ""}`}
             title={ls.map((l) => `${ACTIVE[l.relation]}: ${l.why}`).join("\n")}
+            aria-label={isImage(target) ? `${KIND[target.kind]} at ${clock(target.start_at)}` : gist(target, 72)}
             onClick={(e) => {
               e.stopPropagation()
               ctx.select(targetId, true)
             }}
           >
-            {target.label}
+            {isImage(target) ? <img src={artifactUrl(target.artifact_id)} alt="" loading="lazy" /> : gist(target, 20)}
           </button>
         )
       })}
@@ -140,8 +146,6 @@ function itemProps(ctx: Ctx, id: string) {
     role: "button",
     tabIndex: 0,
     "aria-pressed": ctx.selected === id,
-    onMouseEnter: () => ctx.hover({ item: id }),
-    onMouseLeave: () => ctx.hover(null),
     onClick: () => ctx.select(ctx.selected === id ? null : id),
     onKeyDown: (e: KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -195,7 +199,6 @@ function Tile({ ctx, item }: { ctx: Ctx; item: MomentItem }) {
         <img src={artifactUrl(item.artifact_id)} alt="" loading="lazy" />
       </span>
       <span className="tile-cap">
-        <span className="tile-label">{item.label}</span>
         <span className="row-dim">{clock(item.start_at)}</span>
         <span className="tile-aside">
           <RelationTag link={state.tag} word={state.word} />
@@ -239,48 +242,48 @@ function Stream({ ctx, items }: { ctx: Ctx; items: MomentItem[] }) {
   return <>{out}</>
 }
 
-/** A compact stand-in for an item inside a connection: a thumbnail or the speaker, plus its label. */
+/** A compact stand-in for an item inside a connection: a thumbnail, or the speaker and their words. */
 function Mention({ item }: { item: MomentItem }) {
-  return (
-    <span className="mention">
-      {isImage(item) ? (
+  if (isImage(item))
+    return (
+      <span className="mention" title={`${KIND[item.kind]} at ${clock(item.start_at)}`}>
         <span className="mention-thumb">
           <img src={artifactUrl(item.artifact_id)} alt="" loading="lazy" />
         </span>
+      </span>
+    )
+  return (
+    <span className="mention" title={item.text ?? undefined}>
+      {item.kind === "utterance" ? (
+        <>
+          <span className="mention-who">{speakerName(item.speaker)}</span>
+          <span className="mention-text">{excerpt(item.text, 40)}</span>
+        </>
       ) : (
-        <span className="mention-who">{item.kind === "utterance" ? speakerName(item.speaker) : item.text}</span>
+        <span className="mention-who">{item.text}</span>
       )}
-      <span className="mention-label">{item.label}</span>
     </span>
   )
 }
 
-function Connection({ ctx, link }: { ctx: Ctx; link: MomentLink }) {
+function Connection({ ctx, link, detail }: { ctx: Ctx; link: MomentLink; detail: boolean }) {
   const from = ctx.byId.get(link.from_artifact_id)
   const to = ctx.byId.get(link.to_artifact_id)
   if (!from || !to) return null
-  const quotes = [from, to].filter((i) => i.kind === "utterance" && i.text)
+  const sure = `${Math.round(link.confidence * 100)}% sure`
   return (
-    <li
-      className={`conn ${link.confidence < WEAK ? "weak" : ""}`}
-      onMouseEnter={() => ctx.hover({ link })}
-      onMouseLeave={() => ctx.hover(null)}
-    >
-      <button className="conn-hit" onClick={() => ctx.select(from.artifact_id, true)}>
+    <li className={`conn ${link.confidence < WEAK ? "weak" : ""}`}>
+      <button
+        className="conn-hit"
+        title={link.why ? `${link.why} (${sure})` : sure}
+        onClick={() => ctx.select(from.artifact_id, true)}
+      >
         <span className="conn-sentence">
           <Mention item={from} />
           <span className="conn-verb">{ACTIVE[link.relation]}</span>
           <Mention item={to} />
         </span>
-        {quotes.map((q) => (
-          <span key={q.artifact_id} className="conn-quote">
-            “{excerpt(q.text, 96)}”
-          </span>
-        ))}
-        {link.why && <span className="conn-why">{link.why}</span>}
-        <span className="conn-conf">
-          {Math.round(link.confidence * 100)}% sure{link.confidence < WEAK ? " · weak" : ""}
-        </span>
+        {detail && link.why && <span className="conn-why">{link.why}</span>}
       </button>
     </li>
   )
@@ -290,9 +293,7 @@ function Selected({ ctx, item, onOpen }: { ctx: Ctx; item: MomentItem; onOpen: O
   return (
     <div className="picked">
       <div className="picked-head">
-        <span className="section-label">
-          {item.label} · {item.kind === "keyframe" ? "video frame" : item.kind}
-        </span>
+        <span className="section-label">{KIND[item.kind]}</span>
         <button className="btn ghost slim" onClick={() => ctx.select(null)} title="Clear (Esc)">
           ✕
         </button>
@@ -322,10 +323,11 @@ function Facts({ moment }: { moment: MomentDetail }) {
   const heardNames = new Set(heard.map((sp) => sp.name.toLowerCase()))
   const mentioned = moment.people.filter((p) => !heardNames.has(p.toLowerCase()))
   const rows: [string, ReactNode][] = []
-  if (heard.length)
+  if (heard.length || mentioned.length)
     rows.push([
       "People",
-      heard.map((sp) => {
+      [
+        ...heard.map((sp) => {
         const body = (
           <>
             <span className="speaker-dot" style={{ background: categoryColor(sp.speaker_id ?? sp.name) }} />
@@ -341,16 +343,13 @@ function Facts({ moment }: { moment: MomentDetail }) {
             {body}
           </span>
         )
-      }),
-    ])
-  if (mentioned.length)
-    rows.push([
-      "Also mentioned",
-      mentioned.map((p) => (
-        <span key={p} className="chip quiet">
-          {p}
-        </span>
-      )),
+        }),
+        ...mentioned.map((p) => (
+          <span key={`m-${p}`} className="chip quiet" title="Mentioned">
+            {p}
+          </span>
+        )),
+      ],
     ])
   if (moment.topics.length)
     rows.push(["Topics", moment.topics.map((t) => <span key={t} className="chip">{t}</span>)])
@@ -378,78 +377,95 @@ function Facts({ moment }: { moment: MomentDetail }) {
 
 /** What the user's automations filled in for this moment: one panel per matching rule,
  * set apart from what the moment tier itself wrote. */
+/** Each automation that fired on this moment, as a full-width pill that expands to what it pulled out. */
 function AutomationFacts({ moment }: { moment: MomentDetail }) {
   if (!moment.automations.length) return null
   return (
-    <section className="moment-automations" aria-label="Automations that matched">
-      {moment.automations.map((a) => {
-        const fields = Object.entries(a.fields)
-        return (
-          <div key={a.automation_id} className="auto-card">
-            <div className="auto-card-head">
-              <span className="auto-badge">Automation</span>
-              <Link className="auto-card-name" to={`/automations/${a.automation_id}`}>
-                {a.name}
-              </Link>
-              <span className="auto-card-note">matched this moment</span>
-            </div>
-            {fields.length > 0 && (
-              <dl className="kv">
-                {fields.map(([k, v]) => (
-                  <div key={k}>
-                    <dt>{k}</dt>
-                    <dd className={v ? "" : "row-dim"}>{v || "—"}</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-          </div>
-        )
-      })}
+    <section className="moment-automations" aria-label="Automations that fired">
+      {moment.automations.map((a) => (
+        <FiredPill key={a.automation_id} automation={a} />
+      ))}
     </section>
   )
 }
 
-/** The contributing recordings: an ingest detail, kept reachable but out of the way. */
-function Sources({ moment, onOpen }: { moment: MomentDetail; onOpen: Open }) {
-  const per = new Map<string, { first: MomentItem; lines: number; images: number }>()
-  for (const item of moment.items) {
-    const entry = per.get(item.session_id)
-    if (!entry) per.set(item.session_id, { first: item, lines: 0, images: 0 })
-    const e = per.get(item.session_id)!
-    if (item.start_at < e.first.start_at) e.first = item
-    if (item.kind === "utterance") e.lines++
-    if (isImage(item)) e.images++
-  }
-  const ids = [...new Set([...moment.session_ids, ...per.keys()])]
-  if (!ids.length) return null
+function FiredPill({ automation: a }: { automation: MomentDetail["automations"][number] }) {
+  const [open, setOpen] = useState(false)
+  const fields = Object.entries(a.fields).filter(([, v]) => v)
   return (
-    <details className="sources">
-      <summary>
-        Built from {ids.length} recording{ids.length === 1 ? "" : "s"}
-      </summary>
-      <div className="list">
-        {ids.map((id) => {
-          const e = per.get(id)
-          const what = e
-            ? [e.lines ? `${e.lines} lines` : null, e.images ? `${e.images} images` : null].filter(Boolean).join(" · ")
-            : ""
-          return (
-            <button
-              key={id}
-              className="row"
-              onClick={() => onOpen(id, e?.first.at_ms ?? undefined)}
-            >
-              <span className="session-time">{e ? clock(e.first.start_at) : "—"}</span>
-              <span className="row-main">
-                <span className="row-title mono">{shortId(id)}</span>
-                {what && <span className="row-sub">{what}</span>}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-    </details>
+    <div className={`fired ${open ? "open" : ""}`}>
+      <button type="button" className="fired-pill" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <span className="fired-dot" aria-hidden="true" />
+        <span className="fired-verb">Fired</span>
+        <span className="fired-name">{a.name}</span>
+        {fields.length > 0 && (
+          <span className="fired-count">
+            {fields.length} field{fields.length === 1 ? "" : "s"}
+          </span>
+        )}
+        <span className="fired-chevron" aria-hidden="true">
+          {open ? "▴" : "▾"}
+        </span>
+      </button>
+      {open && (
+        <div className="fired-body">
+          {fields.length > 0 && (
+            <dl className="fired-fields">
+              {fields.map(([k, v]) => (
+                <div key={k}>
+                  <dt>{k}</dt>
+                  <dd>{v}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          <Link className="fired-link" to={`/automations/${a.automation_id}`}>
+            View automation ›
+          </Link>
+        </div>
+      )}
+    </div>
+  )
+}
+
+type Recording = { id: string; first: MomentItem | null; last: MomentItem | null }
+
+/** The recordings a moment draws on, with its earliest and latest item in each. */
+function recordings(moment: MomentDetail): Recording[] {
+  const per = new Map<string, Recording>()
+  for (const id of moment.session_ids) per.set(id, { id, first: null, last: null })
+  for (const item of moment.items) {
+    const e = per.get(item.session_id) ?? { id: item.session_id, first: null, last: null }
+    if (!e.first || item.start_at < e.first.start_at) e.first = item
+    if (!e.last || item.start_at > e.last.start_at) e.last = item
+    per.set(item.session_id, e)
+  }
+  return [...per.values()].sort((a, b) => (a.first?.start_at ?? "").localeCompare(b.first?.start_at ?? ""))
+}
+
+const recordingLabel = (r: Recording) =>
+  r.first && r.last
+    ? `${clock(r.first.start_at)} · ${fmtSpan(r.first.start_at, r.last.start_at)}`
+    : "Recording"
+
+/** The way out to the raw recording: a link for one, a short menu for several. */
+function FullRecording({ list, onOpen }: { list: Recording[]; onOpen: Open }) {
+  const open = (r: Recording) => onOpen(r.id, r.first?.at_ms ?? undefined)
+  if (!list.length) return null
+  if (list.length === 1)
+    return (
+      <button className="link-btn moment-full-recording" onClick={() => open(list[0]!)}>
+        Full recording ›
+      </button>
+    )
+  return (
+    <span className="moment-full-recording">
+      <Menu
+        label="Full recording"
+        trigger="Full recording ›"
+        items={list.map((r) => ({ label: recordingLabel(r), onSelect: () => open(r) }))}
+      />
+    </span>
   )
 }
 
@@ -489,8 +505,6 @@ export default function MomentView({
   const [moment, setMoment] = useState<MomentDetail | null>(null)
   const [status, setStatus] = useState<number | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
-  const [hovered, setHovered] = useState<Focus>(null)
-  const [showUnrelated, setShowUnrelated] = useState(false)
   const narrow = useNarrow("(max-width: 699px)")
 
   const load = useCallback(async () => {
@@ -531,10 +545,8 @@ export default function MomentView({
   const graph = useMemo(() => {
     const items = [...(moment?.items ?? [])].sort((a, b) => Date.parse(a.start_at) - Date.parse(b.start_at))
     const byId = new Map(items.map((i) => [i.artifact_id, i]))
-    const all = (moment?.links ?? []).filter((l) => byId.has(l.from_artifact_id) && byId.has(l.to_artifact_id))
-    const unrelated = all.filter((l) => l.relation === "unrelated").length
-    const links = all
-      .filter((l) => showUnrelated || l.relation !== "unrelated")
+    const links = (moment?.links ?? [])
+      .filter((l) => l.relation !== "unrelated" && byId.has(l.from_artifact_id) && byId.has(l.to_artifact_id))
       .sort((a, b) => ORDER.indexOf(a.relation) - ORDER.indexOf(b.relation) || b.confidence - a.confidence)
     const neighbours = new Map<string, MomentLink[]>()
     for (const l of links) {
@@ -544,8 +556,8 @@ export default function MomentView({
         neighbours.set(id, list)
       }
     }
-    return { items, byId, links, neighbours, unrelated }
-  }, [moment, showUnrelated])
+    return { items, byId, links, neighbours }
+  }, [moment])
 
   if (!moment)
     return status !== null ? (
@@ -578,9 +590,7 @@ export default function MomentView({
   const ctx: Ctx = {
     byId: graph.byId,
     neighbours: graph.neighbours,
-    focus: hovered ?? (selected ? { item: selected } : null),
     selected,
-    hover: setHovered,
     select,
   }
   const heard = graph.items.filter((i) => !isImage(i))
@@ -601,49 +611,49 @@ export default function MomentView({
               disabled={!older}
               onClick={() => older && onNeighbour(older)}
               title="Earlier moment (J or ←)"
+              aria-label="Earlier moment"
             >
-              ‹ earlier
+              ‹
             </button>
             <button
               className="btn ghost slim"
               disabled={!newer}
               onClick={() => newer && onNeighbour(newer)}
               title="Later moment (K or →)"
+              aria-label="Later moment"
             >
-              later ›
+              ›
             </button>
           </span>
         </div>
         <h1 className="moment-head-title">{moment.title || "Untitled moment"}</h1>
         <div className="page-meta">
-          {fmtLongDay(moment.start_at)} · {clock(moment.start_at)}–{clock(moment.end_at)} ·{" "}
-          {fmtSpan(moment.start_at, moment.end_at)}
+          {fmtLongDay(moment.start_at)} · {clock(moment.start_at)} · {fmtSpan(moment.start_at, moment.end_at)}
+          <FullRecording list={recordings(moment)} onOpen={onOpenSession} />
         </div>
-        {moment.summary && <p className="moment-head-summary">{moment.summary}</p>}
-        <Facts moment={moment} />
+        {moment.summary && (
+          <p className="moment-head-summary" title={`Written by ${moment.model}`}>
+            {moment.summary}
+          </p>
+        )}
         <AutomationFacts moment={moment} />
+        <Facts moment={moment} />
       </header>
 
       <div className="evidence">
         {narrow ? (
           <section className="ev-col ev-stream">
-            <h2 className="section-label">
-              As it happened <span className="section-count">{graph.items.length}</span>
-            </h2>
+            <h2 className="section-label">As it happened</h2>
             <Stream ctx={ctx} items={graph.items} />
           </section>
         ) : (
           <>
             <section className="ev-col ev-heard">
-              <h2 className="section-label">
-                Heard <span className="section-count">{heard.length}</span>
-              </h2>
+              <h2 className="section-label">Heard</h2>
               {heard.length ? <Stream ctx={ctx} items={heard} /> : <div className="empty">Nothing was said.</div>}
             </section>
             <section className="ev-col ev-seen">
-              <h2 className="section-label">
-                Seen <span className="section-count">{seen.length}</span>
-              </h2>
+              <h2 className="section-label">Seen</h2>
               {seen.length ? <Stream ctx={ctx} items={seen} /> : <div className="empty">No photos or video.</div>}
             </section>
           </>
@@ -652,15 +662,12 @@ export default function MomentView({
         <aside className="ev-aside">
           {picked && <Selected ctx={ctx} item={picked} onOpen={onOpenSession} />}
           <h2 className="section-label">
-            {picked ? `${picked.label} connects to` : "Connections"}
+            {picked ? "Connects to" : "Connections"}
             <span className="section-count">{shownLinks.length}</span>
           </h2>
-          {!picked && shownLinks.length > 0 && (
-            <p className="ev-hint">Hover or select a line or an image to see what it connects to.</p>
-          )}
           {shownLinks.length === 0 ? (
             <p className="ev-hint">
-              {picked ? "Nothing else in this moment is linked to it." : "No connections were drawn for this moment."}
+              {picked ? "Nothing linked." : "No links."}
             </p>
           ) : (
             ORDER.map((relation) => {
@@ -671,27 +678,20 @@ export default function MomentView({
                   <h3 className="conn-group-label">{GROUP[relation]}</h3>
                   <ul className="conns">
                     {group.map((l) => (
-                      <Connection key={`${l.from_artifact_id}-${l.to_artifact_id}-${l.relation}`} ctx={ctx} link={l} />
+                      <Connection
+                        key={`${l.from_artifact_id}-${l.to_artifact_id}-${l.relation}`}
+                        ctx={ctx}
+                        link={l}
+                        detail={!!picked}
+                      />
                     ))}
                   </ul>
                 </div>
               )
             })
           )}
-          {graph.unrelated > 0 && (
-            <button className="btn ghost slim" onClick={() => setShowUnrelated((v) => !v)}>
-              {showUnrelated ? "Hide" : "Show"} {graph.unrelated} coincidental overlap{graph.unrelated === 1 ? "" : "s"}
-            </button>
-          )}
         </aside>
       </div>
-
-      <footer className="moment-foot">
-        <Sources moment={moment} onOpen={onOpenSession} />
-        <p className="provenance">
-          Title, summary and connections written by <span className="mono">{moment.model}</span>.
-        </p>
-      </footer>
     </div>
   )
 }

@@ -22,23 +22,30 @@ export const ALL_KINDS: { key: EventKind; label: string }[] = [
   { key: "marker", label: "Session markers" },
 ]
 
-const STORAGE_KEY = "audiopipeline.timeline.hidden"
+const STORAGE_KEY = "audiopipeline.timeline.hidden.v2"
+
+/** Kinds hidden until the viewer picks otherwise; the strip already shows sound and location lanes. */
+export const DEFAULT_HIDDEN: EventKind[] = ["sound-span", "audio-tag", "location-point", "conversation", "marker"]
 
 export function loadHidden(): Set<EventKind> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return new Set()
+    if (!raw) return new Set(DEFAULT_HIDDEN)
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return new Set()
     const valid = new Set(ALL_KINDS.map((k) => k.key as string))
     return new Set(parsed.filter((k): k is EventKind => typeof k === "string" && valid.has(k)))
   } catch {
-    return new Set()
+    return new Set(DEFAULT_HIDDEN)
   }
 }
 
 function saveHidden(hidden: Set<EventKind>): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...hidden]))
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...hidden]))
+  } catch {
+    // storage blocked: the choice lasts until reload
+  }
 }
 
 // A small checkbox dropdown for deselecting timeline item types; the choice
@@ -79,8 +86,8 @@ export default function TimelineFilter({
 
   return (
     <div className="filter-menu" ref={root}>
-      <button className={`btn ghost slim ${hidden.size > 0 ? "filtered" : ""}`} onClick={() => setOpen((o) => !o)}>
-        {hidden.size > 0 ? `Showing ${ALL_KINDS.length - hidden.size}/${ALL_KINDS.length}` : "Filter"} ▾
+      <button className="btn ghost slim" onClick={() => setOpen((o) => !o)}>
+        Filter ▾
       </button>
       {open && (
         <div className="filter-pop">

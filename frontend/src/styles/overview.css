@@ -1,0 +1,131 @@
+/* App layer: the signed-in home, automation catches first, then moments, with the rules in a rail. */
+
+.overview {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--sp-6);
+  margin-top: var(--sp-6);
+}
+
+@media (max-width: 1099px) {
+  .overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.overview-section + .overview-section {
+  margin-top: var(--sp-6);
+}
+
+.overview-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--sp-2);
+}
+
+.overview-more {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.overview-more:hover {
+  color: var(--red-ink);
+}
+
+.overview-empty {
+  padding: var(--sp-5) 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.action-table td {
+  padding-top: var(--sp-1);
+  padding-bottom: var(--sp-1);
+  white-space: nowrap;
+}
+
+.action-table th:last-child {
+  width: 45%;
+}
+
+/* One line per row: long cells scroll sideways in place. */
+.cell-scroll {
+  max-width: 320px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+}
+
+.auto-output .cell-scroll {
+  max-width: 560px;
+}
+
+.action-table .kv.compact {
+  display: flex;
+  gap: var(--sp-3);
+}
+
+.action-table .kv.compact > div {
+  display: flex;
+  gap: var(--sp-1);
+}
+
+.action-table .kv dd {
+  overflow-wrap: normal;
+}
+
+.action-table .result.matched {
+  color: var(--red-ink);
+}
+
+.rule-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: var(--bw) solid var(--line);
+}
+
+.rule-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
+  border-bottom: var(--bw) solid var(--line);
+  font-size: var(--fs-sm);
+}
+
+.rule-list li.off .rule-name {
+  color: var(--faint);
+}
+
+.rule-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.rule-name:hover {
+  color: var(--red-ink);
+}
+
+.rule-count {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.rule-list .switch-text {
+  display: none;
+}

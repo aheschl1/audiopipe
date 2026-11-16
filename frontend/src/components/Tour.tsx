@@ -2,46 +2,51 @@ import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from
 import { useLocation, useNavigate } from "react-router"
 import { api } from "../api/client"
 
+// A CSS selector, or the first match whose text contains `text`.
+type Anchor = string | { selector: string; text: string }
+
 type Step = {
   // Where the step lives; a function runs on arrival, so it can read the page it leaves.
   path?: string | (() => string | null | undefined | Promise<string | null | undefined>)
-  // First selector that matches is the anchor; none (or no match) centres the bubble.
-  anchor?: string[]
+  // First anchor that matches is ringed; none (or no match) centres the bubble.
+  anchor?: Anchor[]
+  // Clicked once on arrival, e.g. to select a line so its connections show.
+  select?: Anchor
   text: string
   // The visitor got there on their own: move on.
   done?: (path: string) => boolean
 }
 
+const CV_BOOT = { selector: ".line", text: "torn, grease" }
+
 const STEPS: Step[] = [
   {
     path: "/",
     anchor: ["a.moment"],
-    text: "This is a moment: a drive-through oil change, put together from what the glasses heard and saw.",
+    text: "A customer just came in. Let's see everything that happened.",
     done: (path) => path.startsWith("/moments/"),
   },
   {
     path: () => document.querySelector("a.moment")?.getAttribute("href"),
     anchor: [".moment-head-summary", ".moment-head-title"],
-    text: "The title and summary are written from the transcript and the video frames.",
-  },
-  {
-    anchor: [".facts"],
-    text: "Who spoke, what came up, and text seen in frame. Named voices carry across recordings.",
+    text: "Quick recap: here's what happened during the interaction",
   },
   {
     anchor: [".moment-automations"],
-    text: "An automation pulled out the details: the complaint, the torn CV boot, and the quote.",
+    select: ".fired-pill",
+    text: "This automation was triggered, and the job was documented.",
   },
   {
-    anchor: [".evidence"],
-    text: "Everything behind it, in time order: what was heard, and what was seen.",
+    anchor: [".facts"],
+    text: "Some topics and people got recognized",
   },
   {
     anchor: [".ev-aside"],
-    text: "Connections tie the two together, like the clicking complaint and the footage of the boot. Hover a line to see its links.",
+    select: CV_BOOT,
+    text: "Here's photo evidence of everything the mechanic said.",
   },
-  { path: "/search", anchor: [".search-bar"], text: "Search everything by what was said or what was seen." },
-  { path: "/speakers", anchor: [".speaker-row", ".list"], text: "People: every voice, recognized across recordings." },
+  { path: "/search", anchor: [".search-bar"], text: "Need to find something that happened or was said? This search can find pictures, transcripts, and sounds" },
+  { path: "/speakers", anchor: [".speaker-row", ".list"], text: "Find a person, and lookup past interactions." },
   {
     path: async () => {
       const { data } = await api.GET("/v1/sessions", { params: { query: { limit: 1, offset: 0 } } })
@@ -49,19 +54,35 @@ const STEPS: Step[] = [
       return id ? `/sessions/${id}` : "/sessions"
     },
     anchor: [".timeline-wrap", ".session-main"],
-    text: "Recordings: the raw timeline, for detailed insight.",
+    text: "If you want to go deeper on any moment, you can visit timelines",
   },
   {
     path: "/automations",
     anchor: [".auto-table"],
-    text: "Automations are rules that run on each new moment. This one fills in service details.",
+    text: "Trigger action when things happen with automations.",
   },
-  { text: "That's the tour. Click around freely; the demo is read-only, so nothing is saved." },
+  { text: "The platforms in progress - send any feedback to ajheschl@gmail.com" },
 ]
 
 const SEEN_KEY = "context.tour.seen"
 const GAP = 12
 const EDGE = 16
+const PAD = 4
+const RADIUS = 6
+
+/** Full-viewport clip path with a rounded hole over the ring, so the anchor stays sharp. */
+function holePath(box: Box, vw: number, vh: number) {
+  const x = box.left - PAD
+  const y = box.top - PAD
+  const w = box.width + 2 * PAD
+  const h = box.height + 2 * PAD
+  const r = Math.min(RADIUS, w / 2, h / 2)
+  const hole =
+    `M${x + r},${y} H${x + w - r} A${r},${r} 0 0 1 ${x + w},${y + r} V${y + h - r} ` +
+    `A${r},${r} 0 0 1 ${x + w - r},${y + h} H${x + r} A${r},${r} 0 0 1 ${x},${y + h - r} ` +
+    `V${y + r} A${r},${r} 0 0 1 ${x + r},${y} Z`
+  return `path(evenodd, "M0,0 H${vw} V${vh} H0 Z ${hole}")`
+}
 
 export function tourSeen(): boolean {
   try {
@@ -93,9 +114,14 @@ type Box = { top: number; left: number; width: number; height: number }
 const sameBox = (a: Box | null, b: Box | null) =>
   a === b || (!!a && !!b && a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height)
 
+function find(anchor: Anchor): Element | null {
+  if (typeof anchor === "string") return document.querySelector(anchor)
+  return [...document.querySelectorAll(anchor.selector)].find((el) => el.textContent?.includes(anchor.text)) ?? null
+}
+
 function findAnchor(step: Step): Element | null {
-  for (const selector of step.anchor ?? []) {
-    const el = document.querySelector(selector)
+  for (const anchor of step.anchor ?? []) {
+    const el = find(anchor)
     if (el) return el
   }
   return null
@@ -141,8 +167,17 @@ export default function Tour({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     let frame = 0
     let scrolled = false
+    let selected = !step.select
     let prev: Box | null = null
     const tick = () => {
+      if (!selected && step.select) {
+        const target = find(step.select)
+        if (target) {
+          selected = true
+          const on = target.getAttribute("aria-pressed") === "true" || target.getAttribute("aria-expanded") === "true"
+          if (!on) (target as HTMLElement).click()
+        }
+      }
       const el = findAnchor(step)
       let nextBox: Box | null = null
       if (el) {
@@ -198,10 +233,11 @@ export default function Tour({ onClose }: { onClose: () => void }) {
 
   return (
     <>
+      <div className="tour-backdrop" style={box ? { clipPath: holePath(box, vw, vh) } : undefined} />
       {box && (
         <div
           className="tour-ring"
-          style={{ top: box.top - 4, left: box.left - 4, width: box.width + 8, height: box.height + 8 }}
+          style={{ top: box.top - PAD, left: box.left - PAD, width: box.width + 2 * PAD, height: box.height + 2 * PAD }}
         />
       )}
       <div ref={bubbleRef} className="tour-bubble" style={place} role="dialog" aria-label="Tour">

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { Link } from "react-router"
 import type { TimelineEvent } from "../api/client"
 import { usePlayhead } from "../hooks/usePlayhead"
 import { useSessionTrack, type TrackFix } from "../hooks/useSessionTrack"
@@ -79,6 +80,9 @@ export default function SessionMapPanel({
   return (
     <div className="session-map">
       <div ref={containerRef} className="session-map-canvas" />
+      <Link to="/map" className="session-map-open">
+        Open map
+      </Link>
       {handle && <MapPlayheadMarker handle={handle} points={points} audioEl={audioEl} />}
       {mapFailed && <div className="session-map-note">Couldn't load the map.</div>}
       {loading && <div className="session-map-note">Loading track…</div>}
