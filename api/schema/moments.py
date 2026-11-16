@@ -98,7 +98,7 @@ class MomentRead(BaseModel):
     summary: str
     people: list[str] = Field(description="Participants as the model named them; prefer ``speakers``.")
     speakers: list[MomentSpeaker]
-    places: list[str]
+    topics: list[str] = Field(description="Short topic tags from the model; empty when none apply.")
     visible_text: list[str]
     session_ids: list[UUID]
     counts: MomentCounts
@@ -130,7 +130,7 @@ class MomentRead(BaseModel):
             summary=moment.summary,
             people=list(meta.get("people", [])),
             speakers=_speakers(items.values()),
-            places=list(meta.get("places", [])),
+            topics=list(meta.get("topics", [])),
             visible_text=list(meta.get("visible_text", [])),
             session_ids=moment.session_ids,
             counts=MomentCounts.model_validate(

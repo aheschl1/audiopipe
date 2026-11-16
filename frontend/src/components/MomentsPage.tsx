@@ -64,10 +64,7 @@ function MomentEntry({
   moment: MomentRead
 }) {
   const { utterances, photos, frames } = moment.counts
-  const context = [
-    heardWith(moment.speakers),
-    moment.places.length ? `at ${joinNames(moment.places, 2)}` : null,
-  ].filter(Boolean)
+  const context = [heardWith(moment.speakers), ...moment.topics.slice(0, 3)].filter(Boolean)
   const tally = [
     utterances ? `${utterances} lines` : null,
     photos ? `${photos} photo${photos === 1 ? "" : "s"}` : null,
@@ -98,12 +95,10 @@ function DayHead({ day, story }: { day: Day; story?: string | null }) {
   const people = unique(
     day.moments.map((m) => m.speakers.filter((sp) => !isUnnamed(sp)).map((sp) => sp.name)),
   )
-  const places = unique(day.moments.map((m) => m.places))
   const n = day.moments.length
   const digest = [
     n ? `${n} moment${n === 1 ? "" : "s"}` : null,
     people.length ? `with ${joinNames(people, 4)}` : null,
-    places.length ? joinNames(places, 3) : null,
   ].filter(Boolean)
   return (
     <header className="day-head">

@@ -21,7 +21,7 @@
 
 The agent's links are the new idea, and a node-link diagram would hide them, not explain them. The page keeps the content in readable columns and lets the links act on the content.
 
-- **Head:** a breadcrumb, the title, the date, time span and duration, the summary at 16px, then a *People / Places / Text seen* fact row as chips. People chips use the palette dot, as they do elsewhere.
+- **Head:** a breadcrumb, the title, the date, time span and duration, the summary at 16px, then a *People / Topics / Text seen* fact row as chips. People chips use the palette dot, as they do elsewhere.
 - **Three columns (≥1100px):** *Heard* (utterances and sound spans), *Seen* (keyframes and photos as a 4:3 contact sheet), and a sticky 300px *Connections* aside.
 - **At rest, the web is visible as label refs.** Each line or tile carries small mono tags such as `K2` and `P1`, one for each item it links to. A dashed tag means every link to that item is below 0.5 confidence. The tags work with touch and with no hover, and clicking one selects that item and scrolls to it.
 - **Focus lights a neighbourhood.** Hovering or selecting any item dims everything outside its neighbourhood to 30% opacity. Linked items stay at full strength with a relation tag, phrased from their side ("K2 depicts U3" shows *depicts* on K2 when U3 is focused, and *depicted* on U3 when K2 is). This answers "what does this frame show being said" in one glance, with no lines drawn. Hovering a connection in the aside lights just its two ends.

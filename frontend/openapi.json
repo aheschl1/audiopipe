@@ -7228,12 +7228,13 @@
             "type": "array",
             "title": "Speakers"
           },
-          "places": {
+          "topics": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Places"
+            "title": "Topics",
+            "description": "Short topic tags from the model; empty when none apply."
           },
           "visible_text": {
             "items": {
@@ -7319,7 +7320,7 @@
           "summary",
           "people",
           "speakers",
-          "places",
+          "topics",
           "visible_text",
           "session_ids",
           "counts",
@@ -7609,12 +7610,13 @@
             "type": "array",
             "title": "Speakers"
           },
-          "places": {
+          "topics": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Places"
+            "title": "Topics",
+            "description": "Short topic tags from the model; empty when none apply."
           },
           "visible_text": {
             "items": {
@@ -7660,7 +7662,7 @@
           "summary",
           "people",
           "speakers",
-          "places",
+          "topics",
           "visible_text",
           "session_ids",
           "counts",

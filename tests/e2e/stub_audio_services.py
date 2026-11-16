@@ -108,7 +108,7 @@ def _moment_reply(request: dict) -> dict:
         "title": f"stub moment with {images} images",
         "summary": f"Items: {' '.join(labels)}.",
         "people": ["voice 1"],
-        "places": [],
+        "topics": ["test"],
         "visible_text": [],
         "links": [
             {"from": a, "to": b, "relation": "depicts", "confidence": 0.9, "why": "overlap"}

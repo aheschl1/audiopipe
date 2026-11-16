@@ -78,7 +78,7 @@ class Draft:
     title: str
     summary: str
     people: tuple[str, ...]
-    places: tuple[str, ...]
+    topics: tuple[str, ...]
     visible_text: tuple[str, ...]
     links: tuple[Link, ...]
     dropped_links: int = 0
@@ -248,7 +248,8 @@ Answer with a JSON object:
 - "summary": 2 to 4 sentences: what happened, where, with whom. Be literal; \
 never invent names that are not spoken or written in the items.
 - "people": the participants, by the speaker labels or names actually heard.
-- "places": places, as specific as the evidence allows.
+- "topics": short topic tags (1 to 3 words each, at most 5) for what the \
+moment is about, e.g. "budget review", "hiking". Empty when nothing applies.
 - "visible_text": text read from the images that matters, verbatim.
 - "links": how the items relate. Each link is {"from": label, "to": label, \
 "relation": one of the relations below, "confidence": 0 to 1, "why": a short \
@@ -366,7 +367,7 @@ def parse_reply(body: Mapping[str, Any], labels: Mapping[str, Item], link_max_ms
         title=title[:120],
         summary=summary,
         people=_strings(body.get("people")),
-        places=_strings(body.get("places")),
+        topics=_strings(body.get("topics"), 5),
         visible_text=_strings(body.get("visible_text"), 40),
         links=tuple(kept.values()),
         dropped_links=len(raw) - len(kept),

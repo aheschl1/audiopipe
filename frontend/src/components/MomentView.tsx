@@ -352,8 +352,8 @@ function Facts({ moment }: { moment: MomentDetail }) {
         </span>
       )),
     ])
-  if (moment.places.length)
-    rows.push(["Places", moment.places.map((p) => <span key={p} className="chip">{p}</span>)])
+  if (moment.topics.length)
+    rows.push(["Topics", moment.topics.map((t) => <span key={t} className="chip">{t}</span>)])
   if (moment.visible_text.length)
     rows.push([
       "Text seen",

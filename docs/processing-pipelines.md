@@ -537,8 +537,9 @@ moment has no single session.
   spans other than speech are S1…. Up to 12 images are attached, every photo
   first and then keyframes spread through time, as P1… and K1…. Each
   image–utterance pair within 2 s of each other is listed as a candidate for
-  the model to judge. The model returns a title, summary, people, places,
-  visible text and links.
+  the model to judge. The model returns a title, summary, people, topic
+  tags (up to 5, when any apply), visible text and links. It is not asked
+  for places.
 - **Links** land in `artifact_links`: from, to, `relation`
   (`depicts`/`mentions`/`reads`/`same_scene`/`unrelated`), confidence, why.
   Each link belongs to the moment that asserted it, and a link is deleted

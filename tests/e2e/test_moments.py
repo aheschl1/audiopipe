@@ -74,6 +74,7 @@ async def test_a_conversation_and_a_photo_become_one_linked_moment(
 
     assert detail["previous_id"] is None and detail["next_id"] is None
     assert [s["name"] for s in moment["speakers"]] == ["voice 1", "voice 2"]
+    assert moment["topics"] == ["test"] and "places" not in moment
 
     found = await client.get(
         "/v1/moments/at", params={"session_id": str(audio.id), "at_ms": 50}, headers=account.headers

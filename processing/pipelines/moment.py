@@ -259,7 +259,7 @@ class MomentPipeline(Pipeline):
             model=reply.model,
             metadata={
                 "people": list(draft.people),
-                "places": list(draft.places),
+                "topics": list(draft.topics),
                 "visible_text": list(draft.visible_text),
                 "items": [snapshot(label, item) for label, item in manifest.labels.items()],
                 "cover": [str(i.artifact_id) for i in cover(shown_images, draft.links)],

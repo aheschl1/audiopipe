@@ -127,6 +127,7 @@ def test_parse_reply_keeps_only_verifiable_links() -> None:
         "title": "Dinner by the window",
         "summary": "Dinner.",
         "people": ["Sam", "SPEAKER_01", 3],
+        "topics": ["dinner", " ", "a", "b", "c", "d", "e"],
         "visible_text": "SPECIALS",
         "links": [
             {"from": "K1", "to": "U1", "relation": "depicts", "confidence": 0.9, "why": "table"},
@@ -140,6 +141,7 @@ def test_parse_reply_keeps_only_verifiable_links() -> None:
     }
     draft = parse_reply(body, labels, link_max_ms=10 * 60_000)
     assert draft.people == ("Sam", "SPEAKER_01") and draft.visible_text == ("SPECIALS",)
+    assert draft.topics == ("dinner", "a", "b", "c", "d")
     got = {(l.from_id, l.to_id, l.relation): l.confidence for l in draft.links}
     assert got == {(k1.artifact_id, u1.artifact_id, "depicts"): 0.9, (k1.artifact_id, u1.artifact_id, "mentions"): 1.0}
     assert draft.dropped_links == 5

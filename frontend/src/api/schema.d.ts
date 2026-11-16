@@ -2303,8 +2303,11 @@ export interface components {
             people: string[];
             /** Speakers */
             speakers: components["schemas"]["MomentSpeaker"][];
-            /** Places */
-            places: string[];
+            /**
+             * Topics
+             * @description Short topic tags from the model; empty when none apply.
+             */
+            topics: string[];
             /** Visible Text */
             visible_text: string[];
             /** Session Ids */
@@ -2460,8 +2463,11 @@ export interface components {
             people: string[];
             /** Speakers */
             speakers: components["schemas"]["MomentSpeaker"][];
-            /** Places */
-            places: string[];
+            /**
+             * Topics
+             * @description Short topic tags from the model; empty when none apply.
+             */
+            topics: string[];
             /** Visible Text */
             visible_text: string[];
             /** Session Ids */
