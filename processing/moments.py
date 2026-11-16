@@ -245,7 +245,7 @@ its label. Times are local clock time.
 
 Answer with a JSON object:
 - "title": up to 8 words.
-- "summary": 2 to 4 sentences: what happened, where, with whom. Be literal; \
+- "summary": 2 to 4 sentences: what happened and with whom. Be literal; \
 never invent names that are not spoken or written in the items.
 - "people": the participants, by the speaker labels or names actually heard.
 - "topics": short topic tags (1 to 3 words each, at most 5) for what the \
