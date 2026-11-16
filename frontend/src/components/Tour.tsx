@@ -71,6 +71,15 @@ export function tourSeen(): boolean {
   }
 }
 
+/** Forget the tour was seen, so the next demo sign-in plays it. */
+export function resetTour(): void {
+  try {
+    localStorage.removeItem(SEEN_KEY)
+  } catch {
+    // storage blocked: the tour plays anyway
+  }
+}
+
 function markSeen(): void {
   try {
     localStorage.setItem(SEEN_KEY, "1")

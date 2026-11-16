@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Link } from "react-router"
 import { api } from "../api/client"
 import { DEMO_EMAIL, DEMO_PASSWORD } from "../demo"
+import { resetTour } from "./Tour"
 import HomeDemo from "./HomeDemo"
 
 /** Public landing page, shown at / to signed-out visitors. */
@@ -10,6 +11,7 @@ export default function Home({ onAuthed }: { onAuthed: () => void }) {
   const [failed, setFailed] = useState(false)
 
   const tryDemo = async () => {
+    resetTour()
     setBusy(true)
     setFailed(false)
     const { data } = await api.POST("/v1/auth/session", {
@@ -34,7 +36,7 @@ export default function Home({ onAuthed }: { onAuthed: () => void }) {
           <p className="home-tagline">Context for everyday, built for smart glasses</p>
           <div className="home-actions">
             <button className="btn primary home-cta" disabled={busy} onClick={() => void tryDemo()}>
-              {busy ? "Opening…" : "Try the demo"}
+              {busy ? "Opening…" : "Take a tour"}
             </button>
             <Link to="/login" className="btn home-cta">
               Sign in
