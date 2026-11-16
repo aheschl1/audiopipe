@@ -22,11 +22,11 @@ export function artifactUrl(artifactId: string, token: string): string {
   return `/v1/artifacts/${artifactId}/media?token=${encodeURIComponent(token)}`
 }
 
-/** The small upright JPEG when the thumbnail pipeline has run, else the original. */
-export function imageThumbUrl(image: ImageEvent, token: string): string {
-  return image.thumbnail_id
-    ? artifactUrl(image.thumbnail_id, token)
-    : mediaUrl(image.segment_id, token)
+/** The small upright JPEG when the thumbnail pipeline has run, else the original;
+ * nothing for a HEIC original, which browsers can't show. */
+export function imageThumbUrl(image: ImageEvent, token: string): string | undefined {
+  if (image.thumbnail_id) return artifactUrl(image.thumbnail_id, token)
+  return image.content_type === "image/heic" ? undefined : mediaUrl(image.segment_id, token)
 }
 
 /** Browsers can't show HEIC; fall back to the thumbnail for those. */

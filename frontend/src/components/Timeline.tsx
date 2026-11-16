@@ -472,7 +472,7 @@ export default function Timeline({
                   title={`${fmtWallTime(image.captured_at)} · open`}
                   onClick={() => onOpenImage?.(image.segment_id)}
                 >
-                  {mediaToken ? (
+                  {mediaToken && imageThumbUrl(image, mediaToken) ? (
                     <img
                       src={imageThumbUrl(image, mediaToken)}
                       alt={`image at ${fmtClock(Math.max(0, image.at_ms))}`}

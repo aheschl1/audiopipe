@@ -25,7 +25,11 @@ export default function SessionPhotos({
             title={`photo at ${fmtClock(Math.max(0, image.at_ms))}`}
             onClick={() => onOpen(index)}
           >
-            <img src={imageThumbUrl(image, token)} alt="" loading="lazy" />
+            {imageThumbUrl(image, token) ? (
+              <img src={imageThumbUrl(image, token)} alt="" loading="lazy" />
+            ) : (
+              <span className="thumb-placeholder" />
+            )}
             <span className="contact-time">{fmtClock(Math.max(0, image.at_ms))}</span>
           </button>
         ))}
