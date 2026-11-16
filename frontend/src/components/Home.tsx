@@ -2,7 +2,14 @@ import { useState } from "react"
 import { Link } from "react-router"
 import { api } from "../api/client"
 import { DEMO_EMAIL, DEMO_PASSWORD } from "../demo"
+import { resetTour } from "./Tour"
 import HomeDemo from "./HomeDemo"
+
+const PILLARS = [
+  ["See", "Your glasses capture photos and video as the day goes."],
+  ["Hear", "Speech is transcribed, and voices are recognized across recordings."],
+  ["Act", "Automations pull out details and trigger effects on each new moment."],
+]
 
 /** Public landing page, shown at / to signed-out visitors. */
 export default function Home({ onAuthed }: { onAuthed: () => void }) {
@@ -10,6 +17,7 @@ export default function Home({ onAuthed }: { onAuthed: () => void }) {
   const [failed, setFailed] = useState(false)
 
   const tryDemo = async () => {
+    resetTour()
     setBusy(true)
     setFailed(false)
     const { data } = await api.POST("/v1/auth/session", {
@@ -31,10 +39,10 @@ export default function Home({ onAuthed }: { onAuthed: () => void }) {
       <main className="home-hero">
         <div>
           <h1 className="home-title">Context</h1>
-          <p className="home-tagline">Context for everyday, built for smart glasses</p>
+          <p className="home-tagline">Get actionable context from your smart glasses</p>
           <div className="home-actions">
             <button className="btn primary home-cta" disabled={busy} onClick={() => void tryDemo()}>
-              {busy ? "Opening…" : "Try the demo"}
+              {busy ? "Opening…" : "Take a tour"}
             </button>
             <Link to="/login" className="btn home-cta">
               Sign in
@@ -44,6 +52,16 @@ export default function Home({ onAuthed }: { onAuthed: () => void }) {
         </div>
         <HomeDemo />
       </main>
+      <footer className="home-foot">
+        <div className="home-foot-inner">
+          {PILLARS.map(([title, text]) => (
+            <div key={title}>
+              <h2 className="home-foot-title">{title}</h2>
+              <p className="home-foot-text">{text}</p>
+            </div>
+          ))}
+        </div>
+      </footer>
     </div>
   )
 }

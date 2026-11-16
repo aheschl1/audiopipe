@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { api, type SpeakerRead } from "../api/client"
 import { shortId } from "../format"
-import { useReadOnly } from "../readOnly"
 import { categoryColor, localLabelTail } from "../speakers"
 
 // A voice, wearable anywhere: colour dot + best-known name. Clicking opens
@@ -26,7 +25,6 @@ export default function SpeakerChip({
   // Absent: a static, read-only chip (the public home page demo).
   onChanged?: () => void
 }) {
-  const readOnly = useReadOnly()
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLSpanElement | null>(null)
 
@@ -52,7 +50,7 @@ export default function SpeakerChip({
     (localLabel ? localLabelTail(localLabel) : clusterId ? shortId(clusterId) : "voice")
   const resolved = clusterId != null && name != null
 
-  if (!onChanged || readOnly)
+  if (!onChanged)
     return (
       <span className="speaker-chip-root">
         <span className={`speaker-chip static ${resolved ? "" : "unresolved"}`}>

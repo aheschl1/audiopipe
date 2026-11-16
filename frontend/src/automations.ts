@@ -1,5 +1,6 @@
 import { api, type Schemas } from "./api/client"
 import { clock, dayLabel } from "./format"
+import { isRefusal } from "./readOnly"
 
 export type Automation = Schemas["AutomationRead"]
 export type AutomationWrite = Schemas["AutomationWrite"]
@@ -94,8 +95,9 @@ export function fieldNames(a: Automation): string[] {
 export const TRIGGER = { moment: "New moment" } as const
 export const ACTION = { extract: "Extract fields" } as const
 
-/** FastAPI's 422 detail as one readable line. */
-export function problem(error: unknown): string {
+/** FastAPI's 422 detail as one readable line; null for a read-only refusal, which the notice covers. */
+export function problem(error: unknown): string | null {
+  if (isRefusal(error)) return null
   const detail = (error as { detail?: unknown } | undefined)?.detail
   if (typeof detail === "string") return detail
   if (Array.isArray(detail) && detail.length) {
@@ -107,12 +109,11 @@ export function problem(error: unknown): string {
 }
 
 /** Flip a rule on or off without touching the rest of it. */
-export async function setEnabled(a: Automation, enabled: boolean): Promise<Automation | null> {
-  const { data } = await api.PUT("/v1/automations/{automation_id}", {
+export function setEnabled(a: Automation, enabled: boolean) {
+  return api.PUT("/v1/automations/{automation_id}", {
     params: { path: { automation_id: a.id } },
     body: { ...asWrite(a), enabled },
   })
-  return data ?? null
 }
 
 /** "Today 9:00 AM", for a run or a match. */

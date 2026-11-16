@@ -69,6 +69,33 @@
   text-decoration: none;
 }
 
+.home-foot {
+  flex: none;
+  border-top: var(--bw) solid var(--line);
+}
+
+.home-foot-inner {
+  width: min(1200px, 100% - 2 * var(--gutter));
+  margin: 0 auto;
+  padding: var(--sp-7) 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 220px));
+  gap: var(--sp-6);
+}
+
+.home-foot-title {
+  margin: 0 0 var(--sp-1);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+
+.home-foot-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+}
+
 /* the demo window */
 
 .demo {
@@ -133,6 +160,12 @@
 
   .home-tagline {
     font-size: var(--fs-lg);
+  }
+
+  .home-foot-inner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-4);
+    padding: var(--sp-6) 0;
   }
 
   .demo .strip-talk {

@@ -4,6 +4,7 @@
 
 import createClient, { type Middleware } from "openapi-fetch"
 import type { components, paths } from "./schema"
+import { isRefusal, refused } from "../readOnly"
 import { CSRF_HEADER, CSRF_VALUE, expire } from "./auth"
 
 export type Schemas = components["schemas"]
@@ -44,9 +45,16 @@ const auth: Middleware = {
     request.headers.set(CSRF_HEADER, CSRF_VALUE)
     return request
   },
-  onResponse({ request, response }) {
+  async onResponse({ request, response }) {
     // A failed login is not an expired session; only established auth expires.
     if (response.status === 401 && !request.url.includes("/v1/auth/")) expire()
+    if (response.status === 403) {
+      const body: unknown = await response
+        .clone()
+        .json()
+        .catch(() => null)
+      if (isRefusal(body)) refused()
+    }
     return response
   },
 }
