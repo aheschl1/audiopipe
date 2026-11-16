@@ -353,15 +353,6 @@ function Facts({ moment }: { moment: MomentDetail }) {
     ])
   if (moment.topics.length)
     rows.push(["Topics", moment.topics.map((t) => <span key={t} className="chip">{t}</span>)])
-  if (moment.visible_text.length)
-    rows.push([
-      "Text seen",
-      moment.visible_text.map((t) => (
-        <span key={t} className="chip seen-text">
-          “{t}”
-        </span>
-      )),
-    ])
   if (!rows.length) return null
   return (
     <dl className="facts">
@@ -372,6 +363,26 @@ function Facts({ moment }: { moment: MomentDetail }) {
         </div>
       ))}
     </dl>
+  )
+}
+
+/** Text read off the frames, tucked away: OCR is noisy, so drop strings with no letters. */
+function TextSeen({ moment }: { moment: MomentDetail }) {
+  const text = moment.visible_text.filter((t) => /\p{L}/u.test(t))
+  if (!text.length) return null
+  return (
+    <details className="text-seen">
+      <summary className="section-label">
+        Text seen <span className="section-count">{text.length}</span>
+      </summary>
+      <div className="chips">
+        {text.map((t) => (
+          <span key={t} className="chip seen-text">
+            “{t}”
+          </span>
+        ))}
+      </div>
+    </details>
   )
 }
 
@@ -692,6 +703,7 @@ export default function MomentView({
           )}
         </aside>
       </div>
+      <TextSeen moment={moment} />
     </div>
   )
 }

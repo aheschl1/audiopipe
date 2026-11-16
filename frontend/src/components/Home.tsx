@@ -38,9 +38,6 @@ export default function Home({ onAuthed }: { onAuthed: () => void }) {
             <button className="btn primary home-cta" disabled={busy} onClick={() => void tryDemo()}>
               {busy ? "Opening…" : "Take a tour"}
             </button>
-            <Link to="/login" className="btn home-cta">
-              Sign in
-            </Link>
           </div>
           {failed && <p className="home-error">The demo is unavailable right now.</p>}
         </div>

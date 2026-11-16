@@ -79,6 +79,11 @@
   top: var(--tour-note-h);
 }
 
+/* An open menu sits above the tour's blur. */
+.app.touring .sidebar:has(.menu-pop) {
+  z-index: 62;
+}
+
 @media (min-width: 900px) {
   .app.touring .sidebar {
     height: calc(100vh - var(--tour-note-h));

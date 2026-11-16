@@ -273,6 +273,20 @@
   white-space: normal;
 }
 
+.text-seen {
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-4);
+  border-top: var(--bw) solid var(--line);
+}
+
+.text-seen summary {
+  cursor: pointer;
+}
+
+.text-seen .chips {
+  margin-top: var(--sp-2);
+}
+
 .evidence {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 300px;

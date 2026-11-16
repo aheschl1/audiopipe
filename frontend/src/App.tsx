@@ -24,7 +24,8 @@ import Menu from "./components/Menu"
 import MomentView from "./components/MomentView"
 import Overview from "./components/Overview"
 import ReadOnlyNotice from "./components/ReadOnlyNotice"
-import Tour, { tourSeen } from "./components/Tour"
+import Tour, { markSeen, tourSeen } from "./components/Tour"
+import { ReadOnlyContext } from "./readOnly"
 import { DEMO_EMAIL } from "./demo"
 import { preloadMapLibre } from "./map/trackMap"
 import SearchView from "./components/SearchView"
@@ -257,11 +258,21 @@ export default function App() {
               </>
             }
             items={[
-              ...(me?.user.email === DEMO_EMAIL && !touring
-                ? [{ label: "Take the tour", onSelect: () => setTouring(true) }]
+              ...(me?.user.email === DEMO_EMAIL
+                ? [
+                    touring
+                      ? {
+                          label: "End tour",
+                          onSelect: () => {
+                            markSeen()
+                            setTouring(false)
+                          },
+                        }
+                      : { label: "Take the tour", onSelect: () => setTouring(true) },
+                  ]
                 : []),
               {
-                label: "Log out",
+                label: me?.user.email === DEMO_EMAIL ? "Exit demo" : "Log out",
                 onSelect: () => void api.DELETE("/v1/auth/session").finally(() => setAuthed(false)),
               },
             ]}
@@ -270,6 +281,7 @@ export default function App() {
       </nav>
 
       <main className={`main ${wide ? "wide" : ""}`}>
+        <ReadOnlyContext.Provider value={!!me?.user.read_only}>
         <Routes>
           <Route path="/" element={<Overview />} />
           <Route path="/moments" element={<MomentsPage />} />
@@ -287,6 +299,7 @@ export default function App() {
           <Route path="/ab/:id" element={<AbVoteRoute />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </ReadOnlyContext.Provider>
       </main>
       <ReadOnlyNotice />
       {touring && <Tour onClose={() => setTouring(false)} />}

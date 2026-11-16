@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useContext, useEffect, useRef, useState } from "react"
 import { useSearchParam } from "../useParam"
 import {
   api,
@@ -12,6 +12,7 @@ import { fmtClock, fmtDate, shortId } from "../format"
 import { categoryColor, categoryTint, initials, speakerLabel } from "../speakers"
 import ClipButton, { ClipProgress } from "./ClipButton"
 import Menu from "./Menu"
+import { ReadOnlyContext } from "../readOnly"
 import PageHead from "./PageHead"
 
 // Centroids of one voice spread up to ~0.6; different voices sit near ~0.9.
@@ -573,16 +574,21 @@ export default function SpeakersView({
   }
 
   const effectiveDistance = params?.effective.cluster_distance ?? 0.65
+  const readOnly = useContext(ReadOnlyContext)
 
   return (
     <div className="speakers-view">
       <PageHead title="People">
         <Menu
           items={[
-            {
-              label: panelOpen ? "Hide clustering settings" : "Clustering settings",
-              onSelect: () => setPanelOpen((o) => !o),
-            },
+            ...(readOnly
+              ? []
+              : [
+                  {
+                    label: panelOpen ? "Hide clustering settings" : "Clustering settings",
+                    onSelect: () => setPanelOpen((o) => !o),
+                  },
+                ]),
             { label: "Voice map", to: "/speakers/map" },
           ]}
         />

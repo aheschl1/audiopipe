@@ -23,30 +23,34 @@ const STEPS: Step[] = [
   {
     path: "/",
     anchor: ["a.moment"],
-    text: "A customer just came in. Let's see everything that happened.",
+    text: "A mechanic wore smart glasses through one customer visit. Context turned it into this moment. Open it to see what happened.",
     done: (path) => path.startsWith("/moments/"),
   },
   {
     path: () => document.querySelector("a.moment")?.getAttribute("href"),
     anchor: [".moment-head-summary", ".moment-head-title"],
-    text: "Quick recap: here's what happened during the interaction",
-  },
-  {
-    anchor: [".moment-automations"],
-    select: ".fired-pill",
-    text: "This automation was triggered, and the job was documented.",
-  },
-  {
-    anchor: [".facts"],
-    text: "Some topics and people got recognized",
+    text: "Written from what the glasses heard and saw. Nobody typed anything.",
   },
   {
     anchor: [".ev-aside"],
     select: CV_BOOT,
-    text: "Here's photo evidence of everything the mechanic said.",
+    text: "Every line links to its proof. Here, \u201cCV boot is torn\u201d is tied to the frame where you can see the tear.",
   },
-  { path: "/search", anchor: [".search-bar"], text: "Need to find something that happened or was said? This search can find pictures, transcripts, and sounds" },
-  { path: "/speakers", anchor: [".speaker-row", ".list"], text: "Find a person, and lookup past interactions." },
+  {
+    anchor: [".moment-automations"],
+    select: ".fired-pill",
+    text: "The Service visit automation filled in the complaint, the finding and the $340 quote, straight from the conversation.",
+  },
+  {
+    path: "/search?q=CV%20boot",
+    anchor: [".search-bar"],
+    text: "Search for what\u2019s been said or seen, across your entire library.",
+  },
+  {
+    path: "/speakers",
+    anchor: [{ selector: ".speaker-row", text: "Michelle" }, ".speaker-row", ".list"],
+    text: "Voices are recognized across visits. Every conversation with Michelle is here.",
+  },
   {
     path: async () => {
       const { data } = await api.GET("/v1/sessions", { params: { query: { limit: 1, offset: 0 } } })
@@ -54,17 +58,18 @@ const STEPS: Step[] = [
       return id ? `/sessions/${id}` : "/sessions"
     },
     anchor: [".timeline-wrap", ".session-main"],
-    text: "If you want to go deeper on any moment, you can visit timelines",
+    text: "Every moment links back to the full recording, second by second.",
   },
   {
     path: "/automations",
     anchor: [".auto-table"],
-    text: "Trigger action when things happen with automations.",
+    text: "Automations watch for the moments you care about and do the paperwork.",
   },
-  { text: "The platforms in progress - send any feedback to ajheschl@gmail.com" },
+  { text: "Replay the tour anytime from the menu. Feedback: ajheschl@gmail.com" },
 ]
 
 const SEEN_KEY = "context.tour.seen"
+const EMAIL = /([\w.+-]+@[\w-]+\.[\w.]+\w)/
 const GAP = 12
 const EDGE = 16
 const PAD = 4
@@ -101,7 +106,7 @@ export function resetTour(): void {
   }
 }
 
-function markSeen(): void {
+export function markSeen(): void {
   try {
     localStorage.setItem(SEEN_KEY, "1")
   } catch {
@@ -241,7 +246,17 @@ export default function Tour({ onClose }: { onClose: () => void }) {
         />
       )}
       <div ref={bubbleRef} className="tour-bubble" style={place} role="dialog" aria-label="Tour">
-        <p className="tour-text">{step.text}</p>
+        <p className="tour-text">
+          {step.text.split(EMAIL).map((part, i) =>
+            i % 2 ? (
+              <a key={i} href={`mailto:${part}`}>
+                {part}
+              </a>
+            ) : (
+              part
+            ),
+          )}
+        </p>
         <div className="tour-foot">
           <span className="tour-count">
             {index + 1} of {STEPS.length}

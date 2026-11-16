@@ -114,7 +114,8 @@ async def _stream(ws_url: str, token: str, pcm: bytes, start: datetime, duration
             await ws.send(encode_audio_frame(sequence, chunk, at))
             sequence += 1
 
-        await ws.send(json.dumps({"type": "finish"}))
+        ended_at = start + timedelta(milliseconds=duration_ms)
+        await ws.send(json.dumps({"type": "finish", "ended_at": ended_at.isoformat()}))
         through = -1
         async for message in ws:
             if isinstance(message, bytes):
