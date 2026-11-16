@@ -47,6 +47,7 @@ from api.schema.sessions import (
 )
 from api.schema.speakers import SessionSpeakerRead
 from api.schema.timeline import TimelineEvent
+from database.exceptions import SessionEndedError
 from database.schema.sessions import SessionCreate
 from storage.pipe import BlobPipe
 
@@ -233,6 +234,8 @@ async def upload_segment(
         )
     except ResourceValidationError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    except SessionEndedError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, "recording session has ended") from exc
     return segment_read(segment)
 
 

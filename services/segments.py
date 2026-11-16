@@ -109,6 +109,12 @@ async def ingest_segment(
     raise AssertionError("unreachable")  # the loop returns or raises
 
 
+async def _touch(pipe: DatabasePipe, session_id: UUID, upload: bool) -> None:
+    """Uploads refuse a session that ended while their bytes were in flight."""
+    if not await pipe.sessions.touch(session_id) and upload:
+        raise SessionEndedError(session_id)
+
+
 async def _ingest_once(
     session_id: UUID,
     data: bytes,
@@ -135,7 +141,7 @@ async def _ingest_once(
             )
         if validated.payload is not None:
             # Inline: the row is the storage — one transaction, done.
-            await pipe.sessions.touch(session_id)
+            await _touch(pipe, session_id, upload)
             return await pipe.segments.create(
                 _row(session, segment_id, sequence, resource, validated, checksum,
                      byte_size=len(data), offset_ms=offset_ms, metadata=metadata)
@@ -152,7 +158,7 @@ async def _ingest_once(
         info = await blobs.put(key, data, content_type=validated.content_type)
         try:
             async with DatabasePipe() as pipe:
-                await pipe.sessions.touch(session_id)
+                await _touch(pipe, session_id, upload)
                 return await pipe.segments.create(
                     _row(session, segment_id, sequence, resource, validated, checksum,
                          byte_size=info.byte_size, offset_ms=offset_ms, metadata=metadata,
