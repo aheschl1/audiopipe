@@ -8,19 +8,18 @@ const CY = 118
 const CAPTIONS = [
   ["You do", "the work"],
   ["Your glasses", "take the notes"],
-  ["The paperwork", "does itself"],
+  ["The documentation", "writes itself"],
 ]
-const FIXED = 0
 
 type Pt = [number, number]
 
 // One nut, one arc, in page coordinates: constant horizontal speed, so the
 // time it spends hidden between bubbles matches the distance it covers there.
-// It leaves the mechanic's raised hand and comes down on the number; the apex
+// It leaves the mechanic's raised hand and comes down on the blank job record; the apex
 // shifts so the parabola passes through both at a fixed height.
 const TOSS: Pt = [CENTERS[0] + 16, CY]
 const TOSS_X = TOSS[0]
-const LAND_Y = CY - 4
+const LAND_Y = CY - 5
 const APEX_Y = 50
 const APEX_X = (() => {
   const r = Math.sqrt((TOSS[1] - APEX_Y) / (LAND_Y - APEX_Y))
@@ -44,7 +43,7 @@ const T_THROW = T_PULL + PULL_MS
 const T_TOSS = T_THROW + THROW_MS
 const FLIP_MS = 320
 
-// Off the number: a short pop up, a little drift, then down onto the swoop.
+// Off the report: a short pop up, a little drift, then down onto the swoop.
 const BOUNCE_VX = 35
 const BOUNCE_VY = -95
 const BOUNCE_G = 280
@@ -87,7 +86,7 @@ function entryX(i: number): number {
 const msAt = (x: number) => T_TOSS + ((x - TOSS_X) / SPEED) * 1000
 const T_SEEN = msAt(entryX(1))
 const T_ARRIVES = msAt(entryX(2))
-// The arc comes down on the number in the middle of bubble three.
+// The arc comes down on the report in the middle of bubble three.
 const T_LANDS = msAt(CENTERS[2])
 
 // The logo's swoop (60x60 mark: M0 22 C16 26 28 38 42 40 C50 41 56 39 60 37), stretched under the bubbles.
@@ -373,31 +372,50 @@ function Watcher({ ms, nut, live }: { ms: number; nut: Pt | null; live: boolean 
   )
 }
 
-/** Bubble three: the counter; the nut lands on it and it flips over to one more. */
-function Counter({ ms, still }: { ms: number; still: boolean }) {
-  const p = still ? 1 : (ms - T_LANDS) / FLIP_MS
-  // As the next throw leaves, the last count quietly folds back to zero.
-  const reset = still ? 1 : ms / FLIP_MS
-  const flipped = p >= 0.5 || reset < 0.5
-  // Fold the old number shut, then open the new one.
-  const fold =
-    reset < 1 ? Math.abs(Math.cos(Math.PI * reset)) : p <= 0 || p >= 1 ? 1 : Math.abs(Math.cos(Math.PI * p))
-  const fresh = !still && p >= 0.5 && ms < T_LANDS + FLIP_MS + 700
+// The report's lines, written one after another once the nut lands: [y, length].
+const REPORT: [number, number][] = [
+  [-5, 112],
+  [7, 96],
+  [19, 106],
+  [31, 58],
+]
+const LINE_MS = 380
+const REPORT_X = -56
+
+/** Bubble three: a blank job record that writes itself, line by line, once the nut lands. */
+function Report({ ms, still }: { ms: number; still: boolean }) {
+  const t = still ? Infinity : ms - T_LANDS
+  // The last report fades as the next throw leaves, then the page waits blank.
+  const fade = still ? 1 : ms < FLIP_MS ? 1 - ms / FLIP_MS : 1
+  const carry = !still && ms < FLIP_MS
   return (
     <g transform={`translate(${CENTERS[2]} ${CY})`}>
-      <g transform={`translate(0 -1) scale(1 ${Math.max(0.02, fold)}) translate(0 1)`}>
-        <text className={`hs-counter ${fresh ? "landed" : ""}`} x={0} y={8} textAnchor="middle">
-          {flipped ? FIXED + 1 : FIXED}
-        </text>
-      </g>
-      <text className="hs-counter-sub" x={0} y={36} textAnchor="middle">
-        engines fixed
+      <rect className="hs-card" x={-70} y={-46} width={140} height={90} rx={6} />
+      <text className="hs-card-title" x={REPORT_X} y={-27}>
+        Job record
       </text>
+      <line className="hs-card-rule" x1={REPORT_X} y1={-18} x2={56} y2={-18} />
+      {REPORT.map(([y, len], i) => {
+        const p = carry ? 1 : clamp((t - i * LINE_MS) / LINE_MS)
+        if (p <= 0) return null
+        const writing = !still && !carry && p < 1
+        return (
+          <line
+            key={y}
+            className={`hs-report-line ${writing ? "writing" : ""}`}
+            x1={REPORT_X}
+            y1={y}
+            x2={REPORT_X + len * p}
+            y2={y}
+            style={{ opacity: carry ? fade : 1 }}
+          />
+        )
+      })}
     </g>
   )
 }
 
-/** The landing page's story: a mechanic tosses a nut, the glasses catch it, and the count goes up. */
+/** The landing page's story: a mechanic tosses a nut, the glasses catch it, and the job record writes itself. */
 export default function HomeStory() {
   const still = useReducedMotion()
   const now = useClock(still)
@@ -424,7 +442,7 @@ export default function HomeStory() {
         className="home-story"
         viewBox="0 0 720 260"
         role="img"
-        aria-label="A mechanic working on an engine tosses a nut, someone wearing smart glasses sees it, and an engines-fixed counter goes up."
+        aria-label="A mechanic working on an engine tosses a nut, someone wearing smart glasses sees it, and a job record writes itself."
       >
         <defs>
           {CENTERS.map((cx, i) => (
@@ -458,7 +476,7 @@ export default function HomeStory() {
             <g clipPath={`url(#hs-clip-${i})`}>
               {i === 0 && <Mechanic ms={ms} />}
               {i === 1 && <line className="hs-ground" x1={cx - 80} y1={CY + 58} x2={cx + 80} y2={CY + 58} />}
-              {i === 2 && <Counter ms={ms} still={still} />}
+              {i === 2 && <Report ms={ms} still={still} />}
             </g>
             {i === 1 && (
               <g>
