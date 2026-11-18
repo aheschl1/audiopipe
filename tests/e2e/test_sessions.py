@@ -6,6 +6,7 @@ from uuid import uuid4
 import httpx
 
 from database.pipe import DatabasePipe
+from database.schema.sessions import SessionCreate
 from tests.e2e.conftest import Account, make_session
 
 
@@ -22,8 +23,6 @@ async def test_sessions_are_listed_newest_first(
     client: httpx.AsyncClient, account: Account
 ) -> None:
     now = datetime.now(UTC)
-    from database.schema.sessions import SessionCreate
-
     async with DatabasePipe() as pipe:
         older = await pipe.sessions.create(
             SessionCreate(user_id=account.user.id, label="older", started_at=now - timedelta(1))
@@ -50,6 +49,35 @@ async def test_open_only_filters_ended_sessions(
 
     everything = (await client.get("/v1/sessions", headers=account.headers)).json()
     assert len(everything["items"]) == 2
+
+
+async def test_since_until_keep_overlapping_sessions(
+    client: httpx.AsyncClient, account: Account
+) -> None:
+    now = datetime.now(UTC)
+    async with DatabasePipe() as pipe:
+        old = await pipe.sessions.create(
+            SessionCreate(user_id=account.user.id, started_at=now - timedelta(hours=30))
+        )
+        await pipe.sessions.end(old.id, ended_at=now - timedelta(hours=29))
+        straddling = await pipe.sessions.create(
+            SessionCreate(user_id=account.user.id, started_at=now - timedelta(hours=25))
+        )
+        await pipe.sessions.end(straddling.id, ended_at=now - timedelta(hours=23))
+        live = await pipe.sessions.create(
+            SessionCreate(user_id=account.user.id, started_at=now - timedelta(hours=1))
+        )
+
+    params = {
+        "since": (now - timedelta(hours=24)).isoformat(),
+        "until": now.isoformat(),
+    }
+    body = (await client.get("/v1/sessions", params=params, headers=account.headers)).json()
+    assert [item["id"] for item in body["items"]] == [str(live.id), str(straddling.id)]
+
+    early = {"until": (now - timedelta(hours=2)).isoformat()}
+    body = (await client.get("/v1/sessions", params=early, headers=account.headers)).json()
+    assert str(live.id) not in [item["id"] for item in body["items"]]
 
 
 async def test_session_detail_shape(client: httpx.AsyncClient, account: Account) -> None:

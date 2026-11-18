@@ -51,12 +51,23 @@ class SessionsRepo(BaseRepo):
         open_only: bool = False,
         limit: int = 50,
         offset: int = 0,
+        since: datetime | None = None,
+        until: datetime | None = None,
     ) -> list[RecordingSession]:
+        """Newest first; ``since``/``until`` keep sessions overlapping that window."""
         sql = f"SELECT {COLUMNS} FROM recording_sessions WHERE user_id = %s"
+        params: list[object] = [user_id]
         if open_only:
             sql += " AND ended_at IS NULL"
+        if since is not None:
+            sql += " AND (ended_at IS NULL OR ended_at >= %s)"
+            params.append(since)
+        if until is not None:
+            sql += " AND started_at < %s"
+            params.append(until)
         sql += " ORDER BY started_at DESC LIMIT %s OFFSET %s"
-        return await self._fetch_all(RecordingSession, sql, (user_id, limit, offset))
+        params += [limit, offset]
+        return await self._fetch_all(RecordingSession, sql, tuple(params))
 
     async def touch(self, session_id: UUID) -> bool:
         """Record activity on an open session, keeping the sweeper away.

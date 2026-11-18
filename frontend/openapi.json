@@ -439,6 +439,44 @@
             "description": "Only sessions that have not ended."
           },
           {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only sessions still running at or after this time.",
+              "title": "Since"
+            },
+            "description": "Only sessions still running at or after this time."
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only sessions started before this time.",
+              "title": "Until"
+            },
+            "description": "Only sessions started before this time."
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,

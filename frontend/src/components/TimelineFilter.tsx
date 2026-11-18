@@ -53,9 +53,11 @@ function saveHidden(hidden: Set<EventKind>): void {
 export default function TimelineFilter({
   hidden,
   onChange,
+  kinds = ALL_KINDS,
 }: {
   hidden: Set<EventKind>
   onChange: (hidden: Set<EventKind>) => void
+  kinds?: { key: EventKind; label: string }[]
 }) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement | null>(null)
@@ -91,7 +93,7 @@ export default function TimelineFilter({
       </button>
       {open && (
         <div className="filter-pop">
-          {ALL_KINDS.map(({ key, label }) => (
+          {kinds.map(({ key, label }) => (
             <label key={key} className="filter-option">
               <input
                 type="checkbox"

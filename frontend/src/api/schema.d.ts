@@ -4471,6 +4471,10 @@ export interface operations {
             query?: {
                 /** @description Only sessions that have not ended. */
                 open_only?: boolean;
+                /** @description Only sessions still running at or after this time. */
+                since?: string | null;
+                /** @description Only sessions started before this time. */
+                until?: string | null;
                 limit?: number;
                 offset?: number;
             };

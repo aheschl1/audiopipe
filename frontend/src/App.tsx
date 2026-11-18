@@ -31,16 +31,18 @@ import { preloadMapLibre } from "./map/trackMap"
 import SearchView from "./components/SearchView"
 import SessionList from "./components/SessionList"
 import SessionView from "./components/SessionView"
+import TimelinePage from "./components/TimelinePage"
 import SpeakerMap from "./components/SpeakerMap"
 import SpeakersView from "./components/SpeakersView"
 import { useSearchParam } from "./useParam"
 
 type NavItem = { to: string; label: string; match: (path: string) => boolean }
 
-// Recordings, the voice map, Places and A/B are off the nav: reached from moments, People and recordings.
+// The voice map, Places and A/B are off the nav: reached from moments, People and recordings.
 const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", match: (path) => path === "/" },
   { to: "/moments", label: "Moments", match: (path) => path.startsWith("/moments") },
+  { to: "/timeline", label: "Timeline", match: (path) => path === "/timeline" },
   { to: "/automations", label: "Automations", match: (path) => path.startsWith("/automations") },
   { to: "/search", label: "Search", match: (path) => path === "/search" },
   { to: "/speakers", label: "People", match: (path) => path.startsWith("/speakers") },
@@ -286,6 +288,7 @@ export default function App() {
           <Route path="/" element={<Overview />} />
           <Route path="/moments" element={<MomentsPage />} />
           <Route path="/moments/:id" element={<MomentRoute />} />
+          <Route path="/timeline" element={<TimelinePage />} />
           <Route path="/sessions" element={<SessionList onOpen={openSession} />} />
           <Route path="/sessions/:id" element={<SessionRoute />} />
           <Route path="/search" element={<SearchView onOpen={openAt} onOpenRecording={openSession} />} />

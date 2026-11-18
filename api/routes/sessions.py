@@ -80,10 +80,17 @@ async def list_sessions(
     pipe: Pipe,
     paging: Paging,
     open_only: bool = Query(False, description="Only sessions that have not ended."),
+    since: datetime | None = Query(None, description="Only sessions still running at or after this time."),
+    until: datetime | None = Query(None, description="Only sessions started before this time."),
 ) -> Page[SessionRead]:
     """Newest first, scoped to the caller."""
     rows = await pipe.sessions.list_for_user(
-        user.id, open_only=open_only, limit=paging.probe_limit, offset=paging.offset
+        user.id,
+        open_only=open_only,
+        limit=paging.probe_limit,
+        offset=paging.offset,
+        since=since,
+        until=until,
     )
     return Page.build(rows, paging, SessionRead.from_model)
 

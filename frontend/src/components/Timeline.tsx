@@ -10,13 +10,16 @@ import {
 import { fmtClock } from "../format"
 import { describePoint, fmtCoords } from "../location"
 import { audible, describeSpan } from "../sounds"
-import { clipUrl, fmtWallTime, imageThumbUrl } from "../visual"
+import { clipUrl, fmtWallTime, imageEvents, imageThumbUrl } from "../visual"
+import ImageLightbox from "./ImageLightbox"
 import SpeakerChip from "./SpeakerChip"
 import TimelineFilter, { type EventKind } from "./TimelineFilter"
 import VideoGutter from "./VideoGutter"
 import VideoLightbox from "./VideoLightbox"
 
 const PAGE = 200
+// Frames that carry no content of their own.
+const QUIET = new Set(["session-start", "session-end", "speech-start", "speech-end"])
 // Deep links load the timeline from a little before the target moment, so
 // the interesting event is on the first page even in a long session.
 const FOCUS_LEAD_MS = 15_000
@@ -38,37 +41,70 @@ export default function Timeline({
   sessionId,
   onSeek,
   focusMs,
-  activeId,
+  activeId: activeIdProp,
+  playheadMs,
   follow,
   refreshKey,
   onSpeakersChanged,
   onOpenImage,
   hidden,
   onHiddenChange,
+  stitched,
 }: {
   sessionId: string
   onSeek: (ms: number) => void
   focusMs?: number
   // `artifact_id + start_ms` of the utterance under the playhead, if any.
   activeId?: string | null
+  // Alternative to `activeId`: the playhead, matched against this timeline's own rows.
+  playheadMs?: number
   // When true (playing + follow mode), the active row keeps itself in view.
   follow?: boolean
   refreshKey?: number
   onSpeakersChanged?: () => void
   onOpenImage?: (segmentId: string) => void
   hidden: Set<EventKind>
-  onHiddenChange: (hidden: Set<EventKind>) => void
+  onHiddenChange?: (hidden: Set<EventKind>) => void
+  // One recording among several on the cross-session timeline: wall-clock
+  // times, no toolbar or session markers, clipped to a window, and paged by
+  // scrolling instead of a button. `onDone` fires once every page is loaded.
+  stitched?: {
+    startedAt: string
+    fromMs: number | null
+    toMs: number | null
+    onDone: (hasContent: boolean) => void
+  }
 }) {
   const [events, setEvents] = useState<TimelineEvent[] | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [busy, setBusy] = useState(false)
   const [fromMs, setFromMs] = useState<number | null>(
-    focusMs !== undefined ? Math.max(0, focusMs - FOCUS_LEAD_MS) : null,
+    stitched ? stitched.fromMs : focusMs !== undefined ? Math.max(0, focusMs - FOCUS_LEAD_MS) : null,
   )
+  const toMs = stitched?.toMs ?? null
+  const isStitched = stitched !== undefined
   const [flashKey, setFlashKey] = useState<string | null>(null)
   const flashed = useRef(false)
   // Location runs render collapsed; a click on the head row expands one.
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set())
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const images = useMemo(() => imageEvents(events ?? []), [events])
+  const openImage = useCallback(
+    (segmentId: string) => {
+      if (onOpenImage) return onOpenImage(segmentId)
+      const index = images.findIndex((image) => image.segment_id === segmentId)
+      if (index >= 0) setLightboxIndex(index)
+    },
+    [onOpenImage, images],
+  )
+  const activeId = useMemo(() => {
+    if (activeIdProp !== undefined || playheadMs === undefined || !events) return activeIdProp
+    const hit = events.find(
+      (e): e is TranscriptEvent =>
+        e.type === "transcript" && playheadMs >= e.start_ms && playheadMs < e.end_ms,
+    )
+    return hit ? hit.artifact_id + hit.start_ms : null
+  }, [activeIdProp, playheadMs, events])
   // Inline transcript correction; keyed like the rows so only one is open.
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState("")
@@ -101,6 +137,7 @@ export default function Timeline({
             limit: PAGE,
             offset,
             ...(windowStart !== null ? { from_ms: windowStart } : {}),
+            ...(toMs !== null ? { to_ms: toMs } : {}),
           },
         },
       })
@@ -109,7 +146,7 @@ export default function Timeline({
       setHasMore(data.has_more)
       setEvents((prev) => (offset === 0 ? data.items : [...(prev ?? []), ...data.items]))
     },
-    [sessionId],
+    [sessionId, toMs],
   )
 
   useEffect(() => {
@@ -138,6 +175,7 @@ export default function Timeline({
               limit: PAGE,
               offset: all.length,
               ...(fromMs !== null ? { from_ms: fromMs } : {}),
+              ...(toMs !== null ? { to_ms: toMs } : {}),
             },
           },
         })
@@ -149,7 +187,30 @@ export default function Timeline({
       setEvents(all)
       setHasMore(more)
     })()
-  }, [refreshKey, sessionId, fromMs])
+  }, [refreshKey, sessionId, fromMs, toMs])
+
+  const onDone = stitched?.onDone
+  useEffect(() => {
+    if (events && !hasMore) onDone?.(events.some((e) => !QUIET.has(e.type)))
+  }, [events, hasMore, onDone])
+
+  // Stitched recordings page by scrolling: the next page loads as the end nears.
+  const moreRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const node = moreRef.current
+    if (!isStitched || !node || !hasMore || busy || !events) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void load(events.length, fromMs)
+      },
+      { rootMargin: "600px" },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [isStitched, hasMore, busy, events, load, fromMs])
+
+  const stamp = (ms: number) =>
+    stitched ? fmtWallTime(new Date(Date.parse(stitched.startedAt) + ms).toISOString()) : fmtClock(ms)
 
   // Flash-and-scroll the first substantive event at/after the focus moment,
   // once per deep link.
@@ -204,7 +265,7 @@ export default function Timeline({
   }, [follow, activeId])
 
   if (!events)
-    return (
+    return stitched ? null : (
       <div className="list">
         {[36, 52, 36, 68, 36].map((height, i) => (
           <div key={i} className="skeleton" style={{ height }} />
@@ -231,7 +292,7 @@ export default function Timeline({
               title="Listen from here"
               onClick={() => onSeek(event.at_ms)}
             >
-              {fmtClock(event.at_ms)}
+              {stamp(event.at_ms)}
             </button>
             <div className="event-body">
               {(event.speaker || event.speaker_id) && (
@@ -310,7 +371,7 @@ export default function Timeline({
               title="Listen from here"
               onClick={() => onSeek(event.at_ms)}
             >
-              {fmtClock(event.at_ms)}
+              {stamp(event.at_ms)}
             </button>
             <div className="event-body chips">
               {tags.slice(0, 5).map((tag) => (
@@ -336,7 +397,7 @@ export default function Timeline({
               title="Listen from here"
               onClick={() => onSeek(event.at_ms)}
             >
-              {fmtClock(event.at_ms)}
+              {stamp(event.at_ms)}
             </button>
             <div className="event-body conversation-head">
               <span className="conversation-label">Conversation</span>
@@ -363,14 +424,14 @@ export default function Timeline({
               title="Listen from here"
               onClick={() => onSeek(event.at_ms)}
             >
-              {fmtClock(event.at_ms)}
+              {stamp(event.at_ms)}
             </button>
             <div className="event-body chips">
               <span className="chip strong" title={describeSpan(event)}>
                 {event.label}
               </span>
               <span className="row-dim">
-                {fmtClock(event.start_ms)}–{fmtClock(event.end_ms)} ·{" "}
+                {stamp(event.start_ms)}–{stamp(event.end_ms)} ·{" "}
                 {fmtClock(event.end_ms - event.start_ms)}
               </span>
             </div>
@@ -396,7 +457,7 @@ export default function Timeline({
               title="Listen from here"
               onClick={() => onSeek(Math.max(0, first.at_ms))}
             >
-              {fmtClock(Math.max(0, first.at_ms))}
+              {stamp(Math.max(0, first.at_ms))}
             </button>
             <div className="event-body">
               <button
@@ -416,7 +477,7 @@ export default function Timeline({
               {run.length > 1 && (
                 <span className="row-dim">
                   {" "}{fmtCoords(first)} → {fmtCoords(last)} ·{" "}
-                  {fmtClock(Math.max(0, first.at_ms))}–{fmtClock(Math.max(0, last.at_ms))}
+                  {stamp(Math.max(0, first.at_ms))}–{stamp(Math.max(0, last.at_ms))}
                 </span>
               )}
               {run.length === 1 && first.accuracy_m != null && (
@@ -431,7 +492,7 @@ export default function Timeline({
                         title="Listen from here"
                         onClick={() => onSeek(Math.max(0, point.at_ms))}
                       >
-                        {fmtClock(Math.max(0, point.at_ms))}
+                        {stamp(Math.max(0, point.at_ms))}
                       </button>{" "}
                       {describePoint(point)}
                     </div>
@@ -453,7 +514,7 @@ export default function Timeline({
         return (
           <div key={key} ref={flash ? flashRef : undefined} className={`event visual ${flash ? "flash" : ""}`}>
             <button className="event-time" title="Listen from here" onClick={() => onSeek(at)}>
-              {fmtClock(at)}
+              {stamp(at)}
             </button>
             <div className="event-body gallery">
               {run.map((image) => (
@@ -461,7 +522,7 @@ export default function Timeline({
                   key={image.segment_id}
                   className="thumb"
                   title={`${fmtWallTime(image.captured_at)} · open`}
-                  onClick={() => onOpenImage?.(image.segment_id)}
+                  onClick={() => openImage(image.segment_id)}
                 >
                   {imageThumbUrl(image) ? (
                     <img
@@ -482,14 +543,14 @@ export default function Timeline({
         // Drawn in the gutter alongside the rows it spans, not as a row.
         return null
       case "session-start":
-        if (hidden.has("marker")) return null
+        if (stitched || hidden.has("marker")) return null
         return (
           <div key={key} className="event marker">
             Session started
           </div>
         )
       case "session-end":
-        if (hidden.has("marker")) return null
+        if (stitched || hidden.has("marker")) return null
         return (
           <div key={key} className="event marker">
             session ended · {fmtClock(event.at_ms)}
@@ -511,9 +572,11 @@ export default function Timeline({
 
   return (
     <>
-      <div className="timeline-toolbar">
-        <TimelineFilter hidden={hidden} onChange={onHiddenChange} />
-      </div>
+      {!stitched && onHiddenChange && (
+        <div className="timeline-toolbar">
+          <TimelineFilter hidden={hidden} onChange={onHiddenChange} />
+        </div>
+      )}
       <div
         className="timeline-wrap"
         ref={wrapRef}
@@ -528,7 +591,7 @@ export default function Timeline({
           />
         )}
       <div className="timeline">
-        {fromMs !== null && fromMs > 0 && (
+        {!stitched && fromMs !== null && fromMs > 0 && (
           <button
             className="btn ghost full"
             onClick={() => {
@@ -542,7 +605,7 @@ export default function Timeline({
           </button>
         )}
         {rendered.every((node) => node === null) ? (
-          <div className="empty">
+          stitched ? null : <div className="empty">
             {allFilteredOut
               ? "Everything here is hidden by the filter."
               : "Nothing on the timeline yet. Processing may still be running."}
@@ -550,7 +613,8 @@ export default function Timeline({
         ) : (
           tagged
         )}
-        {hasMore && (
+        {hasMore && stitched && <div ref={moreRef} className="timeline-more" />}
+        {hasMore && !stitched && (
           <button
             className="btn ghost full"
             onClick={() => load(events.length, fromMs)}
@@ -561,6 +625,15 @@ export default function Timeline({
         )}
       </div>
       </div>
+      {lightboxIndex !== null && (
+        <ImageLightbox
+          images={images}
+          index={lightboxIndex}
+          onIndex={setLightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onSeek={onSeek}
+        />
+      )}
       {playing && (
         <VideoLightbox
           clip={playing.clip}
