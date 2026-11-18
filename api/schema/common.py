@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 T = TypeVar("T")
 
 MAX_LIMIT = 200
+MAX_TIMELINE_LIMIT = 5000
 
 
 class PageParams(BaseModel):
@@ -22,6 +23,13 @@ class PageParams(BaseModel):
     def probe_limit(self) -> int:
         """One row more than asked for; ``Page.build`` trims it into ``has_more``."""
         return self.limit + 1
+
+
+class TimelinePageParams(PageParams):
+    """Paging for the event timeline, whose pages may be large: each request
+    assembles the whole session, so fewer, bigger pages are far cheaper."""
+
+    limit: Annotated[int, Query(ge=1, le=MAX_TIMELINE_LIMIT)] = 50
 
 
 class RangeParams(BaseModel):

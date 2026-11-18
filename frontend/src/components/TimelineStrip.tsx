@@ -34,6 +34,7 @@ import SpeakerChip from "./SpeakerChip"
 // overlay re-renders per frame.
 
 const RULER_H = 24
+const VOICE_LANES_SHOWN = 10
 const LANE_H = 28
 const TICK_TARGET_PX = 90
 const TICK_STEPS_MS = [
@@ -63,11 +64,17 @@ type Tooltip = {
   image?: string
 }
 
-function buildLanes(events: TimelineEvent[]): Lane[] {
+function buildLanes(
+  events: TimelineEvent[],
+  scopeOf?: (event: TranscriptEvent) => string,
+): Lane[] {
   const lanes = new Map<string, Lane>()
   for (const event of events) {
     if (event.type !== "transcript") continue
-    const key = event.speaker_id ?? (event.speaker ? `local:${event.speaker}` : "unknown")
+    // Unnamed voices are only distinct within one recording.
+    const scope = scopeOf ? `${scopeOf(event)}:` : ""
+    const key =
+      event.speaker_id ?? (event.speaker ? `local:${scope}${event.speaker}` : `unknown:${scope}`)
     let lane = lanes.get(key)
     if (!lane) {
       lane = {
@@ -120,9 +127,14 @@ export default function TimelineStrip({
   mapOpen,
   onMapToggle,
   onOpenImage,
+  spanMs,
+  offsetMs = 0,
+  fmtTime = fmtClock,
+  scopeOf,
+  bands,
 }: {
   events: TimelineEvent[]
-  truncated: boolean
+  truncated?: boolean
   audioEl: HTMLAudioElement | null
   follow: boolean
   onFollowChange: (follow: boolean) => void
@@ -131,6 +143,15 @@ export default function TimelineStrip({
   mapOpen?: boolean
   onMapToggle?: () => void
   onOpenImage?: (segmentId: string) => void
+  // A fixed width in ms (several recordings on one axis) instead of the audio's.
+  spanMs?: number
+  // Where the playing audio starts on the strip's axis.
+  offsetMs?: number
+  // `coarse` labels ruler ticks a minute or more apart.
+  fmtTime?: (ms: number, coarse?: boolean) => string
+  scopeOf?: (event: TranscriptEvent) => string
+  // Stretches holding a recording, shaded behind the lanes.
+  bands?: { startMs: number; endMs: number }[]
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const [zoom, setZoom] = useState(1)
@@ -142,8 +163,13 @@ export default function TimelineStrip({
   const userScrollUntil = useRef(0)
 
   const [showAllSounds, setShowAllSounds] = useState(false)
+  const [showAllVoices, setShowAllVoices] = useState(false)
 
-  const lanes = useMemo(() => buildLanes(events), [events])
+  const allLanes = useMemo(() => buildLanes(events, scopeOf), [events, scopeOf])
+  const lanes = useMemo(
+    () => (showAllVoices ? allLanes : allLanes.slice(0, VOICE_LANES_SHOWN)),
+    [allLanes, showAllVoices],
+  )
   const conversations = useMemo(
     () => events.filter((e): e is ConversationEvent => e.type === "conversation"),
     [events],
@@ -166,16 +192,18 @@ export default function TimelineStrip({
   // sessions the span tier hasn't reached, so nothing regresses to blank.
   const showTagLane = soundLanes.length === 0 && tagBlocks.length > 0
 
-  const audioDurationMs = useAudioDuration(audioEl)
+  const audioDurationMs = useAudioDuration(spanMs === undefined ? audioEl : null)
   const durationMs = useMemo(() => {
+    if (spanMs !== undefined) return spanMs
     let end = audioDurationMs ?? 0
     for (const event of events) {
       end = Math.max(end, event.at_ms, "end_ms" in event ? event.end_ms : 0)
     }
     return end
-  }, [events, audioDurationMs])
+  }, [events, audioDurationMs, spanMs])
 
-  const maxZoom = Math.min(64, Math.max(4, Math.round(durationMs / 15_000)))
+  // Deep enough to see about a minute across, however long the span.
+  const maxZoom = Math.min(1024, Math.max(4, Math.round(durationMs / 60_000)))
 
   useEffect(() => {
     const el = scrollRef.current
@@ -266,10 +294,20 @@ export default function TimelineStrip({
             />
           ))}
         </div>
+        {bands?.map((band) => (
+          <div
+            key={band.startMs}
+            className="strip-band"
+            style={{
+              left: `${(band.startMs / durationMs) * 100}%`,
+              width: `${(Math.max(0, band.endMs - band.startMs) / durationMs) * 100}%`,
+            }}
+          />
+        ))}
         <div className="strip-ruler" style={{ height: RULER_H }}>
           {ticks.map((t) => (
             <span key={t} className="strip-tick" style={{ left: `${(t / durationMs) * 100}%` }}>
-              {fmtClock(t)}
+              {fmtTime(t, step >= 60_000)}
             </span>
           ))}
         </div>
@@ -298,7 +336,7 @@ export default function TimelineStrip({
                     showBlockTip(e, {
                       color: categoryColor(colorKey),
                       title: laneName,
-                      time: `${fmtClock(block.start_ms)}–${fmtClock(block.end_ms)}`,
+                      time: `${fmtTime(block.start_ms)}–${fmtTime(block.end_ms)}`,
                       text: block.text,
                     })
                   }
@@ -339,7 +377,7 @@ export default function TimelineStrip({
                     showBlockTip(e, {
                       color: categoryColor(colorKey),
                       title: lane.label,
-                      time: `${fmtClock(span.start_ms)}–${fmtClock(span.end_ms)}`,
+                      time: `${fmtTime(span.start_ms)}–${fmtTime(span.end_ms)}`,
                       text: describeSpan(span),
                     })
                   }
@@ -367,7 +405,7 @@ export default function TimelineStrip({
                   showBlockTip(e, {
                     color: null,
                     title: block.labels.map((l) => l.label).join(" · "),
-                    time: `${fmtClock(block.start_ms)}–${fmtClock(block.end_ms)}`,
+                    time: `${fmtTime(block.start_ms)}–${fmtTime(block.end_ms)}`,
                     text: null,
                   })
                 }
@@ -394,7 +432,7 @@ export default function TimelineStrip({
                   showBlockTip(e, {
                     color: null,
                     title: "Location",
-                    time: fmtClock(Math.max(0, point.at_ms)),
+                    time: fmtTime(Math.max(0, point.at_ms)),
                     text: describePoint(point),
                   })
                 }
@@ -428,8 +466,8 @@ export default function TimelineStrip({
                       color: null,
                       title: isImage ? "image" : "video",
                       time: isImage
-                        ? fmtClock(at)
-                        : `${fmtClock(at)}–${fmtClock(Math.max(0, v.end_ms))}`,
+                        ? fmtTime(at)
+                        : `${fmtTime(at)}–${fmtTime(Math.max(0, v.end_ms))}`,
                       text: null,
                       image: isImage ? imageThumbUrl(v) : undefined,
                     })
@@ -453,6 +491,8 @@ export default function TimelineStrip({
     durationMs,
     viewportW,
     zoom,
+    bands,
+    fmtTime,
     onSeek,
     showBlockTip,
     hideTip,
@@ -460,7 +500,7 @@ export default function TimelineStrip({
 
   if (
     durationMs <= 0 ||
-    (lanes.length === 0 &&
+    (allLanes.length === 0 &&
       soundLanes.length === 0 &&
       tagBlocks.length === 0 &&
       points.length === 0 &&
@@ -481,6 +521,17 @@ export default function TimelineStrip({
     <div className="strip">
       <div className="strip-toolbar">
         <span className="strip-title">{truncated && "Showing the first part"}</span>
+        {allLanes.length > VOICE_LANES_SHOWN && (
+          <button
+            className="chip as-button"
+            title="Show every voice, not just those who spoke most"
+            onClick={() => setShowAllVoices((v) => !v)}
+          >
+            {showAllVoices
+              ? `Top ${VOICE_LANES_SHOWN} voices`
+              : `+${allLanes.length - VOICE_LANES_SHOWN} more voices`}
+          </button>
+        )}
         {soundLanes.length > SOUND_LANES_SHOWN && (
           <button
             className="chip as-button"
@@ -525,7 +576,7 @@ export default function TimelineStrip({
           </button>
           <button
             className="btn ghost slim"
-            title="Fit the whole session"
+            title="Fit everything"
             onClick={() => {
               setZoom(1)
               if (scrollRef.current) scrollRef.current.scrollLeft = 0
@@ -631,6 +682,8 @@ export default function TimelineStrip({
             {canvasContent}
             <PlayheadOverlay
               audio={audioEl}
+              offsetMs={offsetMs}
+              fmtTime={fmtTime}
               durationMs={durationMs}
               follow={follow}
               scrollRef={scrollRef}
@@ -662,6 +715,8 @@ export default function TimelineStrip({
 // yielding to any scroll the user made in the last couple of seconds.
 function PlayheadOverlay({
   audio,
+  offsetMs,
+  fmtTime,
   durationMs,
   follow,
   scrollRef,
@@ -669,13 +724,16 @@ function PlayheadOverlay({
   userScrollUntil,
 }: {
   audio: HTMLAudioElement | null
+  offsetMs: number
+  fmtTime: (ms: number) => string
   durationMs: number
   follow: boolean
   scrollRef: RefObject<HTMLDivElement | null>
   programmaticScroll: RefObject<boolean>
   userScrollUntil: RefObject<number>
 }) {
-  const head = usePlayhead(audio, "smooth")
+  const playhead = usePlayhead(audio, "smooth")
+  const head = { ...playhead, ms: playhead.ms + offsetMs }
 
   useEffect(() => {
     if (!follow || !head.playing) return
@@ -693,7 +751,7 @@ function PlayheadOverlay({
   const frac = Math.max(0, Math.min(1, head.ms / durationMs))
   return (
     <div className="strip-playhead" style={{ left: `${frac * 100}%` }}>
-      <span className="strip-playhead-time">{fmtClock(head.ms)}</span>
+      <span className="strip-playhead-time">{fmtTime(head.ms)}</span>
     </div>
   )
 }

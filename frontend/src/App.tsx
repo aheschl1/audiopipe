@@ -29,9 +29,7 @@ import { ReadOnlyContext } from "./readOnly"
 import { DEMO_EMAIL } from "./demo"
 import { preloadMapLibre } from "./map/trackMap"
 import SearchView from "./components/SearchView"
-import SessionList from "./components/SessionList"
-import SessionView from "./components/SessionView"
-import TimelinePage from "./components/TimelinePage"
+import TimelinePage, { recordingRange } from "./components/TimelinePage"
 import SpeakerMap from "./components/SpeakerMap"
 import SpeakersView from "./components/SpeakersView"
 import { useSearchParam } from "./useParam"
@@ -73,21 +71,25 @@ function useNav() {
   return { openSession, openAt, openAb, openMoment, back }
 }
 
+// A recording's own page is the timeline scoped to it.
 function SessionRoute() {
   const { id = "" } = useParams()
   const [params] = useSearchParams()
-  const { openSession, openAb, back } = useNav()
-  const t = Number(params.get("t"))
-  return (
-    <SessionView
-      key={id}
-      sessionId={id}
-      seekMs={params.has("t") && Number.isFinite(t) ? t : undefined}
-      onBack={() => back("/")}
-      onOpenSession={openSession}
-      onAb={openAb}
-    />
-  )
+  const navigate = useNavigate()
+  useEffect(() => {
+    const t = Number(params.get("t"))
+    void api
+      .GET("/v1/sessions/{session_id}", { params: { path: { session_id: id } } })
+      .then(({ data }) =>
+        navigate(
+          data
+            ? `/timeline${recordingRange(data, params.has("t") && Number.isFinite(t) ? t : undefined)}`
+            : "/timeline",
+          { replace: true },
+        ),
+      )
+  }, [id, params, navigate])
+  return null
 }
 
 function AutomationRoute() {
@@ -229,7 +231,6 @@ export default function App() {
   const wide =
     location.pathname === "/" ||
     location.pathname === "/map" ||
-    location.pathname.startsWith("/sessions/") ||
     location.pathname.startsWith("/moments/") ||
     location.pathname === "/speakers/map"
 
@@ -289,7 +290,7 @@ export default function App() {
           <Route path="/moments" element={<MomentsPage />} />
           <Route path="/moments/:id" element={<MomentRoute />} />
           <Route path="/timeline" element={<TimelinePage />} />
-          <Route path="/sessions" element={<SessionList onOpen={openSession} />} />
+          <Route path="/sessions" element={<Navigate to="/timeline" replace />} />
           <Route path="/sessions/:id" element={<SessionRoute />} />
           <Route path="/search" element={<SearchView onOpen={openAt} onOpenRecording={openSession} />} />
           <Route path="/speakers" element={<SpeakersPage />} />

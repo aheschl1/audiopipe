@@ -13,16 +13,14 @@ import { audible, describeSpan } from "../sounds"
 import { clipUrl, fmtWallTime, imageEvents, imageThumbUrl } from "../visual"
 import ImageLightbox from "./ImageLightbox"
 import SpeakerChip from "./SpeakerChip"
-import TimelineFilter, { type EventKind } from "./TimelineFilter"
+import { type EventKind } from "./TimelineFilter"
 import VideoGutter from "./VideoGutter"
 import VideoLightbox from "./VideoLightbox"
 
-const PAGE = 200
+// Rows render in chunks as the end of the list nears; long recordings hold thousands.
+const CHUNK = 300
 // Frames that carry no content of their own.
 const QUIET = new Set(["session-start", "session-end", "speech-start", "speech-end"])
-// Deep links load the timeline from a little before the target moment, so
-// the interesting event is on the first page even in a long session.
-const FOCUS_LEAD_MS = 15_000
 
 function eventKey(event: TimelineEvent, index: number): string {
   const source =
@@ -34,77 +32,81 @@ function eventKey(event: TimelineEvent, index: number): string {
   return `${source}-${event.type}-${event.at_ms}-${index}`
 }
 
-// Renders the session's event stream. The union is open by contract —
-// unknown event types from future tiers are silently skipped (default
-// branch), never an error.
+/** True when a recording's events hold anything beyond its frames. */
+export function hasContent(events: TimelineEvent[]): boolean {
+  return events.some((event) => !QUIET.has(event.type))
+}
+
+// Renders one recording's event stream with wall-clock times. The union is
+// open by contract — unknown event types from future tiers are silently
+// skipped (default branch), never an error.
 export default function Timeline({
   sessionId,
+  startedAt,
+  events: all,
   onSeek,
   focusMs,
-  activeId: activeIdProp,
   playheadMs,
   follow,
-  refreshKey,
   onSpeakersChanged,
-  onOpenImage,
+  onEdited,
   hidden,
-  onHiddenChange,
-  stitched,
+  onDone,
 }: {
   sessionId: string
+  startedAt: string
+  events: TimelineEvent[]
   onSeek: (ms: number) => void
+  // Scroll to and flash the first substantive event at/after this moment.
   focusMs?: number
-  // `artifact_id + start_ms` of the utterance under the playhead, if any.
-  activeId?: string | null
-  // Alternative to `activeId`: the playhead, matched against this timeline's own rows.
+  // Session-relative playhead; highlights the utterance under it.
   playheadMs?: number
   // When true (playing + follow mode), the active row keeps itself in view.
   follow?: boolean
-  refreshKey?: number
   onSpeakersChanged?: () => void
-  onOpenImage?: (segmentId: string) => void
+  onEdited?: () => void
   hidden: Set<EventKind>
-  onHiddenChange?: (hidden: Set<EventKind>) => void
-  // One recording among several on the cross-session timeline: wall-clock
-  // times, no toolbar or session markers, clipped to a window, and paged by
-  // scrolling instead of a button. `onDone` fires once every page is loaded.
-  stitched?: {
-    startedAt: string
-    fromMs: number | null
-    toMs: number | null
-    onDone: (hasContent: boolean) => void
-  }
+  // Fires once every row is rendered, so the next recording can follow.
+  onDone?: () => void
 }) {
-  const [events, setEvents] = useState<TimelineEvent[] | null>(null)
-  const [hasMore, setHasMore] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [fromMs, setFromMs] = useState<number | null>(
-    stitched ? stitched.fromMs : focusMs !== undefined ? Math.max(0, focusMs - FOCUS_LEAD_MS) : null,
+  const focusIndex = useMemo(
+    () =>
+      focusMs === undefined
+        ? -1
+        : all.findIndex(
+            (event) =>
+              (event.type === "transcript" || event.type === "audio-tag") &&
+              !hidden.has(event.type) &&
+              event.at_ms >= focusMs,
+          ),
+    [all, focusMs, hidden],
   )
-  const toMs = stitched?.toMs ?? null
-  const isStitched = stitched !== undefined
+  const [limit, setLimit] = useState(() => Math.max(CHUNK, focusIndex + CHUNK))
+  const events = useMemo(() => all.slice(0, limit), [all, limit])
+  const hasMore = all.length > limit
+  // Corrections show at once; the refetch they trigger catches the rest up.
+  const [edits, setEdits] = useState<Map<string, string>>(new Map())
   const [flashKey, setFlashKey] = useState<string | null>(null)
   const flashed = useRef(false)
   // Location runs render collapsed; a click on the head row expands one.
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set())
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
-  const images = useMemo(() => imageEvents(events ?? []), [events])
+  const images = useMemo(() => imageEvents(all), [all])
   const openImage = useCallback(
     (segmentId: string) => {
-      if (onOpenImage) return onOpenImage(segmentId)
       const index = images.findIndex((image) => image.segment_id === segmentId)
       if (index >= 0) setLightboxIndex(index)
     },
-    [onOpenImage, images],
+    [images],
   )
   const activeId = useMemo(() => {
-    if (activeIdProp !== undefined || playheadMs === undefined || !events) return activeIdProp
+    if (playheadMs === undefined) return null
     const hit = events.find(
       (e): e is TranscriptEvent =>
         e.type === "transcript" && playheadMs >= e.start_ms && playheadMs < e.end_ms,
     )
     return hit ? hit.artifact_id + hit.start_ms : null
-  }, [activeIdProp, playheadMs, events])
+  }, [playheadMs, events])
   // Inline transcript correction; keyed like the rows so only one is open.
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState("")
@@ -116,7 +118,7 @@ export default function Timeline({
     () =>
       hidden.has("video-clip")
         ? []
-        : (events ?? []).filter((e): e is VideoClipEvent => e.type === "video-clip"),
+        : events.filter((e): e is VideoClipEvent => e.type === "video-clip"),
     [events, hidden],
   )
   const openClip = useCallback(
@@ -127,116 +129,42 @@ export default function Timeline({
     if (clips.length === 0) setGutterW(0)
   }, [clips.length])
 
-  const load = useCallback(
-    async (offset: number, windowStart: number | null) => {
-      setBusy(true)
-      const { data } = await api.GET("/v1/sessions/{session_id}/timeline", {
-        params: {
-          path: { session_id: sessionId },
-          query: {
-            limit: PAGE,
-            offset,
-            ...(windowStart !== null ? { from_ms: windowStart } : {}),
-            ...(toMs !== null ? { to_ms: toMs } : {}),
-          },
-        },
-      })
-      setBusy(false)
-      if (!data) return
-      setHasMore(data.has_more)
-      setEvents((prev) => (offset === 0 ? data.items : [...(prev ?? []), ...data.items]))
-    },
-    [sessionId, toMs],
-  )
-
   useEffect(() => {
-    void load(0, fromMs)
-  }, [load, fromMs])
+    if (!hasMore) onDone?.()
+  }, [hasMore, onDone])
 
-  // After a speaker is labeled/merged, re-pull everything currently on
-  // screen (not just page one) so names update without losing scroll depth.
-  const loadedCount = useRef(0)
-  useEffect(() => {
-    loadedCount.current = events?.length ?? 0
-  }, [events])
-  const seenRefresh = useRef(refreshKey)
-  useEffect(() => {
-    if (refreshKey === undefined || refreshKey === seenRefresh.current) return
-    seenRefresh.current = refreshKey
-    void (async () => {
-      const target = Math.max(PAGE, loadedCount.current)
-      const all: TimelineEvent[] = []
-      let more = false
-      while (all.length < target) {
-        const { data } = await api.GET("/v1/sessions/{session_id}/timeline", {
-          params: {
-            path: { session_id: sessionId },
-            query: {
-              limit: PAGE,
-              offset: all.length,
-              ...(fromMs !== null ? { from_ms: fromMs } : {}),
-              ...(toMs !== null ? { to_ms: toMs } : {}),
-            },
-          },
-        })
-        if (!data) break
-        all.push(...data.items)
-        more = data.has_more
-        if (!data.has_more) break
-      }
-      setEvents(all)
-      setHasMore(more)
-    })()
-  }, [refreshKey, sessionId, fromMs, toMs])
-
-  const onDone = stitched?.onDone
-  useEffect(() => {
-    if (events && !hasMore) onDone?.(events.some((e) => !QUIET.has(e.type)))
-  }, [events, hasMore, onDone])
-
-  // Stitched recordings page by scrolling: the next page loads as the end nears.
+  // The next chunk renders as the end of the list nears.
   const moreRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     const node = moreRef.current
-    if (!isStitched || !node || !hasMore || busy || !events) return
+    if (!node || !hasMore) return
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) void load(events.length, fromMs)
+        if (entries.some((entry) => entry.isIntersecting)) setLimit((n) => n + CHUNK)
       },
-      { rootMargin: "600px" },
+      { rootMargin: "800px" },
     )
     observer.observe(node)
     return () => observer.disconnect()
-  }, [isStitched, hasMore, busy, events, load, fromMs])
+  }, [hasMore, limit])
 
-  const stamp = (ms: number) =>
-    stitched ? fmtWallTime(new Date(Date.parse(stitched.startedAt) + ms).toISOString()) : fmtClock(ms)
+  const started = Date.parse(startedAt)
+  const stamp = (ms: number) => fmtWallTime(new Date(started + ms).toISOString())
 
-  // Flash-and-scroll the first substantive event at/after the focus moment,
-  // once per deep link.
+  // Flash-and-scroll the focus event once.
   useEffect(() => {
-    if (focusMs === undefined || flashed.current || !events) return
-    const index = events.findIndex(
-      (event) =>
-        (event.type === "transcript" || event.type === "audio-tag") &&
-        event.at_ms >= focusMs,
-    )
-    if (index >= 0) {
-      flashed.current = true
-      setFlashKey(eventKey(events[index]!, index))
-    }
-  }, [events, focusMs])
+    if (focusIndex < 0 || flashed.current) return
+    flashed.current = true
+    setFlashKey(eventKey(all[focusIndex]!, focusIndex))
+  }, [all, focusIndex])
 
   const flashRef = useCallback((node: HTMLDivElement | null) => {
     node?.scrollIntoView({ block: "center", behavior: "smooth" })
   }, [])
 
-  // Save a transcript correction: the row updates in place for immediate
-  // feedback, then the shared refresh re-pulls so the strip (and any other
-  // consumer of the session's events) serves the same text.
   const saveEdit = async (event: TranscriptEvent) => {
     const text = editDraft.trim()
-    if (!text || text === event.text) {
+    if (!text || text === (edits.get(event.artifact_id) ?? event.text)) {
       setEditingKey(null)
       return
     }
@@ -247,12 +175,9 @@ export default function Timeline({
     })
     setEditBusy(false)
     if (!data) return // keep the editor open so the correction isn't lost
-    setEvents(
-      (prev) =>
-        prev?.map((e) => (e === event ? { ...e, text, chars: text.length } : e)) ?? prev,
-    )
+    setEdits((prev) => new Map(prev).set(event.artifact_id, text))
     setEditingKey(null)
-    onSpeakersChanged?.()
+    onEdited?.()
   }
 
   // Follow mode: as playback crosses into a new utterance, nudge its row
@@ -264,21 +189,13 @@ export default function Timeline({
       ?.scrollIntoView({ block: "nearest", behavior: "smooth" })
   }, [follow, activeId])
 
-  if (!events)
-    return stitched ? null : (
-      <div className="list">
-        {[36, 52, 36, 68, 36].map((height, i) => (
-          <div key={i} className="skeleton" style={{ height }} />
-        ))}
-      </div>
-    )
-
   const rendered = events.map((event, index) => {
     const key = eventKey(event, index)
     const flash = key === flashKey
     switch (event.type) {
       case "transcript": {
         if (hidden.has("transcript")) return null
+        const text = edits.get(event.artifact_id) ?? event.text
         const active = activeId != null && activeId === event.artifact_id + event.start_ms
         const interjection = event.interjection_of != null
         return (
@@ -340,12 +257,12 @@ export default function Timeline({
                 </form>
               ) : (
                 <>
-                  <span className="transcript-text">{event.text}</span>
+                  <span className="transcript-text">{text}</span>
                   <button
                     className="btn ghost slim event-edit"
                     title="Correct this transcript"
                     onClick={() => {
-                      setEditDraft(event.text)
+                      setEditDraft(text)
                       setEditingKey(key)
                     }}
                   >
@@ -543,19 +460,9 @@ export default function Timeline({
         // Drawn in the gutter alongside the rows it spans, not as a row.
         return null
       case "session-start":
-        if (stitched || hidden.has("marker")) return null
-        return (
-          <div key={key} className="event marker">
-            Session started
-          </div>
-        )
       case "session-end":
-        if (stitched || hidden.has("marker")) return null
-        return (
-          <div key={key} className="event marker">
-            session ended · {fmtClock(event.at_ms)}
-          </div>
-        )
+        // Recording boundaries are drawn by the page, between recordings.
+        return null
       default:
         // speech-start/speech-end and any future event types: not rendered.
         return null
@@ -567,16 +474,8 @@ export default function Timeline({
     node ? cloneElement(node as ReactElement<{ "data-at"?: number }>, { "data-at": events[index]!.at_ms }) : null,
   )
 
-  const allFilteredOut =
-    rendered.every((node) => node === null) && hidden.size > 0 && events.length > 0
-
   return (
     <>
-      {!stitched && onHiddenChange && (
-        <div className="timeline-toolbar">
-          <TimelineFilter hidden={hidden} onChange={onHiddenChange} />
-        </div>
-      )}
       <div
         className="timeline-wrap"
         ref={wrapRef}
@@ -590,40 +489,10 @@ export default function Timeline({
             onWidth={setGutterW}
           />
         )}
-      <div className="timeline">
-        {!stitched && fromMs !== null && fromMs > 0 && (
-          <button
-            className="btn ghost full"
-            onClick={() => {
-              flashed.current = true // keep the view where the user is
-              setFlashKey(null)
-              setEvents(null)
-              setFromMs(null)
-            }}
-          >
-            ↑ show from the beginning (jumped to {fmtClock(fromMs + FOCUS_LEAD_MS)})
-          </button>
-        )}
-        {rendered.every((node) => node === null) ? (
-          stitched ? null : <div className="empty">
-            {allFilteredOut
-              ? "Everything here is hidden by the filter."
-              : "Nothing on the timeline yet. Processing may still be running."}
-          </div>
-        ) : (
-          tagged
-        )}
-        {hasMore && stitched && <div ref={moreRef} className="timeline-more" />}
-        {hasMore && !stitched && (
-          <button
-            className="btn ghost full"
-            onClick={() => load(events.length, fromMs)}
-            disabled={busy}
-          >
-            {busy ? "Loading…" : "More"}
-          </button>
-        )}
-      </div>
+        <div className="timeline">
+          {tagged}
+          {hasMore && <div ref={moreRef} className="timeline-more" />}
+        </div>
       </div>
       {lightboxIndex !== null && (
         <ImageLightbox

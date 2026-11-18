@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useLocation, useNavigate } from "react-router"
 import { api } from "../api/client"
+import { recordingRange } from "./TimelinePage"
 
 // A CSS selector, or the first match whose text contains `text`.
 type Anchor = string | { selector: string; text: string }
@@ -54,10 +55,10 @@ const STEPS: Step[] = [
   {
     path: async () => {
       const { data } = await api.GET("/v1/sessions", { params: { query: { limit: 1, offset: 0 } } })
-      const id = data?.items[0]?.id
-      return id ? `/sessions/${id}` : "/sessions"
+      const latest = data?.items[0]
+      return `/timeline${latest ? recordingRange(latest) : ""}`
     },
-    anchor: [".timeline-wrap", ".session-main"],
+    anchor: [".strip", ".timeline-wrap"],
     text: "Every moment links back to the full recording, second by second.",
   },
   {

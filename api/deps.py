@@ -11,7 +11,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, Path, Request, status
 from fastapi.security import APIKeyCookie, HTTPAuthorizationCredentials, HTTPBearer
 
-from api.schema.common import PageParams, RangeParams
+from api.schema.common import PageParams, RangeParams, TimelinePageParams
 from database.pipe import DatabasePipe
 from database.schema.artifacts import PipelineArtifact
 from database.schema.segments import ResourceSegment
@@ -207,3 +207,4 @@ OwnedSpeaker = Annotated[Speaker, Depends(get_owned_speaker)]
 
 Paging = Annotated[PageParams, Depends()]
 Range = Annotated[RangeParams, Depends()]
+TimelinePaging = Annotated[TimelinePageParams, Depends()]

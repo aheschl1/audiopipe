@@ -30,7 +30,7 @@ from api.config import get_settings
 from resources import ResourceValidationError
 from services import segments as segment_service
 from services import stitch
-from api.deps import CurrentUser, OwnedSession, Paging, Pipe, Range
+from api.deps import CurrentUser, OwnedSession, Paging, Pipe, Range, TimelinePaging
 from api.ranges import RangeNotSatisfiable, etag_matches, parse_range
 from api.schema.artifacts import ArtifactRead
 from api.schema.common import ErrorResponse, Page
@@ -318,7 +318,7 @@ async def list_session_conversations(
 async def get_session_timeline(
     session: OwnedSession,
     pipe: Pipe,
-    paging: Paging,
+    paging: TimelinePaging,
     window: Range,
 ) -> Page[TimelineEvent]:
     """What happened when: session frames, speech starts/ends, transcripts,
@@ -340,7 +340,11 @@ async def get_session_timeline(
     streaming.
     """
     rows = await pipe.artifacts.list_for_session(
-        session.id, from_ms=window.from_ms, to_ms=window.to_ms, limit=_MAX_TIMELINE_ARTIFACTS
+        session.id,
+        from_ms=window.from_ms,
+        to_ms=window.to_ms,
+        limit=_MAX_TIMELINE_ARTIFACTS,
+        pairs=timeline_events.expandable(),
     )
     segments = [
         segment
