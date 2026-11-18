@@ -14,6 +14,7 @@ import StripView from "./TimelineStrip"
 
 const TimelineStrip = memo(StripView)
 const DAY_MS = 86_400_000
+const MIN_RECORDINGS = 2
 const SESSION_PAGE = 200
 // Each timeline request assembles the whole recording server-side, so few big pages beat many small ones.
 const EVENT_PAGE = 5000
@@ -187,7 +188,11 @@ export default function TimelinePage() {
   const [params, setParams] = useSearchParams()
   const [now, setNow] = useState(() => Date.now())
   const to = parseParam(params.get("to")) ?? now
-  const from = parseParam(params.get("from")) ?? to - DAY_MS
+  const explicitFrom = parseParam(params.get("from"))
+  // Without a chosen start: the last day, reaching back to at least the latest recordings.
+  const [fallbackFrom, setFallbackFrom] = useState<number | null>(null)
+  const from = explicitFrom ?? fallbackFrom ?? to - DAY_MS
+  const ready = explicitFrom !== null || fallbackFrom !== null
   const focusId = params.get("s")
   const focusT = Number(params.get("t"))
   const focusMs = params.has("t") && Number.isFinite(focusT) ? focusT : undefined
@@ -207,7 +212,28 @@ export default function TimelinePage() {
     stopClip()
   }, [])
 
+  const defaulted = explicitFrom === null
   useEffect(() => {
+    if (!defaulted) return
+    let stale = false
+    setFallbackFrom(null)
+    void api
+      .GET("/v1/sessions", {
+        params: { query: { limit: MIN_RECORDINGS, until: new Date(to).toISOString() } },
+      })
+      .then(({ data }) => {
+        if (stale) return
+        const oldest = data?.items.at(-1)
+        const dayAgo = to - DAY_MS
+        setFallbackFrom(oldest ? Math.min(dayAgo, Date.parse(oldest.started_at)) : dayAgo)
+      })
+    return () => {
+      stale = true
+    }
+  }, [defaulted, to])
+
+  useEffect(() => {
+    if (!ready) return
     let stale = false
     setSpans(null)
     void sessionsBetween(from, to).then((list) => {
@@ -229,7 +255,7 @@ export default function TimelinePage() {
     }
     // The focus applies on arrival only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, to])
+  }, [from, to, ready])
 
   const setRange = (key: "from" | "to", value: string) => {
     const ms = Date.parse(value)
@@ -387,7 +413,7 @@ export default function TimelinePage() {
               setParams({}, { replace: true })
             }}
           >
-            Last 24 hours
+            Latest
           </button>
         )}
       </div>
