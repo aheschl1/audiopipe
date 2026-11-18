@@ -287,6 +287,11 @@ def _attach_visuals(
     return [attach(event) for event in events]
 
 
+def expandable() -> list[tuple[str, str]]:
+    """The ``(pipeline, kind)`` pairs that contribute timeline events."""
+    return list(_EXPANDERS)
+
+
 def assemble(
     session: RecordingSession,
     artifacts: Sequence[PipelineArtifact],

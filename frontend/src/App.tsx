@@ -29,18 +29,18 @@ import { ReadOnlyContext } from "./readOnly"
 import { DEMO_EMAIL } from "./demo"
 import { preloadMapLibre } from "./map/trackMap"
 import SearchView from "./components/SearchView"
-import SessionList from "./components/SessionList"
-import SessionView from "./components/SessionView"
+import TimelinePage, { recordingRange } from "./components/TimelinePage"
 import SpeakerMap from "./components/SpeakerMap"
 import SpeakersView from "./components/SpeakersView"
 import { useSearchParam } from "./useParam"
 
 type NavItem = { to: string; label: string; match: (path: string) => boolean }
 
-// Recordings, the voice map, Places and A/B are off the nav: reached from moments, People and recordings.
+// The voice map, Places and A/B are off the nav: reached from moments, People and recordings.
 const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", match: (path) => path === "/" },
   { to: "/moments", label: "Moments", match: (path) => path.startsWith("/moments") },
+  { to: "/timeline", label: "Timeline", match: (path) => path === "/timeline" },
   { to: "/automations", label: "Automations", match: (path) => path.startsWith("/automations") },
   { to: "/search", label: "Search", match: (path) => path === "/search" },
   { to: "/speakers", label: "People", match: (path) => path.startsWith("/speakers") },
@@ -71,21 +71,25 @@ function useNav() {
   return { openSession, openAt, openAb, openMoment, back }
 }
 
+// A recording's own page is the timeline scoped to it.
 function SessionRoute() {
   const { id = "" } = useParams()
   const [params] = useSearchParams()
-  const { openSession, openAb, back } = useNav()
-  const t = Number(params.get("t"))
-  return (
-    <SessionView
-      key={id}
-      sessionId={id}
-      seekMs={params.has("t") && Number.isFinite(t) ? t : undefined}
-      onBack={() => back("/")}
-      onOpenSession={openSession}
-      onAb={openAb}
-    />
-  )
+  const navigate = useNavigate()
+  useEffect(() => {
+    const t = Number(params.get("t"))
+    void api
+      .GET("/v1/sessions/{session_id}", { params: { path: { session_id: id } } })
+      .then(({ data }) =>
+        navigate(
+          data
+            ? `/timeline${recordingRange(data, params.has("t") && Number.isFinite(t) ? t : undefined)}`
+            : "/timeline",
+          { replace: true },
+        ),
+      )
+  }, [id, params, navigate])
+  return null
 }
 
 function AutomationRoute() {
@@ -227,7 +231,6 @@ export default function App() {
   const wide =
     location.pathname === "/" ||
     location.pathname === "/map" ||
-    location.pathname.startsWith("/sessions/") ||
     location.pathname.startsWith("/moments/") ||
     location.pathname === "/speakers/map"
 
@@ -286,7 +289,8 @@ export default function App() {
           <Route path="/" element={<Overview />} />
           <Route path="/moments" element={<MomentsPage />} />
           <Route path="/moments/:id" element={<MomentRoute />} />
-          <Route path="/sessions" element={<SessionList onOpen={openSession} />} />
+          <Route path="/timeline" element={<TimelinePage />} />
+          <Route path="/sessions" element={<Navigate to="/timeline" replace />} />
           <Route path="/sessions/:id" element={<SessionRoute />} />
           <Route path="/search" element={<SearchView onOpen={openAt} onOpenRecording={openSession} />} />
           <Route path="/speakers" element={<SpeakersPage />} />

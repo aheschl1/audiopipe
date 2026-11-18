@@ -195,10 +195,12 @@ class ArtifactsRepo(BaseRepo):
         to_ms: int | None = None,
         limit: int = 50,
         offset: int = 0,
+        pairs: Sequence[tuple[str, str]] | None = None,
     ) -> list[PipelineArtifact]:
         """Artifacts of one session, timeline order (whole-session rows first).
 
-        ``from_ms``/``to_ms`` restrict to span artifacts overlapping the range.
+        ``from_ms``/``to_ms`` restrict to span artifacts overlapping the range;
+        ``pairs`` to the listed ``(pipeline, kind)`` combinations.
         """
         sql = f"SELECT {COLUMNS} FROM pipeline_artifacts WHERE session_id = %s"
         params: list = [session_id]
@@ -208,6 +210,11 @@ class ArtifactsRepo(BaseRepo):
         if kind is not None:
             sql += " AND kind = %s"
             params.append(kind)
+        if pairs is not None:
+            if not pairs:
+                return []
+            sql += " AND (pipeline, kind) IN (" + ", ".join(["(%s, %s)"] * len(pairs)) + ")"
+            params += [value for pair in pairs for value in pair]
         if from_ms is not None:
             sql += " AND end_ms > %s"
             params.append(from_ms)

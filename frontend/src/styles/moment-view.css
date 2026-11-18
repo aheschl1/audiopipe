@@ -37,14 +37,12 @@
   gap: var(--sp-1) var(--sp-3);
 }
 
-.moment-full-recording,
-.moment-full-recording .menu-trigger {
+.moment-full-recording {
   font-size: var(--fs-sm);
   color: var(--muted);
 }
 
-.moment-full-recording:hover,
-.moment-full-recording .menu-trigger:hover {
+.moment-full-recording:hover {
   color: var(--red-ink);
 }
 

@@ -1,177 +1,4 @@
-/* App layer: session view, timeline list, timeline strip, media. */
-
-/* ------------- session list */
-
-.day-group {
-  margin-bottom: var(--sp-5);
-}
-
-.day-label {
-  margin: 0 0 var(--sp-2);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--ink);
-}
-
-.session-row {
-  align-items: baseline;
-}
-
-.session-time {
-  flex: none;
-  min-width: 5.5em;
-  white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  color: var(--muted);
-}
-
-/* ------------- session view: header, strip, then transcript beside an aside */
-
-.session-view {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  grid-template-areas:
-    "head head"
-    "strip strip"
-    "body body";
-  gap: var(--sp-4) var(--sp-6);
-  padding-bottom: var(--dock-h);
-}
-
-.session-header {
-  grid-area: head;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-}
-
-.session-head-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--sp-2) var(--sp-4);
-}
-
-.session-title {
-  margin: 0;
-  font-size: var(--fs-2xl);
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--sp-3);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.session-title .badge {
-  margin-left: 0;
-}
-
-.session-head-row .page-actions {
-  margin-left: auto;
-}
-
-.session-rename {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-  flex: 1;
-}
-
-.session-rename .input {
-  font-size: var(--fs-lg);
-  min-width: min(320px, 70vw);
-}
-
-.session-sub {
-  color: var(--muted);
-  font-size: var(--fs-sm);
-}
-
-.session-view > .strip {
-  grid-area: strip;
-}
-
-.session-body {
-  grid-area: body;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: var(--sp-6);
-  align-items: start;
-}
-
-.session-main {
-  grid-column: 1;
-  grid-row: 1;
-  min-width: 0;
-}
-
-.session-aside {
-  grid-column: 2;
-  grid-row: 1;
-  position: sticky;
-  top: calc(var(--topbar-h) + var(--sp-4));
-  max-height: calc(100vh - var(--topbar-h) - var(--dock-h) - var(--sp-6));
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-5);
-  scrollbar-width: thin;
-}
-
-.session-aside:empty {
-  display: none;
-}
-
-.aside-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-}
-
-.contact-sheet {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--sp-1);
-}
-
-.contact {
-  position: relative;
-  aspect-ratio: 4 / 3;
-  padding: 0;
-  border: var(--bw) solid var(--line);
-  border-radius: var(--r-2);
-  overflow: hidden;
-  background: var(--sunken);
-  cursor: zoom-in;
-  transition: border-color var(--dur) var(--ease);
-}
-
-.contact:hover {
-  border-color: var(--ink);
-}
-
-.contact img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.contact-time {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  padding: 0 var(--sp-1);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  line-height: 16px;
-  color: var(--ink);
-  background: var(--surface);
-  border-top-right-radius: var(--r-1);
-}
+/* App layer: the timeline page, its list and strip, media. */
 
 /* The player docks to the bottom edge so it is always in reach while reading. */
 .player-dock {
@@ -216,24 +43,6 @@
   font-size: var(--fs-sm);
 }
 
-@media (max-width: 1099px) {
-  .session-view,
-  .session-body {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .session-aside {
-    position: static;
-    max-height: none;
-    overflow: visible;
-  }
-
-  .session-photos {
-    display: none;
-  }
-}
-
 @media (max-width: 899px) {
   .player-dock {
     left: 0;
@@ -251,13 +60,6 @@
 }
 
 /* ------------- timeline list */
-
-.timeline-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--sp-2);
-}
 
 .timeline-wrap {
   position: relative;
@@ -603,6 +405,14 @@
   min-width: 100%;
 }
 
+.strip-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--sunken);
+  pointer-events: none;
+}
+
 .strip-conversations {
   position: absolute;
   left: 0;
@@ -936,4 +746,60 @@
 
 .session-body:has(> .session-aside:empty) {
   grid-template-columns: minmax(0, 1fr);
+}
+
+/* ------------- cross-recording timeline */
+
+.timeline-page {
+  padding-bottom: var(--dock-h);
+}
+
+.range-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.range-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.recording-end {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: var(--sp-3) 0;
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.recording-end::before,
+.recording-end::after {
+  content: "";
+  flex: 1;
+  border-top: var(--bw) dashed var(--line);
+}
+
+.timeline-more {
+  height: 1px;
+}
+
+@media (max-width: 640px) {
+  .range-field {
+    flex: 1 1 100%;
+  }
+}
+
+.timeline-page .menu-pop {
+  min-width: 260px;
+  max-height: 60vh;
+  overflow-y: auto;
 }

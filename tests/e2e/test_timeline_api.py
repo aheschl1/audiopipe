@@ -117,6 +117,20 @@ async def test_timeline_orders_and_pages_events(
         offset += 2
     assert paged == items
 
+    # Timeline pages may be far larger than other listings'.
+    big = await client.get(
+        f"/v1/sessions/{session_id}/timeline",
+        params={"limit": 5000},
+        headers=account.headers,
+    )
+    assert big.json()["items"] == items
+    too_big = await client.get(
+        f"/v1/sessions/{session_id}/timeline",
+        params={"limit": 5001},
+        headers=account.headers,
+    )
+    assert too_big.status_code == 422
+
     # Ending the session appends the closing frame.
     ended = await client.post(f"/v1/sessions/{session_id}/end", headers=account.headers)
     after = await client.get(f"/v1/sessions/{session_id}/timeline", headers=account.headers)

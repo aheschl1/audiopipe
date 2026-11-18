@@ -11,7 +11,6 @@ import { Link } from "react-router"
 import { isUnnamed, personHref } from "../moments"
 import { categoryColor } from "../speakers"
 import { artifactUrl } from "../visual"
-import Menu from "./Menu"
 
 type Open = (sessionId: string, seekMs?: number) => void
 
@@ -439,44 +438,13 @@ function FiredPill({ automation: a }: { automation: MomentDetail["automations"][
   )
 }
 
-type Recording = { id: string; first: MomentItem | null; last: MomentItem | null }
-
-/** The recordings a moment draws on, with its earliest and latest item in each. */
-function recordings(moment: MomentDetail): Recording[] {
-  const per = new Map<string, Recording>()
-  for (const id of moment.session_ids) per.set(id, { id, first: null, last: null })
-  for (const item of moment.items) {
-    const e = per.get(item.session_id) ?? { id: item.session_id, first: null, last: null }
-    if (!e.first || item.start_at < e.first.start_at) e.first = item
-    if (!e.last || item.start_at > e.last.start_at) e.last = item
-    per.set(item.session_id, e)
-  }
-  return [...per.values()].sort((a, b) => (a.first?.start_at ?? "").localeCompare(b.first?.start_at ?? ""))
-}
-
-const recordingLabel = (r: Recording) =>
-  r.first && r.last
-    ? `${clock(r.first.start_at)} · ${fmtSpan(r.first.start_at, r.last.start_at)}`
-    : "Recording"
-
-/** The way out to the raw recording: a link for one, a short menu for several. */
-function FullRecording({ list, onOpen }: { list: Recording[]; onOpen: Open }) {
-  const open = (r: Recording) => onOpen(r.id, r.first?.at_ms ?? undefined)
-  if (!list.length) return null
-  if (list.length === 1)
-    return (
-      <button className="link-btn moment-full-recording" onClick={() => open(list[0]!)}>
-        Full recording ›
-      </button>
-    )
+/** The way out to the raw stream: the timeline over the moment's span. */
+function FullRecording({ moment }: { moment: MomentDetail }) {
+  const q = new URLSearchParams({ from: moment.start_at, to: moment.end_at })
   return (
-    <span className="moment-full-recording">
-      <Menu
-        label="Full recording"
-        trigger="Full recording ›"
-        items={list.map((r) => ({ label: recordingLabel(r), onSelect: () => open(r) }))}
-      />
-    </span>
+    <Link className="link-btn moment-full-recording" to={`/timeline?${q}`}>
+      Full recording ›
+    </Link>
   )
 }
 
@@ -640,7 +608,7 @@ export default function MomentView({
         <h1 className="moment-head-title">{moment.title || "Untitled moment"}</h1>
         <div className="page-meta">
           {fmtLongDay(moment.start_at)} · {clock(moment.start_at)} · {fmtSpan(moment.start_at, moment.end_at)}
-          <FullRecording list={recordings(moment)} onOpen={onOpenSession} />
+          <FullRecording moment={moment} />
         </div>
         {moment.summary && (
           <p className="moment-head-summary" title={`Written by ${moment.model}`}>
